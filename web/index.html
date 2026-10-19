@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+
+  <script>
+    // ============================================================
+    // RAIGON ART - PHOTO COLLECTION
+    // Chrome File System Access API
+    // ============================================================
+
+    let photoDirectoryHandle = null;
+    let photoObjectUrls = [];
+
+    const PHOTO_DB_NAME = 'raigon_art_photo_collection';
+    const PHOTO_STORE_NAME = 'settings';
+    const PHOTO_HANDLE_KEY = 'selected_folder';
+
+    const PHOTO_EXTENSIONS = [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.webp',
+      '.gif',
+      '.bmp',
+      '.avif'
+    ];
+
+
+    // ============================================================
+    // LOG
+    // ============================================================
+
+    function photoLog(message, data) {
+      if (data !== undefined) {
+        console.log('[PHOTO_COLLECTION_JS]', message, data);
+      } else {
+        console.log('[PHOTO_COLLECTION_JS]', message);
+      }
+    }
+
+    function photoError(message, error) {
+      console.error(
+        '[PHOTO_COLLECTION_JS]',
+        message,
+        error
+      );
+    }
+
+
+    // ============================================================
+    // IMAGE HELPERS
+    // ============================================================
+
+    function isImageFile(name) {
+      const lower = name.toLowerCase();
+
+      return PHOTO_EXTENSIONS.some(
+        extension => lower.endsWith(extension)
+      );
+    }
+
+    function revokePhotoUrls() {
+      for (const url of photoObjectUrls) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (_) {}
+      }
+
+      photoObjectUrls = [];
+    }
+
+
+    // ============================================================
+    // INDEXED DB
+    // ============================================================
+
+    function openPhotoDatabase() {
+      return new Promise((resolve, reject) => {
+
+        const request = indexedDB.open(
+          PHOTO_DB_NAME,
+          1
+        );
+
+        request.onupgradeneeded = function () {
+
+          const db = request.result;
+
+          if (!db.objectStoreNames.contains(
+            PHOTO_STORE_NAME
+          )) {
+            db.createObjectStore(
+              PHOTO_STORE_NAME
+            );
+          }
+        };
+
+        request.onsuccess = function () {
+          resolve(request.result);
+        };
+
+        request.onerror = function () {
+          reject(request.error);
+        };
+      });
+    }
+
+
+    async function savePhotoDirectoryHandle(handle) {
+
+      photoLog(
+        'STORAGE: saving folder handle:',
+        handle.name
+      );
+
+      const db =
+        await openPhotoDatabase();
+
+      return new Promise((resolve, reject) => {
+
+        const transaction =
+          db.transaction(
+            PHOTO_STORE_NAME,
+            'readwrite'
+          );
+
+        const store =
+          transaction.objectStore(
+            PHOTO_STORE_NAME
+          );
+
+        const request =
+          store.put(
+            handle,
+            PHOTO_HANDLE_KEY
+          );
+
+        request.onsuccess = function () {
+
+          photoLog(
+            'STORAGE: folder handle saved'
+          );
+
+          resolve();
+        };
+
+        request.onerror = function () {
+          reject(request.error);
+        };
+      });
+    }
+
+
+    async function getSavedPhotoDirectoryHandle() {
+
+      photoLog(
+        'STORAGE: checking saved folder...'
+      );
+
+      const db =
+        await openPhotoDatabase();
+
+      return new Promise((resolve, reject) => {
+
+        const transaction =
+          db.transaction(
+            PHOTO_STORE_NAME,
+            'readonly'
+          );
+
+        const store =
+          transaction.objectStore(
+            PHOTO_STORE_NAME
+          );
+
+        const request =
+          store.get(
+            PHOTO_HANDLE_KEY
+          );
+
+        request.onsuccess = function () {
+
+          const handle =
+            request.result || null;
+
+          if (handle) {
+
+            photoLog(
+              'STORAGE: saved folder found:',
+              handle.name
+            );
+
+          } else {
+
+            photoLog(
+              'STORAGE: no saved folder'
+            );
+          }
+
+          resolve(handle);
+        };
+
+        request.onerror = function () {
+          reject(request.error);
+        };
+      });
+    }
+
+
+    async function removeSavedPhotoDirectoryHandle() {
+
+      photoLog(
+        'STORAGE: removing saved folder'
+      );
+
+      const db =
+        await openPhotoDatabase();
+
+      return new Promise((resolve, reject) => {
+
+        const transaction =
+          db.transaction(
+            PHOTO_STORE_NAME,
+            'readwrite'
+          );
+
+        const store =
+          transaction.objectStore(
+            PHOTO_STORE_NAME
+          );
+
+        const request =
+          store.delete(
+            PHOTO_HANDLE_KEY
+          );
+
+        request.onsuccess = function () {
+          resolve();
+        };
+
+        request.onerror = function () {
+          reject(request.error);
+        };
+      });
+    }
+
+
+    // ============================================================
+    // READ DIRECTORY
+    // ============================================================
+
+    async function readPhotoDirectory() {
+
+      if (!photoDirectoryHandle) {
+        throw new Error(
+          'No photo folder selected.'
+        );
+      }
+
+      photoLog(
+        'READ: reading folder:',
+        photoDirectoryHandle.name
+      );
+
+      revokePhotoUrls();
+
+      const files = [];
+
+      for await (
+        const [name, handle]
+        of photoDirectoryHandle.entries()
+      ) {
+
+        if (handle.kind !== 'file') {
+          continue;
+        }
+
+        if (!isImageFile(name)) {
+          continue;
+        }
+
+        try {
+
+          const file =
+            await handle.getFile();
+
+          const url =
+            URL.createObjectURL(file);
+
+          photoObjectUrls.push(url);
+
+          files.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            url: url,
+          });
+
+        } catch (error) {
+
+          photoError(
+            'READ: failed to read ' + name,
+            error
+          );
+        }
+      }
+
+      files.sort((a, b) =>
+        a.name.localeCompare(
+          b.name,
+          undefined,
+          {
+            numeric: true,
+            sensitivity: 'base',
+          }
+        )
+      );
+
+      photoLog(
+        'READ: completed',
+        {
+          folder: photoDirectoryHandle.name,
+          files: files.length
+        }
+      );
+
+      return {
+        folderName:
+          photoDirectoryHandle.name,
+        files: files,
+      };
+    }
+
+
+    // ============================================================
+    // SELECT FOLDER
+    // ============================================================
+
+    window.pickPhotoDirectory = async function () {
+
+      photoLog(
+        'SELECT: picker opened'
+      );
+
+      try {
+
+        if (
+          !('showDirectoryPicker' in window)
+        ) {
+          throw new Error(
+            'Chrome Directory Picker is not supported.'
+          );
+        }
+
+        const handle =
+          await window.showDirectoryPicker({
+            mode: 'readwrite'
+          });
+
+        photoDirectoryHandle =
+          handle;
+
+        photoLog(
+          'SELECT: selected:',
+          handle.name
+        );
+
+        // Save for next time
+        await savePhotoDirectoryHandle(
+          handle
+        );
+
+        const result =
+          await readPhotoDirectory();
+
+        return JSON.stringify(result);
+
+      } catch (error) {
+
+        if (
+          error &&
+          error.name === 'AbortError'
+        ) {
+
+          photoLog(
+            'SELECT: user cancelled'
+          );
+
+          return null;
+        }
+
+        photoError(
+          'SELECT: error',
+          error
+        );
+
+        return JSON.stringify({
+          error:
+            error.message ||
+            String(error)
+        });
+      }
+    };
+
+
+    // ============================================================
+    // RESTORE SAVED FOLDER
+    // ============================================================
+
+    window.restorePhotoDirectory = async function () {
+
+      photoLog(
+        'RESTORE: checking previous folder'
+      );
+
+      try {
+
+        const handle =
+          await getSavedPhotoDirectoryHandle();
+
+        if (!handle) {
+
+          return JSON.stringify({
+            hasFolder: false
+          });
+        }
+
+        photoDirectoryHandle =
+          handle;
+
+        photoLog(
+          'RESTORE: found:',
+          handle.name
+        );
+
+
+        // --------------------------------------------------------
+        // Check existing permission
+        // --------------------------------------------------------
+
+        let permission =
+          await handle.queryPermission({
+            mode: 'readwrite'
+          });
+
+        photoLog(
+          'RESTORE: permission:',
+          permission
+        );
+
+
+        // --------------------------------------------------------
+        // If permission is already granted
+        // --------------------------------------------------------
+
+        if (permission === 'granted') {
+
+          const result =
+            await readPhotoDirectory();
+
+          return JSON.stringify({
+            hasFolder: true,
+            folderName: result.folderName,
+            files: result.files
+          });
+        }
+
+
+        // --------------------------------------------------------
+        // Permission not granted.
+        //
+        // IMPORTANT:
+        // We do NOT call requestPermission here because
+        // browser permission requests should happen from
+        // a user interaction.
+        // --------------------------------------------------------
+
+        return JSON.stringify({
+          hasFolder: true,
+          permissionRequired: true,
+          folderName: handle.name,
+          files: []
+        });
+
+      } catch (error) {
+
+        photoError(
+          'RESTORE: error',
+          error
+        );
+
+        await removeSavedPhotoDirectoryHandle();
+
+        photoDirectoryHandle =
+          null;
+
+        return JSON.stringify({
+          hasFolder: false,
+          error:
+            error.message ||
+            String(error)
+        });
+      }
+    };
+
+
+    // ============================================================
+    // REQUEST SAVED FOLDER PERMISSION
+    // ============================================================
+
+    window.requestPhotoDirectoryPermission =
+      async function () {
+
+        photoLog(
+          'PERMISSION: requesting folder access'
+        );
+
+        try {
+
+          if (!photoDirectoryHandle) {
+
+            return JSON.stringify({
+              error:
+                'No saved folder found.'
+            });
+          }
+
+          const permission =
+            await photoDirectoryHandle
+              .requestPermission({
+                mode: 'readwrite'
+              });
+
+          photoLog(
+            'PERMISSION:',
+            permission
+          );
+
+          if (permission !== 'granted') {
+
+            return JSON.stringify({
+              error:
+                'Folder permission was denied.'
+            });
+          }
+
+          const result =
+            await readPhotoDirectory();
+
+          return JSON.stringify({
+            hasFolder: true,
+            folderName:
+              result.folderName,
+            files:
+              result.files
+          });
+
+        } catch (error) {
+
+          photoError(
+            'PERMISSION: error',
+            error
+          );
+
+          return JSON.stringify({
+            error:
+              error.message ||
+              String(error)
+          });
+        }
+      };
+
+
+    // ============================================================
+    // REFRESH
+    // ============================================================
+
+    window.refreshPhotoDirectory =
+      async function () {
+
+        photoLog(
+          'REFRESH: called'
+        );
+
+        try {
+
+          if (!photoDirectoryHandle) {
+
+            return JSON.stringify({
+              error:
+                'No folder selected.'
+            });
+          }
+
+          let permission =
+            await photoDirectoryHandle
+              .queryPermission({
+                mode: 'readwrite'
+              });
+
+          if (permission !== 'granted') {
+
+            return JSON.stringify({
+              error:
+                'Folder permission is required.'
+            });
+          }
+
+          const result =
+            await readPhotoDirectory();
+
+          return JSON.stringify(result);
+
+        } catch (error) {
+
+          photoError(
+            'REFRESH: error',
+            error
+          );
+
+          return JSON.stringify({
+            error:
+              error.message ||
+              String(error)
+          });
+        }
+      };
+
+
+    // ============================================================
+    // DELETE
+    // ============================================================
+
+    window.deletePhotoFiles =
+      async function (
+        fileNamesJson
+      ) {
+
+        photoLog(
+          'DELETE: called'
+        );
+
+        try {
+
+          if (!photoDirectoryHandle) {
+
+            return JSON.stringify({
+              success: false,
+              message:
+                'No folder selected.'
+            });
+          }
+
+          const fileNames =
+            JSON.parse(
+              fileNamesJson
+            );
+
+          if (!Array.isArray(fileNames)) {
+
+            return JSON.stringify({
+              success: false,
+              message:
+                'Invalid file names.'
+            });
+          }
+
+          const permission =
+            await photoDirectoryHandle
+              .queryPermission({
+                mode: 'readwrite'
+              });
+
+          if (permission !== 'granted') {
+
+            return JSON.stringify({
+              success: false,
+              message:
+                'Folder permission is required.'
+            });
+          }
+
+          const deleted = [];
+
+          for (
+            const fileName of fileNames
+          ) {
+
+            try {
+
+              await photoDirectoryHandle
+                .removeEntry(fileName);
+
+              deleted.push(fileName);
+
+              photoLog(
+                'DELETE:',
+                fileName
+              );
+
+            } catch (error) {
+
+              photoError(
+                'DELETE failed: ' + fileName,
+                error
+              );
+            }
+          }
+
+          const result =
+            await readPhotoDirectory();
+
+          return JSON.stringify({
+            success: true,
+            folderName:
+              result.folderName,
+            files:
+              result.files,
+            deleted:
+              deleted
+          });
+
+        } catch (error) {
+
+          photoError(
+            'DELETE: error',
+            error
+          );
+
+          return JSON.stringify({
+            success: false,
+            message:
+              error.message ||
+              String(error)
+          });
+        }
+      };
+
+
+    // ============================================================
+    // DEBUG
+    // ============================================================
+
+    console.log(
+      '[PHOTO_COLLECTION_JS] Bridge loaded'
+    );
+
+    console.log(
+      'pickPhotoDirectory:',
+      typeof window.pickPhotoDirectory
+    );
+
+    console.log(
+      'restorePhotoDirectory:',
+      typeof window.restorePhotoDirectory
+    );
+
+    console.log(
+      'requestPhotoDirectoryPermission:',
+      typeof window.requestPhotoDirectoryPermission
+    );
+
+    console.log(
+      'refreshPhotoDirectory:',
+      typeof window.refreshPhotoDirectory
+    );
+
+    console.log(
+      'deletePhotoFiles:',
+      typeof window.deletePhotoFiles
+    );
+
+  </script>
+</head>
+
+<body>
+
+  <script
+    src="flutter_bootstrap.js"
+    async>
+  </script>
+
+</body>
+
+</html>

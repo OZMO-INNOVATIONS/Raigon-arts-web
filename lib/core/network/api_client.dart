@@ -12,6 +12,7 @@ class ApiClient {
   final http.Client _http;
   bool _isRefreshing = false;
   static const Duration defaultTimeout = Duration(seconds: 25);
+  static void Function()? onSessionExpired;
 
   Uri _buildUri(String path, [Map<String, dynamic>? queryParameters]) {
     final cleanPath = path.startsWith('/') ? path : '/$path';
@@ -178,6 +179,8 @@ class ApiClient {
         if (refreshed) {
           final newHeaders = _buildHeaders(requiresAuth: true);
           response = await _http.get(uri, headers: newHeaders).timeout(defaultTimeout);
+        } else {
+          onSessionExpired?.call();
         }
       }
 
@@ -206,6 +209,8 @@ class ApiClient {
           response = await _http
               .post(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
+        } else {
+          onSessionExpired?.call();
         }
       }
 
@@ -234,6 +239,8 @@ class ApiClient {
           response = await _http
               .put(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
+        } else {
+          onSessionExpired?.call();
         }
       }
 
@@ -262,6 +269,8 @@ class ApiClient {
           response = await _http
               .patch(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
+        } else {
+          onSessionExpired?.call();
         }
       }
 
@@ -287,6 +296,8 @@ class ApiClient {
           response = await _http
               .delete(uri, headers: newHeaders)
               .timeout(defaultTimeout);
+        } else {
+          onSessionExpired?.call();
         }
       }
 
@@ -334,6 +345,8 @@ class ApiClient {
               await retryRequest.send().timeout(const Duration(seconds: 60));
           final retryResponse = await http.Response.fromStream(retryStreamed);
           return _handleResponse(retryResponse);
+        } else {
+          onSessionExpired?.call();
         }
       }
 

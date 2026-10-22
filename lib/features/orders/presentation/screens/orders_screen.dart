@@ -622,9 +622,16 @@ class _OrderRowState extends State<_OrderRow> {
                   alignment: Alignment.centerLeft,
                   child: PhotoStrip(
                     count: c.photoCount,
-                    urls: c.photoUrls,
+                    urls: c.photoUrls.isNotEmpty
+                        ? c.photoUrls
+                        : [
+                            for (final f in c.frames)
+                              if (f.photoUrl != null && f.photoUrl!.isNotEmpty)
+                                f.photoUrl!,
+                          ],
                     bytes: c.photoBytes,
                     seed: c.id.hashCode,
+                    onTap: widget.onView,
                   ),
                 ),
               ),

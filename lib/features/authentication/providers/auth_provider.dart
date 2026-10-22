@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:raigon_art/core/network/api_client.dart';
 import 'package:raigon_art/core/network/auth_token_manager.dart';
 import 'package:raigon_art/features/authentication/models/auth_model.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
@@ -13,7 +14,10 @@ class AuthProvider extends ChangeNotifier {
   static const int _resendSeconds = 120;
   String? get userRole => _state.userRole;
 
-  AuthModel _state = const AuthModel();
+  AuthModel _state = AuthModel(
+    isAuthenticated: AuthTokenManager.instance.isAuthenticated,
+    userRole: AuthTokenManager.instance.currentUser?.role,
+  );
   Timer? _timer;
 
   AuthModel get state => _state;
@@ -30,6 +34,11 @@ class AuthProvider extends ChangeNotifier {
   String get timeText => _state.timeText;
 
   Future<void> _init() async {
+    ApiClient.onSessionExpired = () {
+      debugPrint('[AuthProvider] Session expired from ApiClient. Signing out...');
+      signOut();
+    };
+
     await AuthTokenManager.instance.init();
     if (AuthTokenManager.instance.isAuthenticated) {
       _update(
@@ -38,6 +47,15 @@ class AuthProvider extends ChangeNotifier {
           userRole: AuthTokenManager.instance.currentUser?.role,
         ),
       );
+
+      try {
+        final profile = await AuthService.fetchProfile();
+        if (profile != null) {
+          _update(_state.copyWith(userRole: profile.role));
+        }
+      } catch (e) {
+        debugPrint('[AuthProvider] Background profile check notice: $e');
+      }
     }
   }
 

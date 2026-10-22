@@ -8,6 +8,7 @@ import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/authentication/presentation/widgets/auth_widget.dart';
 import 'package:provider/provider.dart';
+import 'package:raigon_art/core/network/auth_token_manager.dart';
 import 'package:raigon_art/features/authentication/models/auth_model.dart';
 import 'package:raigon_art/features/authentication/providers/auth_provider.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
@@ -37,6 +38,18 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_phoneCtrl.text.isEmpty) {
       _phoneCtrl.text = AuthModel.registeredPhone;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (context.read<AuthProvider>().isAuthenticated ||
+          AuthTokenManager.instance.isAuthenticated) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRouter.dashboard,
+          (route) => false,
+        );
+      }
+    });
   }
 
   @override
@@ -197,10 +210,19 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
-      child: _buildAuthScreen(),
-    );
+    final isAuth = context.select<AuthProvider, bool>((a) => a.isAuthenticated) ||
+        AuthTokenManager.instance.isAuthenticated;
+
+    if (isAuth) {
+      return const Scaffold(
+        backgroundColor: AppColors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        ),
+      );
+    }
+
+    return _buildAuthScreen();
   }
 
   Widget _buildAuthScreen() {

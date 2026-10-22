@@ -51,7 +51,7 @@ class RaigonartApp extends StatelessWidget {
             themeMode: mode,
             theme: _theme(Brightness.light),
             darkTheme: _theme(Brightness.dark),
-            initialRoute: AppRouter.auth,
+            initialRoute: AppRouter.initialRoute,
             onGenerateRoute: AppRouter.generateRoute,
           ),
         ),

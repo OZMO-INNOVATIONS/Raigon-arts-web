@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -121,9 +122,17 @@ Future<void> showEditCustomerDialog(
 
 enum FrameMode { same, individual }
 
+class _ExistingPhotoItem {
+  _ExistingPhotoItem({required this.url, required this.name});
+  final String url;
+  final String name;
+}
+
 class _FrameEntry {
-  _FrameEntry({this.photo});
+  _FrameEntry({this.photo, this.existingUrl, this.existingName});
   PickedPhoto? photo;
+  String? existingUrl;
+  String? existingName;
   final FrameSpecData spec = FrameSpecData();
 }
 
@@ -149,6 +158,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   final _advance = TextEditingController();
   final _balance = TextEditingController();
   final List<PickedPhoto> _photos = [];
+  final List<_ExistingPhotoItem> _existingPhotos = [];
   final FrameSpecData _shared = FrameSpecData();
   final List<_FrameEntry> _entries = [];
   FrameMode _mode = FrameMode.same;
@@ -191,6 +201,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         final b = f.photoBytes;
         _entries.add(
           _FrameEntry(
+            existingUrl: f.photoUrl,
+            existingName: f.photoName,
             photo: b == null
                 ? null
                 : PickedPhoto(
@@ -202,6 +214,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         );
       }
     } else {
+      for (var i = 0; i < c.photoUrls.length; i++) {
+        final u = c.photoUrls[i];
+        if (u.trim().isNotEmpty) {
+          final n = i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
+          _existingPhotos.add(_ExistingPhotoItem(url: u, name: n));
+        }
+      }
       for (var i = 0; i < c.photoBytes.length; i++) {
         final b = c.photoBytes[i];
         _photos.add(
@@ -214,7 +233,17 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           ),
         );
       }
-      _shared.loadSpec(frames.first);
+      if (frames.isNotEmpty) {
+        _shared.loadSpec(frames.first);
+        if (frames.first.photoUrl != null &&
+            frames.first.photoUrl!.isNotEmpty &&
+            !_existingPhotos.any((e) => e.url == frames.first.photoUrl)) {
+          _existingPhotos.add(_ExistingPhotoItem(
+            url: frames.first.photoUrl!,
+            name: frames.first.photoName ?? 'Frame_Photo.webp',
+          ));
+        }
+      }
       if (c.frames.isEmpty) {
         _shared.qty.text = c.photoCount > 1 ? '1' : '${c.qty}';
       }
@@ -360,7 +389,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Future<void> _replace(_FrameEntry e) async {
     final picked = await _pick(multiple: false);
     if (!mounted || picked.isEmpty) return;
-    setState(() => e.photo = picked.first);
+    setState(() {
+      e.photo = picked.first;
+      e.existingUrl = null;
+      e.existingName = null;
+    });
   }
 
   void _removeEntry(_FrameEntry e) {
@@ -422,8 +455,31 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         ? [_shared.toSpec()]
         : [for (final e in _entries) e.spec.toSpec(e.photo)];
     final int qty = same
-        ? frames.first.qty * math.max(1, photos.length).toInt()
+        ? frames.first.qty *
+            math.max(1, _existingPhotos.length + photos.length).toInt()
         : frames.fold<int>(0, (a, f) => a + f.qty);
+
+    final remainingUrls = same
+        ? [for (final e in _existingPhotos) e.url]
+        : [
+            for (final e in _entries)
+              if (e.photo == null &&
+                  e.existingUrl != null &&
+                  e.existingUrl!.isNotEmpty)
+                e.existingUrl!,
+          ];
+    final remainingNames = same
+        ? [for (final e in _existingPhotos) e.name]
+        : [
+            for (final e in _entries)
+              if (e.photo == null &&
+                  e.existingName != null &&
+                  e.existingName!.isNotEmpty)
+                e.existingName!,
+          ];
+    final newPhotoNames = [for (final p in photos) p.name];
+    final allPhotoNames = [...remainingNames, ...newPhotoNames];
+    final totalPhotoCount = remainingUrls.length + photos.length;
 
     final customer = Customer(
       id:
@@ -435,8 +491,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       altPhone: _alt.text.trim(),
       address: _address.text.trim(),
       pincode: _pin.text.trim(),
-      photoNames: [for (final p in photos) p.name],
-      photoCount: photos.length,
+      photoNames: allPhotoNames.isNotEmpty
+          ? allPhotoNames
+          : (widget.existing?.photoNames ?? const []),
+      photoCount: totalPhotoCount > 0
+          ? totalPhotoCount
+          : (widget.existing?.photoCount ?? 0),
       photoBytes: [for (final p in photos) p.bytes],
       frameSize: _join([for (final f in frames) f.sizeLabel]),
       frameType: _join([for (final f in frames) f.frameType]),
@@ -447,7 +507,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       status: _status,
       orderDate: _orderDate,
       expectedDelivery: _delivery,
-      photoUrls: widget.existing?.photoUrls ?? const [],
+      photoUrls: remainingUrls,
+      photoSizeLabels: widget.existing?.photoSizeLabels ?? const [],
       frames: frames,
     );
     Navigator.of(context).pop(customer);
@@ -936,21 +997,91 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             ),
           ),
         ),
-        if (_photos.isNotEmpty) ...[
+        if (_existingPhotos.isNotEmpty || _photos.isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(
-            '${_photos.length} photos selected',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.gold,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.photo_library, size: 16, color: AppColors.gold),
+              const SizedBox(width: 8),
+              Text(
+                '${_existingPhotos.length + _photos.length} photos attached'
+                '${_existingPhotos.isNotEmpty && _photos.isNotEmpty ? ' (${_existingPhotos.length} existing, ${_photos.length} new)' : ''}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.gold,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 14,
             runSpacing: 14,
             children: [
+              for (var i = 0; i < _existingPhotos.length; i++)
+                SizedBox(
+                  width: 76,
+                  height: 76,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            ImageUrlHelper.resolve(_existingPhotos[i].url),
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: Colors.black12,
+                                alignment: Alignment.center,
+                                child: const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.gold,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, _, _) => Container(
+                              color: Colors.black26,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.broken_image,
+                                size: 26,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 5,
+                        right: 5,
+                        child: InkWell(
+                          onTap: () => setState(() => _existingPhotos.removeAt(i)),
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE05252),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               for (var i = 0; i < _photos.length; i++)
                 SizedBox(
                   width: 76,
@@ -1051,6 +1182,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Widget _entryCard(FormColors c, int index, _FrameEntry e) {
     final p = c.p;
     final photo = e.photo;
+    final hasExisting = e.existingUrl != null && e.existingUrl!.isNotEmpty;
 
     final thumb = Container(
       width: 68,
@@ -1060,9 +1192,16 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         color: p.avatarBg,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: photo == null
-          ? Icon(Icons.image_outlined, color: p.textMuted, size: 28)
-          : Image.memory(photo.bytes, fit: BoxFit.cover),
+      child: photo != null
+          ? Image.memory(photo.bytes, fit: BoxFit.cover)
+          : hasExisting
+              ? Image.network(
+                  ImageUrlHelper.resolve(e.existingUrl!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(Icons.image_outlined, color: p.textMuted, size: 28),
+                )
+              : Icon(Icons.image_outlined, color: p.textMuted, size: 28),
     );
 
     final info = Column(
@@ -1074,7 +1213,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                photo?.name ?? 'No photo selected',
+                photo?.name ?? e.existingName ?? (hasExisting ? 'Attached Photo' : 'No photo selected'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

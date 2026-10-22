@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 
 @JS('pickPhotoDirectory')
@@ -141,7 +142,8 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
           final fileName = item['name']?.toString() ?? '';
 
-          final url = item['url']?.toString() ?? '';
+          final rawUrl = item['url']?.toString() ?? '';
+          final url = ImageUrlHelper.resolve(rawUrl);
 
           final size = _parseSize(item['size']);
 
@@ -268,7 +270,8 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
           }
 
           final fileName = item['name']?.toString() ?? '';
-          final url = item['url']?.toString() ?? '';
+          final rawUrl = item['url']?.toString() ?? '';
+          final url = ImageUrlHelper.resolve(rawUrl);
           final size = _parseSize(item['size']);
 
           _photoLog(
@@ -399,7 +402,8 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
           if (item is! Map) continue;
 
           final fileName = item['name']?.toString() ?? '';
-          final url = item['url']?.toString() ?? '';
+          final rawUrl = item['url']?.toString() ?? '';
+          final url = ImageUrlHelper.resolve(rawUrl);
           final size = _parseSize(item['size']);
 
           _photoLog(

@@ -34,6 +34,8 @@ class FrameSpecData {
   String unit = 'Inch';
   String type = 'Wooden Frame';
   String orientation = 'Landscape (Horizontal)';
+  String? existingPhotoUrl;
+  String? existingPhotoName;
   final TextEditingController width;
   final TextEditingController height;
   final TextEditingController material;
@@ -52,8 +54,9 @@ class FrameSpecData {
     orientation: orientation,
     qty: math.max(1, int.tryParse(qty.text) ?? 1),
     notes: notes.text.trim(),
-    photoName: photo?.name,
+    photoName: photo?.name ?? existingPhotoName,
     photoBytes: photo?.bytes,
+    photoUrl: photo != null ? null : existingPhotoUrl,
   );
 
   void dispose() {
@@ -76,6 +79,8 @@ class FrameSpecData {
     finish.text = s.finish;
     qty.text = '${s.qty}';
     notes.text = s.notes;
+    existingPhotoUrl = s.photoUrl;
+    existingPhotoName = s.photoName;
   }
 }
 

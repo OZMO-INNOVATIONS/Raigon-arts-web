@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -261,9 +262,16 @@ class _CustomersTableState extends State<CustomersTable> {
 
             PhotoStrip(
               count: c.photoCount,
-              urls: c.photoUrls,
+              urls: c.photoUrls.isNotEmpty
+                  ? c.photoUrls
+                  : [
+                      for (final f in c.frames)
+                        if (f.photoUrl != null && f.photoUrl!.isNotEmpty)
+                          f.photoUrl!,
+                    ],
               bytes: c.photoBytes,
               seed: index,
+              onTap: () => widget.onView?.call(c),
             ),
             Text(
               c.frameSize,
@@ -353,12 +361,14 @@ class PhotoStrip extends StatelessWidget {
     required this.urls,
     required this.seed,
     this.bytes = const [],
+    this.onTap,
   });
 
   final int count;
   final List<String> urls;
   final List<Uint8List> bytes;
   final int seed;
+  final VoidCallback? onTap;
 
   static const _tones = [
     Color(0xFFB9B3A8),
@@ -372,8 +382,11 @@ class PhotoStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final validUrls = urls.where((u) => u.trim().isNotEmpty).toList();
+    final effectiveCount =
+        count > 0 ? count : math.max(validUrls.length, bytes.length);
 
-    if (count <= 0) {
+    if (effectiveCount <= 0) {
       return Text(
         'No photos',
         maxLines: 1,
@@ -386,56 +399,113 @@ class PhotoStrip extends StatelessWidget {
     const gap = 3.0;
     const maxThumbs = 2;
 
-    final shown = math.min(count, maxThumbs);
-    final extra = count - shown;
+    final shown = math.min(effectiveCount, maxThumbs);
+    final extra = effectiveCount - shown;
 
-    return Row(
+    final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < shown; i++) ...[
           if (i > 0) const SizedBox(width: gap),
-          _thumb(i, thumbSize),
+          _thumb(i, thumbSize, p, validUrls),
         ],
         if (extra > 0) ...[
-          const SizedBox(width: 3),
+          const SizedBox(width: 4),
           Flexible(
-            child: Text(
-              '+$extra',
-              maxLines: 1,
-              overflow: TextOverflow.clip,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: p.textMuted,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '+$extra',
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.gold,
+                ),
               ),
             ),
           ),
         ],
       ],
     );
+
+    if (onTap != null) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Tooltip(
+            message: 'View attached photos ($effectiveCount)',
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return content;
   }
 
-  Widget _thumb(int i, double size) {
-    final url = i < urls.length ? urls[i] : '';
+  Widget _thumb(int i, double size, AppPalette p, List<String> validUrls) {
+    final rawUrl = i < validUrls.length ? validUrls[i] : (i < urls.length ? urls[i] : '');
+    final url = ImageUrlHelper.resolve(rawUrl);
+
+    Widget imageWidget;
+    if (i < bytes.length) {
+      imageWidget = Image.memory(bytes[i], fit: BoxFit.cover);
+    } else if (url.isNotEmpty) {
+      imageWidget = Image.network(
+        url,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: p.chipFill,
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: AppColors.gold,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, _, _) => Container(
+          color: p.chipFill,
+          alignment: Alignment.center,
+          child: Icon(Icons.broken_image_outlined, size: 14, color: p.textMuted),
+        ),
+      );
+    } else {
+      imageWidget = ColoredBox(color: _tones[(seed + i) % _tones.length]);
+    }
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: Colors.white, width: 1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.7),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: i < bytes.length
-          ? Image.memory(bytes[i], fit: BoxFit.cover)
-          : url.isEmpty
-          ? ColoredBox(color: _tones[(seed + i) % _tones.length])
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  ColoredBox(color: _tones[(seed + i) % _tones.length]),
-            ),
+      child: imageWidget,
     );
   }
 }

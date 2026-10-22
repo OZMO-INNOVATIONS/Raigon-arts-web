@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -64,7 +65,7 @@ class FrameSpec {
     qty: (j['qty'] as num?)?.toInt() ?? 1,
     notes: j['notes'] as String? ?? '',
     photoName: j['photoName'] as String?,
-    photoUrl: j['photoUrl'] as String?,
+    photoUrl: (j['photoUrl'] != null && j['photoUrl'].toString().isNotEmpty) ? ImageUrlHelper.resolve(j['photoUrl'].toString()) : null,
     // Supports older documents that contain Base64 image bytes.
     photoBytes: j['photoBytes'] == null
         ? null

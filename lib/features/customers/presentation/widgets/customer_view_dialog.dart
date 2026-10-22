@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
+import 'package:raigon_art/core/widgets/customer_dialog_kit.dart';
+import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/core/widgets/status_pill.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
-import 'package:raigon_art/core/widgets/customer_dialog_kit.dart';
-import 'package:raigon_art/core/widgets/form_kit.dart';
 
 enum _ViewAction { edit }
 
@@ -31,56 +33,202 @@ class _VaultPhoto {
     required this.name,
     required this.sizeLabel,
     required this.image,
+    this.url,
   });
 
   final String name;
   final String sizeLabel;
   final ImageProvider image;
+  final String? url;
+}
+
+void _showPhotoViewerDialog(BuildContext context, _VaultPhoto photo) {
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 880, maxHeight: 720),
+        decoration: BoxDecoration(
+          color: const Color(0xFF14141E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.gold, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.6),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              color: const Color(0xFF1E1E2C),
+              padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.photo_library, color: AppColors.gold, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          photo.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (photo.url != null && photo.url!.isNotEmpty)
+                          Text(
+                            photo.url!,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (photo.url != null && photo.url!.isNotEmpty) ...[
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new, color: AppColors.gold, size: 20),
+                      tooltip: 'Open in new tab',
+                      onPressed: () {
+                        final uri = Uri.tryParse(photo.url!);
+                        if (uri != null) {
+                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: Container(
+                color: Colors.black,
+                alignment: Alignment.center,
+                child: InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 5.0,
+                  child: Image(
+                    image: photo.image,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppColors.gold),
+                      );
+                    },
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, size: 54, color: Colors.white38),
+                          SizedBox(height: 12),
+                          Text(
+                            'Could not load full resolution image',
+                            style: TextStyle(color: Colors.white54, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              color: const Color(0xFF1E1E2C),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: AppColors.gold),
+                  const SizedBox(width: 8),
+                  Text(
+                    photo.sizeLabel,
+                    style: const TextStyle(
+                      color: AppColors.gold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'Pinch or scroll to zoom · Drag to pan',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 List<_VaultPhoto> _photosOf(Customer c) {
   final photos = <_VaultPhoto>[];
 
-  // Show images stored in memory, if available.
-  if (c.photoBytes.isNotEmpty) {
-    for (var i = 0; i < c.photoBytes.length; i++) {
-      final bytes = c.photoBytes[i];
-      final name =
-          i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.jpg';
-      final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
-          ? c.photoSizeLabels[i]
-          : PickedPhoto(name: name, bytes: bytes, size: bytes.length).sizeLabel;
+  // 1. Show images stored in memory, if available.
+  for (var i = 0; i < c.photoBytes.length; i++) {
+    final bytes = c.photoBytes[i];
+    final name =
+        i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.jpg';
+    final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
+        ? c.photoSizeLabels[i]
+        : PickedPhoto(name: name, bytes: bytes, size: bytes.length).sizeLabel;
 
-      photos.add(
-        _VaultPhoto(
-          name: name,
-          sizeLabel: size,
-          image: MemoryImage(bytes),
-        ),
-      );
-    }
-  } else {
-    // Show images loaded from REST API CDN Storage.
-    for (var i = 0; i < c.photoUrls.length; i++) {
-      final url = c.photoUrls[i];
-      if (url.trim().isEmpty) continue;
-      final name =
-          i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
-      final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
-          ? c.photoSizeLabels[i]
-          : 'High-Res Photo';
+    photos.add(
+      _VaultPhoto(
+        name: name,
+        sizeLabel: size,
+        image: MemoryImage(bytes),
+      ),
+    );
+  }
 
+  // 2. Show images loaded from REST API / Supabase Storage.
+  for (var i = 0; i < c.photoUrls.length; i++) {
+    final url = ImageUrlHelper.resolve(c.photoUrls[i]);
+    if (url.trim().isEmpty) continue;
+    final name =
+        i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
+    final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
+        ? c.photoSizeLabels[i]
+        : 'High-Res Vault Photo';
+
+    if (!photos.any((p) => p.url == url || p.name == name)) {
       photos.add(
         _VaultPhoto(
           name: name,
           sizeLabel: size,
           image: NetworkImage(url),
+          url: url,
         ),
       );
     }
   }
 
-  // Also include frame-specific photos if not already included
+  // 3. Also include frame-specific photos if not already included
   for (var i = 0; i < c.frames.length; i++) {
     final frame = c.frames[i];
     if (frame.photoBytes != null) {
@@ -99,15 +247,19 @@ List<_VaultPhoto> _photosOf(Customer c) {
         );
       }
     } else if (frame.photoUrl != null && frame.photoUrl!.isNotEmpty) {
-      final name = frame.photoName ?? 'Frame_${i + 1}.webp';
-      if (!photos.any((p) => p.name == name)) {
-        photos.add(
-          _VaultPhoto(
-            name: name,
-            sizeLabel: 'Frame Photo',
-            image: NetworkImage(frame.photoUrl!),
-          ),
-        );
+      final url = ImageUrlHelper.resolve(frame.photoUrl!);
+      if (url.trim().isNotEmpty) {
+        final name = frame.photoName ?? 'Frame_${i + 1}.webp';
+        if (!photos.any((p) => p.url == url || p.name == name)) {
+          photos.add(
+            _VaultPhoto(
+              name: name,
+              sizeLabel: 'Frame Photo',
+              image: NetworkImage(url),
+              url: url,
+            ),
+          );
+        }
       }
     }
   }
@@ -815,6 +967,127 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                         ],
                       ),
                     ),
+                    if (f.photoUrl != null && f.photoUrl!.isNotEmpty || f.photoBytes != null) ...[
+                      const SizedBox(height: 16),
+                      Builder(
+                        builder: (ctx) {
+                          final photoUrl = (f.photoUrl != null && f.photoUrl!.isNotEmpty)
+                              ? ImageUrlHelper.resolve(f.photoUrl!)
+                              : null;
+                          final photoName = f.photoName ?? 'Artwork #${index + 1}';
+                          final photo = _VaultPhoto(
+                            name: photoName,
+                            sizeLabel: 'Frame Artwork Spec',
+                            image: f.photoBytes != null
+                                ? MemoryImage(f.photoBytes!)
+                                : NetworkImage(photoUrl!) as ImageProvider,
+                            url: photoUrl,
+                          );
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: p.isDark ? const Color(0xFF2A2C46) : const Color(0xFFF7F5EE),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                InkWell(
+                                  onTap: () => _showPhotoViewerDialog(ctx, photo),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        width: 58,
+                                        height: 58,
+                                        clipBehavior: Clip.antiAlias,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: AppColors.gold, width: 1.5),
+                                        ),
+                                        child: f.photoBytes != null
+                                            ? Image.memory(f.photoBytes!, fit: BoxFit.cover)
+                                            : Image.network(
+                                                photoUrl!,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, _, _) => Icon(
+                                                  Icons.broken_image,
+                                                  color: p.textMuted,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                      ),
+                                      Positioned(
+                                        right: 2,
+                                        bottom: 2,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.6),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Icon(Icons.zoom_in, size: 12, color: AppColors.gold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.image, size: 15, color: AppColors.gold),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              photoName,
+                                              style: TextStyle(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        photoUrl != null ? 'Asset URL: $photoUrl' : 'Attached In-Memory Image',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: p.textMuted,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                OutlinedButton.icon(
+                                  onPressed: () => _showPhotoViewerDialog(ctx, photo),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.gold,
+                                    side: const BorderSide(color: AppColors.gold),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  icon: const Icon(Icons.zoom_in, size: 16),
+                                  label: const Text('View Full Image', style: TextStyle(fontSize: 12.5)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -996,35 +1269,56 @@ class _VaultCardState extends State<_VaultCard> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 76,
-              height: 76,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.7),
-                  width: 2,
+            InkWell(
+              onTap: () => _showPhotoViewerDialog(context, photo),
+              child: Container(
+                width: 76,
+                height: 76,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.7),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Image(
-                image: photo.image,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: p.chipFill,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.broken_image_outlined,
-                    size: 28,
-                    color: p.textMuted,
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Image(
+                        image: photo.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: p.chipFill,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            size: 28,
+                            color: p.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.zoom_in, size: 14, color: AppColors.gold),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1097,7 +1391,7 @@ class _VaultCardState extends State<_VaultCard> {
             const SizedBox(width: 12),
             InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () {},
+              onTap: () => _showPhotoViewerDialog(context, photo),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

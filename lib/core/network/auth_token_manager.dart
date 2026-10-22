@@ -52,7 +52,8 @@ class AuthTokenManager {
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
   AuthUser? get currentUser => _currentUser;
-  bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+  bool get isAuthenticated =>
+      _accessToken != null && _accessToken!.trim().isNotEmpty;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
 
   Future<void> init() async {
@@ -72,6 +73,9 @@ class AuthTokenManager {
         }
       }
       _initialized = true;
+      debugPrint(
+        '[AuthTokenManager] Initialized. Authenticated: $isAuthenticated, User: ${_currentUser?.name} (${_currentUser?.role})',
+      );
     } catch (e) {
       debugPrint('[AuthTokenManager] Init failed: $e');
     }

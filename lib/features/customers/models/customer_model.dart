@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -104,6 +105,9 @@ class Customer {
     'altPhone': altPhone,
     'address': address,
     'pincode': pincode,
+    'photoUrls': photoUrls,
+    'photoNames': photoNames,
+    'photoSizeLabels': photoSizeLabels,
     'total': total,
     'advance': advance,
     'paymentStatus': paymentStatus,
@@ -150,9 +154,65 @@ class Customer {
       return DateTime.tryParse(value.toString()) ?? DateTime.now();
     }
 
+    final frames = [
+      for (final f in (j['frames'] as List? ?? const []))
+        if (f is Map)
+          FrameSpec.fromJson(Map<String, dynamic>.from(f)),
+    ];
+
     final pNames = strings('photoNames');
-    final pUrls = strings('photoUrls');
+    final rawUrls = strings('photoUrls');
+    var pUrls = [
+      for (final u in rawUrls) ImageUrlHelper.resolve(u),
+    ].where((u) => u.isNotEmpty).toList();
     final pSizeLabels = strings('photoSizeLabels');
+
+    // Collect any frame photos that might not be in pUrls
+    for (var i = 0; i < frames.length; i++) {
+      final f = frames[i];
+      if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
+        final resolvedFrameUrl = ImageUrlHelper.resolve(f.photoUrl!);
+        if (!pUrls.contains(resolvedFrameUrl)) {
+          pUrls.add(resolvedFrameUrl);
+          final fname = f.photoName ?? 'Frame_${i + 1}.webp';
+          if (!pNames.contains(fname)) {
+            pNames.add(fname);
+          }
+        }
+      }
+    }
+
+    // Link frames to pUrls if frame has no photoUrl but customer vault has photos
+    final resolvedFrames = <FrameSpec>[];
+    for (var i = 0; i < frames.length; i++) {
+      final f = frames[i];
+      if ((f.photoUrl == null || f.photoUrl!.isEmpty) && pUrls.isNotEmpty) {
+        final assignedUrl = i < pUrls.length ? pUrls[i] : pUrls.first;
+        final assignedName = i < pNames.length ? pNames[i] : 'Photo_${i + 1}';
+        resolvedFrames.add(FrameSpec(
+          size: f.size,
+          unit: f.unit,
+          customWidth: f.customWidth,
+          customHeight: f.customHeight,
+          frameType: f.frameType,
+          material: f.material,
+          finish: f.finish,
+          orientation: f.orientation,
+          qty: f.qty,
+          notes: f.notes,
+          photoName: f.photoName ?? assignedName,
+          photoUrl: assignedUrl,
+          photoBytes: f.photoBytes,
+        ));
+      } else {
+        resolvedFrames.add(f);
+      }
+    }
+
+    final rawPhotoCount = (j['photoCount'] as num?)?.toInt() ?? 0;
+    final photoCount = rawPhotoCount > 0
+        ? rawPhotoCount
+        : (pUrls.isNotEmpty ? pUrls.length : pNames.length);
 
     return Customer(
       id: j['id'] as String? ?? '',
@@ -162,8 +222,7 @@ class Customer {
       altPhone: j['altPhone'] as String? ?? '',
       address: j['address'] as String? ?? '',
       pincode: j['pincode'] as String? ?? '',
-      photoCount: (j['photoCount'] as num?)?.toInt() ??
-          (pUrls.isNotEmpty ? pUrls.length : pNames.length),
+      photoCount: photoCount,
       photoNames: pNames,
       photoUrls: pUrls,
       photoSizeLabels: pSizeLabels,
@@ -182,11 +241,7 @@ class Customer {
       expectedDelivery: j['expectedDelivery'] == null
           ? null
           : DateTime.tryParse(j['expectedDelivery'].toString()),
-      frames: [
-        for (final f in (j['frames'] as List? ?? const []))
-          if (f is Map)
-            FrameSpec.fromJson(Map<String, dynamic>.from(f)),
-      ],
+      frames: resolvedFrames,
     );
   }
 

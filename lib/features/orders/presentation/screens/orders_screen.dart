@@ -621,6 +621,7 @@ class _OrderRowState extends State<_OrderRow> {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: PhotoStrip(
+                    customer: c,
                     count: c.photoCount,
                     urls: c.photoUrls.isNotEmpty
                         ? c.photoUrls

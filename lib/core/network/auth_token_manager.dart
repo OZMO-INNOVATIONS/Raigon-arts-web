@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web/web.dart' as web;
 
 class AuthUser {
   const AuthUser({
@@ -37,7 +38,9 @@ class AuthUser {
 }
 
 class AuthTokenManager {
-  AuthTokenManager._();
+  AuthTokenManager._() {
+    _restoreFromLocalStorage();
+  }
   static final AuthTokenManager instance = AuthTokenManager._();
 
   static const String _keyToken = 'raigon_auth_token';
@@ -55,21 +58,52 @@ class AuthTokenManager {
   bool get isAuthenticated =>
       _accessToken != null && _accessToken!.trim().isNotEmpty;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
+  bool get isInitialized => _initialized;
+
+  void _restoreFromLocalStorage() {
+    if (!kIsWeb) return;
+    try {
+      final token = web.window.localStorage.getItem(_keyToken);
+      final refresh = web.window.localStorage.getItem(_keyRefreshToken);
+      final userJson = web.window.localStorage.getItem(_keyUser);
+
+      if (token != null && token.trim().isNotEmpty) {
+        _accessToken = token.trim();
+        if (refresh != null && refresh.trim().isNotEmpty) {
+          _refreshToken = refresh.trim();
+        }
+        if (userJson != null && userJson.trim().isNotEmpty) {
+          try {
+            _currentUser = AuthUser.fromJson(
+              jsonDecode(userJson) as Map<String, dynamic>,
+            );
+          } catch (_) {}
+        }
+        _initialized = true;
+        debugPrint(
+          '[AuthTokenManager] Synchronously restored session from localStorage. User: ${_currentUser?.name} (${_currentUser?.role})',
+        );
+      }
+    } catch (e) {
+      debugPrint('[AuthTokenManager] localStorage restore note: $e');
+    }
+  }
 
   Future<void> init() async {
-    if (_initialized) return;
+    _restoreFromLocalStorage();
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      _accessToken = prefs.getString(_keyToken);
-      _refreshToken = prefs.getString(_keyRefreshToken);
+      _accessToken ??= prefs.getString(_keyToken);
+      _refreshToken ??= prefs.getString(_keyRefreshToken);
       final userJson = prefs.getString(_keyUser);
-      if (userJson != null && userJson.isNotEmpty) {
+      if (_currentUser == null && userJson != null && userJson.isNotEmpty) {
         try {
           _currentUser = AuthUser.fromJson(
             jsonDecode(userJson) as Map<String, dynamic>,
           );
         } catch (e) {
-          debugPrint('[AuthTokenManager] Failed to decode user: $e');
+          debugPrint('[AuthTokenManager] Failed to decode user from prefs: $e');
         }
       }
       _initialized = true;
@@ -77,7 +111,7 @@ class AuthTokenManager {
         '[AuthTokenManager] Initialized. Authenticated: $isAuthenticated, User: ${_currentUser?.name} (${_currentUser?.role})',
       );
     } catch (e) {
-      debugPrint('[AuthTokenManager] Init failed: $e');
+      debugPrint('[AuthTokenManager] Prefs init failed: $e');
     }
   }
 
@@ -89,14 +123,33 @@ class AuthTokenManager {
     _accessToken = token;
     if (refreshToken != null) _refreshToken = refreshToken;
     if (user != null) _currentUser = user;
+    _initialized = true;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyToken, token);
-    if (refreshToken != null) {
-      await prefs.setString(_keyRefreshToken, refreshToken);
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.setItem(_keyToken, token);
+        if (refreshToken != null) {
+          web.window.localStorage.setItem(_keyRefreshToken, refreshToken);
+        }
+        if (user != null) {
+          web.window.localStorage.setItem(_keyUser, jsonEncode(user.toJson()));
+        }
+      } catch (e) {
+        debugPrint('[AuthTokenManager] localStorage save error: $e');
+      }
     }
-    if (user != null) {
-      await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyToken, token);
+      if (refreshToken != null) {
+        await prefs.setString(_keyRefreshToken, refreshToken);
+      }
+      if (user != null) {
+        await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+      }
+    } catch (e) {
+      debugPrint('[AuthTokenManager] SharedPreferences save error: $e');
     }
   }
 
@@ -107,27 +160,58 @@ class AuthTokenManager {
     _accessToken = token;
     if (refreshToken != null) _refreshToken = refreshToken;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyToken, token);
-    if (refreshToken != null) {
-      await prefs.setString(_keyRefreshToken, refreshToken);
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.setItem(_keyToken, token);
+        if (refreshToken != null) {
+          web.window.localStorage.setItem(_keyRefreshToken, refreshToken);
+        }
+      } catch (_) {}
     }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyToken, token);
+      if (refreshToken != null) {
+        await prefs.setString(_keyRefreshToken, refreshToken);
+      }
+    } catch (_) {}
   }
 
   Future<void> updateCurrentUser(AuthUser user) async {
     _currentUser = user;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.setItem(_keyUser, jsonEncode(user.toJson()));
+      } catch (_) {}
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+    } catch (_) {}
   }
 
   Future<void> clear() async {
     _accessToken = null;
     _refreshToken = null;
     _currentUser = null;
+    _initialized = false;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyToken);
-    await prefs.remove(_keyRefreshToken);
-    await prefs.remove(_keyUser);
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.removeItem(_keyToken);
+        web.window.localStorage.removeItem(_keyRefreshToken);
+        web.window.localStorage.removeItem(_keyUser);
+      } catch (_) {}
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyToken);
+      await prefs.remove(_keyRefreshToken);
+      await prefs.remove(_keyUser);
+    } catch (_) {}
   }
 }

@@ -1,4 +1,3 @@
-import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -6,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:raigon_art/core/widgets/status_pill.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 
@@ -261,6 +262,7 @@ class _CustomersTableState extends State<CustomersTable> {
             Text(c.phone, style: cell),
 
             PhotoStrip(
+              customer: c,
               count: c.photoCount,
               urls: c.photoUrls.isNotEmpty
                   ? c.photoUrls
@@ -361,6 +363,7 @@ class PhotoStrip extends StatelessWidget {
     required this.urls,
     required this.seed,
     this.bytes = const [],
+    this.customer,
     this.onTap,
   });
 
@@ -368,6 +371,7 @@ class PhotoStrip extends StatelessWidget {
   final List<String> urls;
   final List<Uint8List> bytes;
   final int seed;
+  final Customer? customer;
   final VoidCallback? onTap;
 
   static const _tones = [
@@ -378,6 +382,34 @@ class PhotoStrip extends StatelessWidget {
     Color(0xFF7A86A3),
     Color(0xFFE2D8D0),
   ];
+
+  void _openViewer(BuildContext context, int initialIndex, List<String> validUrls) {
+    if (customer != null) {
+      showAppImageViewer(
+        context: context,
+        items: viewerItemsFromCustomer(customer!),
+        initialIndex: initialIndex,
+      );
+      return;
+    }
+
+    final items = <AppViewerItem>[
+      for (var i = 0; i < bytes.length; i++)
+        AppViewerItem(bytes: bytes[i], title: 'Photo #${i + 1}'),
+      for (var i = 0; i < validUrls.length; i++)
+        AppViewerItem(url: validUrls[i], title: 'Artwork #${i + 1}'),
+    ];
+
+    if (items.isNotEmpty) {
+      showAppImageViewer(
+        context: context,
+        items: items,
+        initialIndex: initialIndex.clamp(0, items.length - 1),
+      );
+    } else {
+      onTap?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -395,37 +427,47 @@ class PhotoStrip extends StatelessWidget {
       );
     }
 
-    const thumbSize = 30.0;
-    const gap = 3.0;
+    const thumbSize = 32.0;
+    const gap = 4.0;
     const maxThumbs = 2;
 
     final shown = math.min(effectiveCount, maxThumbs);
     final extra = effectiveCount - shown;
 
-    final content = Row(
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < shown; i++) ...[
           if (i > 0) const SizedBox(width: gap),
-          _thumb(i, thumbSize, p, validUrls),
+          _thumb(context, i, thumbSize, p, validUrls),
         ],
         if (extra > 0) ...[
           const SizedBox(width: 4),
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '+$extra',
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.gold,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => _openViewer(context, shown, validUrls),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.6),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '+$extra',
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -433,43 +475,39 @@ class PhotoStrip extends StatelessWidget {
         ],
       ],
     );
-
-    if (onTap != null) {
-      return MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: Tooltip(
-            message: 'View attached photos ($effectiveCount)',
-            child: content,
-          ),
-        ),
-      );
-    }
-
-    return content;
   }
 
-  Widget _thumb(int i, double size, AppPalette p, List<String> validUrls) {
-    final rawUrl = i < validUrls.length ? validUrls[i] : (i < urls.length ? urls[i] : '');
+  Widget _thumb(
+    BuildContext context,
+    int i,
+    double size,
+    AppPalette p,
+    List<String> validUrls,
+  ) {
+    final rawUrl =
+        i < validUrls.length ? validUrls[i] : (i < urls.length ? urls[i] : '');
     final url = ImageUrlHelper.resolve(rawUrl);
 
     Widget imageWidget;
     if (i < bytes.length) {
-      imageWidget = Image.memory(bytes[i], fit: BoxFit.cover);
+      imageWidget = Image.memory(
+        bytes[i],
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+      );
     } else if (url.isNotEmpty) {
       imageWidget = Image.network(
         url,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return Container(
             color: p.chipFill,
             alignment: Alignment.center,
             child: const SizedBox(
-              width: 10,
-              height: 10,
+              width: 12,
+              height: 12,
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
                 color: AppColors.gold,
@@ -487,25 +525,34 @@ class PhotoStrip extends StatelessWidget {
       imageWidget = ColoredBox(color: _tones[(seed + i) % _tones.length]);
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.7),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(
+        message: 'Click to view full photo',
+        child: GestureDetector(
+          onTap: () => _openViewer(context, i, validUrls),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.8),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: imageWidget,
           ),
-        ],
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: imageWidget,
     );
   }
 }

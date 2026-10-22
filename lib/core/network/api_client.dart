@@ -153,10 +153,13 @@ class ApiClient {
           );
           return true;
         }
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        debugPrint('[ApiClient] Server rejected refresh token (${response.statusCode}). Session expired.');
+        onSessionExpired?.call();
       }
       return false;
     } catch (e) {
-      debugPrint('[ApiClient] Token refresh failed: $e');
+      debugPrint('[ApiClient] Token refresh network note: $e');
       return false;
     } finally {
       _isRefreshing = false;
@@ -179,8 +182,6 @@ class ApiClient {
         if (refreshed) {
           final newHeaders = _buildHeaders(requiresAuth: true);
           response = await _http.get(uri, headers: newHeaders).timeout(defaultTimeout);
-        } else {
-          onSessionExpired?.call();
         }
       }
 
@@ -209,8 +210,6 @@ class ApiClient {
           response = await _http
               .post(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
-        } else {
-          onSessionExpired?.call();
         }
       }
 
@@ -239,8 +238,6 @@ class ApiClient {
           response = await _http
               .put(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
-        } else {
-          onSessionExpired?.call();
         }
       }
 
@@ -269,8 +266,6 @@ class ApiClient {
           response = await _http
               .patch(uri, headers: newHeaders, body: encodedBody)
               .timeout(defaultTimeout);
-        } else {
-          onSessionExpired?.call();
         }
       }
 
@@ -296,8 +291,6 @@ class ApiClient {
           response = await _http
               .delete(uri, headers: newHeaders)
               .timeout(defaultTimeout);
-        } else {
-          onSessionExpired?.call();
         }
       }
 
@@ -345,8 +338,6 @@ class ApiClient {
               await retryRequest.send().timeout(const Duration(seconds: 60));
           final retryResponse = await http.Response.fromStream(retryStreamed);
           return _handleResponse(retryResponse);
-        } else {
-          onSessionExpired?.call();
         }
       }
 

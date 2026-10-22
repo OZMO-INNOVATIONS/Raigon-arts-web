@@ -1,4 +1,5 @@
 import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -1026,33 +1027,60 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            ImageUrlHelper.resolve(_existingPhotos[i].url),
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return Container(
-                                color: Colors.black12,
-                                alignment: Alignment.center,
-                                child: const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.gold,
+                        child: Tooltip(
+                          message: 'Tap to view full image',
+                          child: InkWell(
+                            onTap: () {
+                              final allItems = <AppViewerItem>[
+                                for (final p in _existingPhotos)
+                                  AppViewerItem(
+                                    url: p.url,
+                                    title: p.name,
+                                    subtitle: 'Existing Customer Photo',
                                   ),
-                                ),
+                                for (final p in _photos)
+                                  AppViewerItem(
+                                    bytes: p.bytes,
+                                    title: p.name,
+                                    subtitle: 'New Photo · ${p.sizeLabel}',
+                                  ),
+                              ];
+                              showAppImageViewer(
+                                context: context,
+                                items: allItems,
+                                initialIndex: i,
                               );
                             },
-                            errorBuilder: (_, _, _) => Container(
-                              color: Colors.black26,
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.broken_image,
-                                size: 26,
-                                color: Colors.white54,
+                            borderRadius: BorderRadius.circular(10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                ImageUrlHelper.resolve(_existingPhotos[i].url),
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return Container(
+                                    color: Colors.black12,
+                                    alignment: Alignment.center,
+                                    child: const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.gold,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (_, _, _) => Container(
+                                  color: Colors.black26,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    size: 26,
+                                    color: Colors.white54,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -1089,11 +1117,38 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.memory(
-                            _photos[i].bytes,
-                            fit: BoxFit.cover,
+                        child: Tooltip(
+                          message: 'Tap to view full image',
+                          child: InkWell(
+                            onTap: () {
+                              final allItems = <AppViewerItem>[
+                                for (final p in _existingPhotos)
+                                  AppViewerItem(
+                                    url: p.url,
+                                    title: p.name,
+                                    subtitle: 'Existing Customer Photo',
+                                  ),
+                                for (final p in _photos)
+                                  AppViewerItem(
+                                    bytes: p.bytes,
+                                    title: p.name,
+                                    subtitle: 'New Photo · ${p.sizeLabel}',
+                                  ),
+                              ];
+                              showAppImageViewer(
+                                context: context,
+                                items: allItems,
+                                initialIndex: _existingPhotos.length + i,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                _photos[i].bytes,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -1184,24 +1239,47 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     final photo = e.photo;
     final hasExisting = e.existingUrl != null && e.existingUrl!.isNotEmpty;
 
-    final thumb = Container(
-      width: 68,
-      height: 68,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: p.avatarBg,
-        borderRadius: BorderRadius.circular(10),
+    final thumb = InkWell(
+      onTap: () {
+        if (photo != null) {
+          showSingleImageViewer(
+            context: context,
+            bytes: photo.bytes,
+            title: photo.name,
+            subtitle: photo.sizeLabel,
+          );
+        } else if (hasExisting) {
+          showSingleImageViewer(
+            context: context,
+            url: e.existingUrl!,
+            title: e.existingName ?? 'Attached Photo',
+            subtitle: 'Frame Artwork Spec',
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Tooltip(
+        message: (photo != null || hasExisting) ? 'Tap to view full image' : '',
+        child: Container(
+          width: 68,
+          height: 68,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: p.avatarBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: photo != null
+              ? Image.memory(photo.bytes, fit: BoxFit.cover)
+              : hasExisting
+                  ? Image.network(
+                      ImageUrlHelper.resolve(e.existingUrl!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          Icon(Icons.image_outlined, color: p.textMuted, size: 28),
+                    )
+                  : Icon(Icons.image_outlined, color: p.textMuted, size: 28),
+        ),
       ),
-      child: photo != null
-          ? Image.memory(photo.bytes, fit: BoxFit.cover)
-          : hasExisting
-              ? Image.network(
-                  ImageUrlHelper.resolve(e.existingUrl!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      Icon(Icons.image_outlined, color: p.textMuted, size: 28),
-                )
-              : Icon(Icons.image_outlined, color: p.textMuted, size: 28),
     );
 
     final info = Column(

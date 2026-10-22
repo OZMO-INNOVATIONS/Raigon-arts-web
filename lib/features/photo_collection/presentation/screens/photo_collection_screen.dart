@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' show ImageFilter;
 
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 
 @JS('pickPhotoDirectory')
@@ -583,23 +583,23 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
   }
 
   void _preview(PhotoItem photo) {
-    showGeneralDialog(
+    final list = _filtered;
+    final items = list
+        .map(
+          (p) => AppViewerItem(
+            url: p.url,
+            title: p.fileName,
+            subtitle: '${_folderName ?? 'Photos'} · ${p.sizeLabel}',
+          ),
+        )
+        .toList();
+
+    final index = list.indexOf(photo);
+
+    showAppImageViewer(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Preview',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 180),
-      transitionBuilder: (_, animation, _, child) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      pageBuilder: (_, _, _) {
-        return _PreviewOverlay(
-          photo: photo,
-          onDownload: () {
-            _download([photo]);
-          },
-        );
-      },
+      items: items,
+      initialIndex: index >= 0 ? index : 0,
     );
   }
 
@@ -1445,251 +1445,6 @@ class _Check extends StatelessWidget {
       child: checked
           ? const Icon(Icons.check, size: 15, color: Colors.white)
           : null,
-    );
-  }
-}
-
-class _PreviewOverlay extends StatelessWidget {
-  const _PreviewOverlay({required this.photo, required this.onDownload});
-
-  final PhotoItem photo;
-  final VoidCallback onDownload;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    final mq = MediaQuery.of(context);
-
-    final side = math.max(
-      200.0,
-      math.min(732.0, mq.size.height - 64 - 48 - 90),
-    );
-
-    final headerBg = p.isDark
-        ? const Color(0xFFA3A3B5)
-        : const Color(0xFFFCFAF5);
-
-    final bodyBg = p.isDark ? p.surface : const Color(0xFFF1F0EE);
-
-    return Material(
-      color: Colors.transparent,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                Navigator.of(context).pop();
-              },
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  color: Colors.black.withValues(alpha: p.isDark ? 0.8 : 0.72),
-                ),
-              ),
-            ),
-          ),
-
-          Positioned(top: 24, right: 28, child: _closePreviewButton(context)),
-
-          Center(
-            child: GestureDetector(
-              onTap: () {},
-              child: Container(
-                width: side + 48,
-                decoration: BoxDecoration(
-                  color: bodyBg,
-                  borderRadius: BorderRadius.circular(24),
-                  border: p.isDark ? Border.all(color: p.border) : null,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      height: 64,
-                      color: headerBg,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.image,
-                            size: 22,
-                            color: Color(0xFFD1BC85),
-                          ),
-
-                          const SizedBox(width: 12),
-
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  photo.fileName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 16.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.isDark
-                                        ? Colors.black
-                                        : AppColors.black,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 2),
-
-                                Text(
-                                  photo.sizeLabel,
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 12),
-
-                          _downloadPill(context),
-
-                          const SizedBox(width: 10),
-
-                          InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: p.isDark
-                                    ? const Color(0xFF2E3050)
-                                    : const Color(0xFFF2F0EB),
-                                border: p.isDark
-                                    ? null
-                                    : Border.all(color: p.border),
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                size: 18,
-                                color: p.isDark
-                                    ? Colors.white
-                                    : AppColors.black,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          photo.url,
-                          width: side,
-                          height: side,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: side,
-                              height: side,
-                              color: p.surface,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                size: 60,
-                                color: p.textMuted,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _downloadPill(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: AppColors.darkGradient,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onDownload,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.download, size: 16, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Download',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _closePreviewButton(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: AppColors.darkGradient,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: () {
-            Navigator.of(context).pop();
-          },
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.close, size: 16, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Close Preview',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

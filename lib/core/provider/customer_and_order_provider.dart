@@ -49,8 +49,6 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
       debugPrint('[CustomerProvider] Initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
-
-      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

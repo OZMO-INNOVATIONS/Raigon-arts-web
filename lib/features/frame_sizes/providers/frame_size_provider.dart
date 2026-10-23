@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:raigon_art/core/network/api_client.dart';
@@ -6,7 +7,13 @@ import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FrameSizeProvider extends ChangeNotifier {
-  FrameSizeProvider({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
+  FrameSizeProvider({ApiClient? apiClient}) : _api = apiClient ?? ApiClient() {
+    CustomerAndOrderProvider.onAnyOrderChange = () {
+      refresh().catchError((e) {
+        debugPrint('[FrameSizeProvider] Auto-refresh on order change: $e');
+      });
+    };
+  }
 
   final ApiClient _api;
   static const String _storageKey = 'raigon_frame_sizes_cached';

@@ -171,7 +171,8 @@ class ReportData {
       .toList();
 
   bool _inRange(Customer c, DateTime from, DateTime to) {
-    final d = DateTime(c.orderDate.year, c.orderDate.month, c.orderDate.day);
+    final local = c.orderDate.toLocal();
+    final d = DateTime(local.year, local.month, local.day);
     return !d.isBefore(from) && d.isBefore(to);
   }
 
@@ -250,22 +251,38 @@ class ReportData {
 
     final bucketDays = period == ReportPeriod.month1 ? 5 : 10;
     final start = startDate;
+    final end = today;
     final labels = <String>[];
     final values = <double>[];
 
-    for (var i = 0; i < 6; i++) {
-      final from = DateTime(
-        start.year,
-        start.month,
-        start.day + i * bucketDays,
-      );
-      final to = DateTime(
-        start.year,
-        start.month,
-        start.day + (i + 1) * bucketDays,
-      );
-      labels.add(_shortDate(from));
-      values.add(_sumTotal(from, to).toDouble());
+
+    // Checkpoint dates spanning from start through today inclusive
+    final checkpoints = <DateTime>[];
+    for (
+      var d = start;
+      !d.isAfter(end);
+      d = DateTime(d.year, d.month, d.day + bucketDays)
+    ) {
+      checkpoints.add(d);
+    }
+    if (checkpoints.isEmpty || !checkpoints.last.isAtSameMomentAs(end)) {
+      checkpoints.add(end);
+    }
+
+    for (var i = 0; i < checkpoints.length; i++) {
+      final curDate = checkpoints[i];
+      labels.add(_shortDate(curDate));
+
+      if (i == 0) {
+        final nextDay = DateTime(curDate.year, curDate.month, curDate.day + 1);
+        values.add(_sumTotal(curDate, nextDay).toDouble());
+      } else {
+        final prevDate = checkpoints[i - 1];
+        final from = DateTime(prevDate.year, prevDate.month, prevDate.day + 1);
+        final toExclusive = DateTime(curDate.year, curDate.month, curDate.day + 1);
+        values.add(_sumTotal(from, toExclusive).toDouble());
+      }
+
     }
     return ChartSeries(labels, values);
   }
@@ -297,9 +314,10 @@ class ReportData {
       labels.add('${_months[m.month - 1]}$suffix');
 
       final sum = periodCustomers
-          .where(
-            (c) => c.orderDate.year == m.year && c.orderDate.month == m.month,
-          )
+          .where((c) {
+            final local = c.orderDate.toLocal();
+            return local.year == m.year && local.month == m.month;
+          })
           .fold<int>(0, (a, c) => a + c.total);
       values.add(sum.toDouble());
     }
@@ -388,6 +406,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _showArchived = false;
 
   static const _goldText = Color(0xFFB49A55);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CustomerAndOrderProvider>().refresh().catchError((_) {});
+      }
+    });
+  }
   static const _red = Color(0xFFE0605E);
 
   Future<void> _exportPdf(

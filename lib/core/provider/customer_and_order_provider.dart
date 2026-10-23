@@ -8,6 +8,8 @@ import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/repository/customer_repository.dart';
 
 class CustomerAndOrderProvider extends ChangeNotifier {
+  static VoidCallback? onAnyOrderChange;
+
   CustomerAndOrderProvider({CustomerRepository? repository})
     : _repository = repository ?? RestCustomerRepository();
 
@@ -62,6 +64,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = await _repository.getAll();
       _initialized = true;
       notifyListeners();
+      onAnyOrderChange?.call();
     } catch (error) {
       _error = error;
       notifyListeners();
@@ -108,6 +111,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         for (final c in _customers) c.id == customer.id ? created : c,
       ];
       notifyListeners();
+      onAnyOrderChange?.call();
     } catch (error) {
       _customers = _customers.where((c) => c.id != customer.id).toList();
       _error = error;
@@ -138,6 +142,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         for (final c in _customers) c.id == customer.id ? updated : c,
       ];
       notifyListeners();
+      onAnyOrderChange?.call();
     } catch (error) {
       _customers = previous;
       _error = error;
@@ -152,6 +157,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     _customers = _customers.where((c) => c.id != id).toList();
     _error = null;
     notifyListeners();
+    onAnyOrderChange?.call();
 
     try {
       await _repository.delete(id);
@@ -193,6 +199,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         photoSizeLabels: cur.photoSizeLabels,
       );
       notifyListeners();
+      onAnyOrderChange?.call();
     }
     try {
       await _repository.updatePayment(id, advance, paymentStatus);
@@ -230,6 +237,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers[index] = _customers[index].copyWith(status: status);
     }
     notifyListeners();
+    onAnyOrderChange?.call();
 
     // Persist status change to REST API asynchronously
     _repository.updateStatus(customer.id, status).catchError((e) {

@@ -39,7 +39,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      context.read<FrameSizeProvider>().init();
+      context.read<FrameSizeProvider>().refresh().catchError((_) {});
     });
   }
 

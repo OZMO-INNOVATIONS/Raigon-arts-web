@@ -254,7 +254,11 @@ class ReportData {
     final values = <double>[];
 
     for (var i = 0; i < 6; i++) {
-      final from = DateTime(start.year, start.month, start.day + i * bucketDays);
+      final from = DateTime(
+        start.year,
+        start.month,
+        start.day + i * bucketDays,
+      );
       final to = DateTime(
         start.year,
         start.month,
@@ -276,11 +280,7 @@ class ReportData {
     }
 
     var months = <DateTime>[];
-    for (
-      var m = first;
-      !m.isAfter(cur);
-      m = DateTime(m.year, m.month + 1)
-    ) {
+    for (var m = first; !m.isAfter(cur); m = DateTime(m.year, m.month + 1)) {
       months.add(m);
     }
     if (months.length > 12) months = months.sublist(months.length - 12);
@@ -415,7 +415,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ['Total Billed Revenue', 'Rs. ${_inr(d.billed)}'],
                 ['Advance Collected', 'Rs. ${_inr(d.advance)}'],
                 ['Outstanding Balance Due', 'Rs. ${_inr(d.outstanding)}'],
-                ['Average Order Value (AOV)', 'Rs. ${_inr(d.aov)}'],
+                [
+                  'Highest Value Order',
+                  'Rs. ${_inr(d.periodCustomers.isEmpty ? 0 : d.periodCustomers.map((c) => c.total).reduce(math.max))}',
+                ],
                 ['Orders Analyzed', '${d.orders}'],
                 ['Growth', d.growthLabel],
                 ['Collection Ratio', d.ratioLabel],
@@ -697,12 +700,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       ),
       _MetricCard(
-        label: 'AVERAGE ORDER VALUE (AOV)',
-        value: _money(d.aov),
-        tile: _tile(const Color(0xFFF7EFD9), Icons.receipt_long, _goldText),
+        label: 'HIGHEST VALUE ORDER',
+        value: _money(
+          d.periodCustomers.isEmpty
+              ? 0
+              : d.periodCustomers.map((c) => c.total).reduce(math.max),
+        ),
+        tile: _tile(
+          const Color(0xFFF7EFD9),
+          Icons.workspace_premium,
+          _goldText,
+        ),
         badge: _badge(
           p,
-          '${d.orders} ${d.orders == 1 ? 'Order' : 'Orders'} Analyzed',
+          '${d.periodCustomers.isEmpty ? 0 : d.periodCustomers.length} '
+          '${d.periodCustomers.length == 1 ? 'Order' : 'Orders'} Analyzed',
           _goldText,
           icon: Icons.shopping_bag,
         ),
@@ -896,10 +908,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ];
 
     final chipStyles = <(Color, Color)>[
-      (
-        p.isDark ? const Color(0xFF4A4A52) : const Color(0xFFF5EFE0),
-        goldPct,
-      ),
+      (p.isDark ? const Color(0xFF4A4A52) : const Color(0xFFF5EFE0), goldPct),
       (const Color(0xFFD8F5E3), const Color(0xFF3FB866)),
       (const Color(0xFFD9F3F8), AppPalette.teal),
       (const Color(0xFFFDEBDD), const Color(0xFFF2A04E)),
@@ -997,8 +1006,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             emptyNote('No frame orders in this period.')
           else
             for (var i = 0; i < sizes.length; i++)
-              row(sizes[i], rowStyles[i % rowStyles.length].$1,
-                  rowStyles[i % rowStyles.length].$2),
+              row(
+                sizes[i],
+                rowStyles[i % rowStyles.length].$1,
+                rowStyles[i % rowStyles.length].$2,
+              ),
           const SizedBox(height: 2),
           Divider(height: 1, color: p.rowDivider),
           const SizedBox(height: 18),

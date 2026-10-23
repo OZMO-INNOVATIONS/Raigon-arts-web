@@ -38,8 +38,36 @@ class FrameSize {
       height: (json['height'] as num?)?.toDouble() ?? 0,
       unit: json['unit'] as String? ?? 'Inch',
       category: json['category'] as String? ?? '',
-      orders: (json['orders'] as num?)?.toInt() ?? 0,
-      active: json['active'] as bool? ?? true,
+      orders: (json['orders'] as num?)?.toInt() ??
+          (json['ordersCount'] as num?)?.toInt() ??
+          (json['orders_count'] as num?)?.toInt() ??
+          0,
+      active: json['active'] as bool? ??
+          json['isActive'] as bool? ??
+          json['is_active'] as bool? ??
+          true,
+    );
+  }
+
+  FrameSize copyWith({
+    String? code,
+    String? name,
+    double? width,
+    double? height,
+    String? unit,
+    String? category,
+    int? orders,
+    bool? active,
+  }) {
+    return FrameSize(
+      code: code ?? this.code,
+      name: name ?? this.name,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      unit: unit ?? this.unit,
+      category: category ?? this.category,
+      orders: orders ?? this.orders,
+      active: active ?? this.active,
     );
   }
 }

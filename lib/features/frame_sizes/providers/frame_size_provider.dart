@@ -1,13 +1,21 @@
+import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:raigon_art/core/network/api_client.dart';
 import 'package:raigon_art/core/network/api_constants.dart';
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FrameSizeProvider extends ChangeNotifier {
   FrameSizeProvider({ApiClient? apiClient}) : _api = apiClient ?? ApiClient() {
+    CustomerAndOrderProvider.onOrdersUpdated = (customers) {
+      syncCountsWithCustomers(customers);
+      refresh().catchError((e) {
+        debugPrint('[FrameSizeProvider] Auto-refresh on order change: $e');
+      });
+    };
     CustomerAndOrderProvider.onAnyOrderChange = () {
       refresh().catchError((e) {
         debugPrint('[FrameSizeProvider] Auto-refresh on order change: $e');
@@ -122,6 +130,79 @@ class FrameSizeProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('[FrameSizeProvider] Failed to cache frame sizes: $e');
     }
+  }
+
+  void syncCountsWithCustomers(List<Customer> customers) {
+    if (_sizes.isEmpty) return;
+    final active = customers.where((c) => c.status != Status.cancelled).toList();
+    var changed = false;
+    final updated = <FrameSize>[];
+
+    for (final size in _sizes) {
+      final matching = active.where((c) => _matchesCustomer(size, c)).length;
+      if (size.orders != matching) {
+        changed = true;
+        updated.add(size.copyWith(orders: matching));
+      } else {
+        updated.add(size);
+      }
+    }
+
+    if (changed) {
+      _sizes = updated;
+      _saveToCache();
+      notifyListeners();
+    }
+  }
+
+  static bool _matchesCustomer(FrameSize size, Customer customer) {
+    if (customer.status == Status.cancelled) return false;
+    final w = size.width;
+    final h = size.height;
+    final sCode = size.code.trim().toLowerCase();
+    final sName = size.name.trim().toLowerCase();
+
+    for (final f in customer.effectiveFrames) {
+      final cw = double.tryParse(f.customWidth.trim());
+      final ch = double.tryParse(f.customHeight.trim());
+      if (cw != null && ch != null && ((cw == w && ch == h) || (cw == h && ch == w))) {
+        return true;
+      }
+
+      final fSize = f.size.trim().toLowerCase();
+      if (fSize.isNotEmpty && fSize != 'standard') {
+        if (fSize == sCode || fSize == sName) return true;
+        final dims = _extractDimensions(fSize);
+        for (final d in dims) {
+          if ((d.$1 == w && d.$2 == h) || (d.$1 == h && d.$2 == w)) return true;
+        }
+      }
+    }
+
+    final summary = customer.frameSize.trim().toLowerCase();
+    if (summary.isNotEmpty && summary != 'standard') {
+      if (summary == sCode || summary == sName) return true;
+      final dims = _extractDimensions(summary);
+      for (final d in dims) {
+        if ((d.$1 == w && d.$2 == h) || (d.$1 == h && d.$2 == w)) return true;
+      }
+    }
+
+    return false;
+  }
+
+  static List<(double, double)> _extractDimensions(String str) {
+    final results = <(double, double)>[];
+    final matches = RegExp(r'(\d+(?:\.\d+)?)\s*(?:[×*x]|\s+by\s+)\s*(\d+(?:\.\d+)?)', caseSensitive: false)
+        .allMatches(str);
+    for (final m in matches) {
+      final w = double.tryParse(m.group(1)!);
+      final h = double.tryParse(m.group(2)!);
+      if (w != null && h != null) {
+        results.add((w, h));
+      }
+    }
+    return results;
   }
 
   void setQuery(String query) {

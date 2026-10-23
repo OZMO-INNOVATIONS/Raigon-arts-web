@@ -13,6 +13,7 @@ import 'package:raigon_art/core/widgets/app_dropdown.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/core/models/status.dart';
+import 'package:raigon_art/features/reports/services/reports_service.dart';
 
 enum ReportPeriod { month1, month2, allTime }
 
@@ -59,7 +60,8 @@ const _months = [
 String _date(DateTime d) =>
     '${_months[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
 
-String _shortDate(DateTime d) => '${_months[d.month - 1]} ${d.day}';
+String _shortDate(DateTime d) =>
+    '${_months[d.month - 1]} ${d.day.toString().padLeft(2, '0')}';
 
 String _initials(String name) {
   final parts = name
@@ -258,16 +260,12 @@ class ReportData {
 
     // Checkpoint dates spanning from start through today inclusive
     final checkpoints = <DateTime>[];
-    for (
-      var d = start;
-      !d.isAfter(end);
-      d = DateTime(d.year, d.month, d.day + bucketDays)
-    ) {
-      checkpoints.add(d);
+    var cp = DateTime(start.year, start.month, start.day);
+    while (cp.isBefore(end)) {
+      checkpoints.add(cp);
+      cp = DateTime(cp.year, cp.month, cp.day + bucketDays);
     }
-    if (checkpoints.isEmpty || !checkpoints.last.isAtSameMomentAs(end)) {
-      checkpoints.add(end);
-    }
+    checkpoints.add(end);
 
     for (var i = 0; i < checkpoints.length; i++) {
       final curDate = checkpoints[i];
@@ -404,6 +402,7 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   ReportPeriod _period = ReportPeriod.month1;
   bool _showArchived = false;
+  SalesTrajectory? _apiTrajectory;
 
   static const _goldText = Color(0xFFB49A55);
 
@@ -413,8 +412,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<CustomerAndOrderProvider>().refresh().catchError((_) {});
+        _fetchApiSummary();
       }
     });
+  }
+
+  Future<void> _fetchApiSummary() async {
+    try {
+      final summary = await ReportsService().getSummary(period: _period.name);
+      if (mounted && summary.salesTrajectory != null) {
+        setState(() {
+          _apiTrajectory = summary.salesTrajectory;
+        });
+      }
+    } catch (e) {
+      debugPrint('[ReportsScreen] API summary fetch error: $e');
+    }
   }
   static const _red = Color(0xFFE0605E);
 
@@ -589,7 +602,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
           value: _period,
           items: ReportPeriod.values,
           labelOf: (x) => ReportData.dropdownLabel(x, d.now),
-          onChanged: (v) => setState(() => _period = v),
+          onChanged: (v) {
+            setState(() {
+              _period = v;
+              _apiTrajectory = null;
+            });
+            _fetchApiSummary();
+          },
           width: 233,
         ),
         const SizedBox(width: 10),
@@ -826,7 +845,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _salesCard(AppPalette p, ReportData d) {
-    final series = d.chart;
+    final series = (_apiTrajectory != null &&
+            _apiTrajectory!.labels.isNotEmpty &&
+            _apiTrajectory!.values.isNotEmpty)
+        ? ChartSeries(_apiTrajectory!.labels, _apiTrajectory!.values)
+        : d.chart;
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: p.card(radius: 16),
@@ -897,7 +920,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: TweenAnimationBuilder<double>(
-              key: ValueKey(_period),
+              key: ValueKey('${_period}_${series.labels.join('_')}_${series.values.join('_')}'),
               tween: Tween(begin: 0, end: 1),
               duration: const Duration(milliseconds: 450),
               curve: Curves.easeOutCubic,
@@ -1840,6 +1863,51 @@ class _TrajectoryPainter extends CustomPainter {
             ..color = AppColors.gold
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.6,
+        );
+      }
+    }
+
+    for (var i = 0; i < pts.length; i++) {
+      if (values[i] > 0) {
+        final val = values[i].round();
+        final text = _money(val);
+        final tp = TextPainter(
+          text: TextSpan(
+            text: text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: dark ? Colors.white : const Color(0xFF14141F),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        final pillW = tp.width + 14;
+        final pillH = tp.height + 6;
+        final pillCenter = Offset(
+          pts[i].dx.clamp(padX / 2 + pillW / 2, size.width - padX / 2 - pillW / 2),
+          pts[i].dy - 20,
+        );
+        final rrect = RRect.fromRectAndRadius(
+          Rect.fromCenter(center: pillCenter, width: pillW, height: pillH),
+          const Radius.circular(6),
+        );
+
+        canvas.drawRRect(
+          rrect,
+          Paint()..color = dark ? const Color(0xFF1E2034) : Colors.white,
+        );
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = AppColors.gold
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.4,
+        );
+        tp.paint(
+          canvas,
+          Offset(pillCenter.dx - tp.width / 2, pillCenter.dy - tp.height / 2),
         );
       }
     }

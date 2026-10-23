@@ -9,6 +9,12 @@ import 'package:raigon_art/features/customers/repository/customer_repository.dar
 
 class CustomerAndOrderProvider extends ChangeNotifier {
   static VoidCallback? onAnyOrderChange;
+  static void Function(List<Customer>)? onOrdersUpdated;
+
+  void _notifyOrderChange() {
+    onAnyOrderChange?.call();
+    onOrdersUpdated?.call(_customers);
+  }
 
   CustomerAndOrderProvider({CustomerRepository? repository})
     : _repository = repository ?? RestCustomerRepository();
@@ -35,7 +41,9 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       return;
     }
 
-    debugPrint('[CustomerProvider] Initializing customer data from REST API...');
+    debugPrint(
+      '[CustomerProvider] Initializing customer data from REST API...',
+    );
 
     _isLoading = true;
     _error = null;
@@ -64,7 +72,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = await _repository.getAll();
       _initialized = true;
       notifyListeners();
-      onAnyOrderChange?.call();
+      _notifyOrderChange();
     } catch (error) {
       _error = error;
       notifyListeners();
@@ -111,7 +119,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         for (final c in _customers) c.id == customer.id ? created : c,
       ];
       notifyListeners();
-      onAnyOrderChange?.call();
+      _notifyOrderChange();
     } catch (error) {
       _customers = _customers.where((c) => c.id != customer.id).toList();
       _error = error;
@@ -142,7 +150,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         for (final c in _customers) c.id == customer.id ? updated : c,
       ];
       notifyListeners();
-      onAnyOrderChange?.call();
+      _notifyOrderChange();
     } catch (error) {
       _customers = previous;
       _error = error;
@@ -157,7 +165,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     _customers = _customers.where((c) => c.id != id).toList();
     _error = null;
     notifyListeners();
-    onAnyOrderChange?.call();
+    _notifyOrderChange();
 
     try {
       await _repository.delete(id);
@@ -169,7 +177,11 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updatePayment(String id, int advance, String paymentStatus) async {
+  Future<void> updatePayment(
+    String id,
+    int advance,
+    String paymentStatus,
+  ) async {
     final previous = List<Customer>.of(_customers);
     final index = _customers.indexWhere((c) => c.id == id);
     if (index != -1) {
@@ -199,7 +211,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         photoSizeLabels: cur.photoSizeLabels,
       );
       notifyListeners();
-      onAnyOrderChange?.call();
+      _notifyOrderChange();
     }
     try {
       await _repository.updatePayment(id, advance, paymentStatus);
@@ -237,7 +249,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers[index] = _customers[index].copyWith(status: status);
     }
     notifyListeners();
-    onAnyOrderChange?.call();
+    _notifyOrderChange();
 
     // Persist status change to REST API asynchronously
     _repository.updateStatus(customer.id, status).catchError((e) {

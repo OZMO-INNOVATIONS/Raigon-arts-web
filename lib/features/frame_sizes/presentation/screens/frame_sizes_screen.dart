@@ -10,6 +10,7 @@ import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_dropdown.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
@@ -39,6 +40,10 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
+      final custProvider = context.read<CustomerAndOrderProvider>();
+      if (custProvider.customers.isNotEmpty) {
+        context.read<FrameSizeProvider>().syncCountsWithCustomers(custProvider.customers);
+      }
       context.read<FrameSizeProvider>().refresh().catchError((_) {});
     });
   }

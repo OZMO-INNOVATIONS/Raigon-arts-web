@@ -16,8 +16,8 @@ import 'package:raigon_art/features/customers/presentation/widgets/add_customer_
 import 'package:raigon_art/features/customers/presentation/screens/customers_screen.dart';
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
+import 'package:raigon_art/features/messaging_automation/connection/providers/connection_provider.dart';
 import 'package:raigon_art/features/messaging_automation/presentation/screens/messaging_automation_screen.dart';
-import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
 import 'package:raigon_art/features/photo_collection/presentation/screens/photo_collection_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';
@@ -54,15 +54,10 @@ class _AppShellState extends State<AppShell> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
-      context.read<CustomerAndOrderProvider>().init();
-
       if (instagramConnected) {
         final username = uri.queryParameters['username'] ?? '';
 
-        context.read<MessagingAutomationProvider>().handleInstagramConnected(
-          username,
-        );
+        context.read<ConnectionProvider>().handleInstagramConnected(username);
       }
     });
   }
@@ -93,7 +88,7 @@ class _AppShellState extends State<AppShell> {
       _showNotifications = false;
     });
 
-    final provider = context.read<MessagingAutomationProvider>();
+    final provider = context.read<ConnectionProvider>();
     final uri = Uri.base;
 
     if (uri.queryParameters['instagram'] == 'connected') {

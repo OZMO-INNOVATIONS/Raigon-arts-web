@@ -84,6 +84,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (ok) {
+      AppSnackBar.success(context, 'Signed in successfully. Welcome back!');
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRouter.dashboard,

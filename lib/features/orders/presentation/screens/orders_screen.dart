@@ -11,6 +11,8 @@ import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
 import 'package:raigon_art/core/models/status.dart';
+import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customers_table.dart';
@@ -462,13 +464,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                         _statusOf(rows[i]) == Status.cancelled
                                         ? 'N/A'
                                         : _date(rows[i].expectedDelivery),
-                                    onStatus: (s) {
+                                    onStatus: (s) async {
+                                      final oldStatus = _statusOf(rows[i]);
                                       setState(
                                         () => _statusOverride[rows[i].id] = s,
                                       );
-                                      context
-                                          .read<CustomerAndOrderProvider>()
-                                          .setOrderStatus(rows[i], s);
+                                      try {
+                                        await context
+                                            .read<CustomerAndOrderProvider>()
+                                            .setOrderStatus(rows[i], s);
+                                        if (context.mounted) {
+                                          AppSnackBar.success(
+                                            context,
+                                            'Order ${rows[i].id} status updated to ${s.label}.',
+                                          );
+                                        }
+                                      } catch (error) {
+                                        if (context.mounted) {
+                                          setState(
+                                            () => _statusOverride[rows[i].id] =
+                                                oldStatus,
+                                          );
+                                          final msg = error is ApiException
+                                              ? error.userFriendlyMessage
+                                              : 'Could not update order status. Try again.';
+                                          AppSnackBar.error(context, msg);
+                                        }
+                                      }
                                     },
                                     onView: () => showViewCustomerDialog(
                                       context,

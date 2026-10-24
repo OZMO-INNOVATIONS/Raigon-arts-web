@@ -533,10 +533,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       if (!mounted) return;
       AppSnackBar.success(context, 'Report exported successfully.');
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Export failed. Please try again.')),
+      AppSnackBar.error(
+        context,
+        'Export failed. Please check storage permissions or try again.',
       );
     }
   }

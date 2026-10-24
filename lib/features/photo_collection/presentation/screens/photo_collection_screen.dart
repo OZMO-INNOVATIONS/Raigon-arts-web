@@ -333,13 +333,17 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
       if (!mounted) return;
 
+      final msg = _cleanError(e);
       setState(() {
         _photos.clear();
         _selected.clear();
         _loading = false;
         _hasFolder = false;
-        _error = _cleanError(e);
+        _error = msg;
       });
+      if (msg.isNotEmpty && !msg.toLowerCase().contains('abort') && !msg.toLowerCase().contains('cancel')) {
+        AppSnackBar.error(context, msg);
+      }
     }
   }
 
@@ -450,10 +454,14 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
       if (!mounted) return;
 
+      final msg = _cleanError(e);
       setState(() {
         _loading = false;
-        _error = _cleanError(e);
+        _error = msg;
       });
+      if (msg.isNotEmpty && !msg.toLowerCase().contains('abort') && !msg.toLowerCase().contains('cancel')) {
+        AppSnackBar.error(context, msg);
+      }
     }
   }
 
@@ -577,8 +585,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_cleanError(e))));
+      AppSnackBar.error(context, _cleanError(e));
     }
   }
 

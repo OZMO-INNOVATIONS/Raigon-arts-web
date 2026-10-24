@@ -10,6 +10,8 @@ import 'package:raigon_art/core/widgets/status_pill.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
+import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 
@@ -69,7 +71,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (customerAndOrderProvider.isLoading &&
         !customerAndOrderProvider.initialized) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.gold),
+      );
+    }
+
+    if (customerAndOrderProvider.error != null && customers.isEmpty) {
+      final msg = customerAndOrderProvider.error is ApiException
+          ? (customerAndOrderProvider.error as ApiException).userFriendlyMessage
+          : 'Unable to connect to the backend server. Please verify network or API status.';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 54, color: AppColors.error),
+              const SizedBox(height: 16),
+              Text(
+                'Connection Issue',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: p.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: p.textMuted),
+                ),
+              ),
+              const SizedBox(height: 20),
+              AppPrimaryButton(
+                label: 'Retry Connection',
+                icon: Icons.refresh,
+                onPressed: () {
+                  customerAndOrderProvider.refresh().then((_) {
+                    if (context.mounted) {
+                      AppSnackBar.success(context, 'Connected successfully.');
+                    }
+                  }).catchError((e) {
+                    if (context.mounted) {
+                      final errText = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
+                      AppSnackBar.error(context, errText);
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return LayoutBuilder(

@@ -239,7 +239,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                   ),
 
                   Expanded(
-                    child: SingleChildScrollView(child: _table(p, list)),
+                    child: SingleChildScrollView(child: _table(p, list, provider)),
                   ),
                 ],
               ),
@@ -286,7 +286,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
     );
   }
 
-  Widget _table(AppPalette p, List<FrameSize> list) {
+  Widget _table(AppPalette p, List<FrameSize> list, FrameSizeProvider provider) {
     return LayoutBuilder(
       builder: (context, c) {
         final w = math.max(c.maxWidth, 1100.0);
@@ -320,7 +320,50 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                     ],
                   ),
                 ),
-                if (list.isEmpty)
+                if (provider.error != null && list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off_rounded, size: 44, color: AppColors.error),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Failed to load frame sizes catalog',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          provider.error is ApiException
+                              ? (provider.error as ApiException).userFriendlyMessage
+                              : 'Please check your connection to the server.',
+                          style: TextStyle(fontSize: 13, color: p.textMuted),
+                        ),
+                        const SizedBox(height: 14),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            context.read<FrameSizeProvider>().refresh().then((_) {
+                              if (context.mounted) {
+                                AppSnackBar.success(context, 'Frame sizes loaded.');
+                              }
+                            }).catchError((e) {
+                              if (context.mounted) {
+                                final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
+                                AppSnackBar.error(context, msg);
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (list.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 48),
                     child: Text(

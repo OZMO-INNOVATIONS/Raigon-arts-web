@@ -242,7 +242,8 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     return _statusOverride[customer.id] ?? customer.status;
   }
 
-  void setOrderStatus(Customer customer, Status status) {
+  Future<void> setOrderStatus(Customer customer, Status status) async {
+    final oldStatus = statusOf(customer);
     _statusOverride[customer.id] = status;
     final index = _customers.indexWhere((c) => c.id == customer.id);
     if (index != -1) {
@@ -251,10 +252,18 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
     _notifyOrderChange();
 
-    // Persist status change to REST API asynchronously
-    _repository.updateStatus(customer.id, status).catchError((e) {
+    try {
+      await _repository.updateStatus(customer.id, status);
+    } catch (e) {
       debugPrint('[CustomerAndOrderProvider] Status persist error: $e');
-    });
+      _statusOverride[customer.id] = oldStatus;
+      if (index != -1) {
+        _customers[index] = _customers[index].copyWith(status: oldStatus);
+      }
+      notifyListeners();
+      _notifyOrderChange();
+      rethrow;
+    }
   }
 
   void setOrderFilter(Status? status) {

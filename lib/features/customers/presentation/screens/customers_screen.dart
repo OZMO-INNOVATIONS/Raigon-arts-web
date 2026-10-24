@@ -184,23 +184,73 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: _toolbar(p, wide),
                       ),
 
-                      CustomersTable(
-                        customers: pageItems,
-                        onView: (c) => showViewCustomerDialog(context, c),
-                        onWhatsApp: _sendWhatsApp,
-                        onEdit: _edit,
-                        onDelete: _delete,
-                      ),
+                      if (customerProvider.error != null && customerProvider.customers.isEmpty)
+                        Expanded(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.error),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'Failed to load customers',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    customerProvider.error is ApiException
+                                        ? (customerProvider.error as ApiException).userFriendlyMessage
+                                        : 'Please check your connection to the server.',
+                                    style: TextStyle(fontSize: 14, color: p.textMuted),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      customerProvider.refresh().then((_) {
+                                        if (context.mounted) {
+                                          AppSnackBar.success(context, 'Customers loaded successfully.');
+                                        }
+                                      }).catchError((e) {
+                                        if (context.mounted) {
+                                          final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
+                                          AppSnackBar.error(context, msg);
+                                        }
+                                      });
+                                    },
+                                    icon: const Icon(Icons.refresh, size: 16),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else ...[
+                        CustomersTable(
+                          customers: pageItems,
+                          onView: (c) => showViewCustomerDialog(context, c),
+                          onWhatsApp: _sendWhatsApp,
+                          onEdit: _edit,
+                          onDelete: _delete,
+                        ),
 
-                      AppPaginationFooter(
-                        totalItems: all.length,
-                        page: pagination.page,
-                        pageSize: pagination.pageSize,
-                        itemLabel: 'customers',
-                        onPageChanged: (newPage) {
-                          pagination.setPage(newPage, all.length);
-                        },
-                      ),
+                        AppPaginationFooter(
+                          totalItems: all.length,
+                          page: pagination.page,
+                          pageSize: pagination.pageSize,
+                          itemLabel: 'customers',
+                          onPageChanged: (newPage) {
+                            pagination.setPage(newPage, all.length);
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),

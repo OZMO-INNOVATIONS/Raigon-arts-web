@@ -79,12 +79,18 @@ class ApiClient {
     List<dynamic> errors = const [];
 
     if (decoded is Map<String, dynamic>) {
-      if (decoded['message'] != null) {
-        message = decoded['message'].toString();
+      if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+        message = decoded['message'].toString().trim();
+      } else if (decoded['error'] != null && decoded['error'].toString().trim().isNotEmpty) {
+        message = decoded['error'].toString().trim();
+      } else if (decoded['details'] != null && decoded['details'].toString().trim().isNotEmpty) {
+        message = decoded['details'].toString().trim();
       }
       if (decoded['errors'] is List) {
         errors = decoded['errors'] as List<dynamic>;
       }
+    } else if (decoded is String && decoded.trim().isNotEmpty && !decoded.contains('<html')) {
+      message = decoded.trim();
     }
 
     throw ApiException(
@@ -115,8 +121,12 @@ class ApiClient {
     } catch (e) {
       debugPrint('[ApiClient] Unexpected error: $e');
       if (e is ApiException) rethrow;
+      final str = e.toString();
+      final cleanMsg = str.contains('SocketException') || str.contains('Failed host lookup')
+          ? 'Unable to connect to server. Please check your internet connection.'
+          : 'Network request error: $e';
       throw ApiException(
-        message: 'Network request error: $e',
+        message: cleanMsg,
         statusCode: 0,
       );
     }

@@ -17,6 +17,7 @@ import 'package:raigon_art/features/customers/presentation/screens/customers_scr
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
 import 'package:raigon_art/features/messaging_automation/presentation/screens/messaging_automation_screen.dart';
+import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
 import 'package:raigon_art/features/photo_collection/presentation/screens/photo_collection_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';
@@ -44,12 +45,25 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
 
-    _current = _isAdmin ? NavDestination.dashboard : NavDestination.customers;
+    final uri = Uri.base;
+    final instagramConnected = uri.queryParameters['instagram'] == 'connected';
+
+    _current = instagramConnected
+        ? NavDestination.messagingAutomation
+        : (_isAdmin ? NavDestination.dashboard : NavDestination.customers);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
       context.read<CustomerAndOrderProvider>().init();
+
+      if (instagramConnected) {
+        final username = uri.queryParameters['username'] ?? '';
+
+        context.read<MessagingAutomationProvider>().handleInstagramConnected(
+          username,
+        );
+      }
     });
   }
 
@@ -60,10 +74,33 @@ class _AppShellState extends State<AppShell> {
   void _goTo(NavDestination destination) {
     if (!_canAccess(destination)) return;
 
+    if (destination == NavDestination.messagingAutomation) {
+      _openMessagingAutomation();
+      return;
+    }
+
     setState(() {
       _current = destination;
       _showNotifications = false;
     });
+  }
+
+  Future<void> _openMessagingAutomation() async {
+    if (!_canAccess(NavDestination.messagingAutomation)) return;
+
+    setState(() {
+      _current = NavDestination.messagingAutomation;
+      _showNotifications = false;
+    });
+
+    final provider = context.read<MessagingAutomationProvider>();
+    final uri = Uri.base;
+
+    if (uri.queryParameters['instagram'] == 'connected') {
+      provider.handleInstagramConnected(uri.queryParameters['username'] ?? '');
+    } else {
+      await provider.restoreInstagramConnection();
+    }
   }
 
   void _openAddCustomer() {

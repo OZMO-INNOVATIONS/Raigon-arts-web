@@ -125,6 +125,61 @@ class MessagingAutomationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> restoreInstagramConnection() async {
+    if (connecting) return;
+
+    connecting = true;
+    notifyListeners();
+
+    try {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+
+      if (session == null) {
+        connected = false;
+        stage = AutomationStage.channelSelect;
+        return;
+      }
+
+      final response = await supabase.functions.invoke(
+        'instagram-oauth',
+        method: HttpMethod.get,
+        queryParameters: {'action': 'status'},
+      );
+
+      final data = response.data;
+
+      if (response.status < 200 || response.status >= 300 || data is! Map) {
+        throw Exception('Could not restore Instagram connection.');
+      }
+
+      final accounts = data['accounts'];
+
+      if (data['connected'] == true &&
+          accounts is List &&
+          accounts.isNotEmpty &&
+          accounts.first is Map) {
+        final account = accounts.first as Map;
+
+        channel = AutomationChannel.instagram;
+        accountName = account['username']?.toString() ?? 'Instagram';
+        connected = true;
+        tab = DashboardTab.automations;
+        stage = AutomationStage.dashboard;
+      } else {
+        connected = false;
+        stage = AutomationStage.channelSelect;
+      }
+    } catch (error) {
+      debugPrint('Could not restore Instagram connection: $error');
+      connected = false;
+      stage = AutomationStage.channelSelect;
+    } finally {
+      connecting = false;
+      notifyListeners();
+    }
+  }
+
   /// Simulated connect. Replace body with real OAuth / Cloud API call later.
   Future<void> connect() async {
     if (connecting) return;
@@ -202,6 +257,15 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
   void setTab(DashboardTab t) {
     tab = t;
+    notifyListeners();
+  }
+
+  void handleInstagramConnected(String username) {
+    channel = AutomationChannel.instagram;
+    accountName = username.isNotEmpty ? username : 'Instagram';
+    connected = true;
+    stage = AutomationStage.dashboard;
+    tab = DashboardTab.automations;
     notifyListeners();
   }
 

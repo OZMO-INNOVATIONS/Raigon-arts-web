@@ -139,6 +139,10 @@ Thank you for choosing Raigon Arts! ❤️
     // Remove spaces, +, brackets, hyphens and other punctuation.
     var digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
 
+    if (digits.startsWith('0') && digits.length == 11) {
+      digits = digits.substring(1);
+    }
+
     // Normalize Indian mobile numbers to country code +91.
     if (digits.length == 10) {
       digits = '91$digits';

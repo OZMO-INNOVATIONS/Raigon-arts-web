@@ -66,7 +66,18 @@ class ApiClient {
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (decoded is Map<String, dynamic>) {
+      if (decoded is Map) {
+        if (decoded['success'] == false) {
+          final msg = decoded['message']?.toString() ??
+              decoded['error']?.toString() ??
+              decoded['details']?.toString() ??
+              'Operation failed with status ${response.statusCode}';
+          throw ApiException(
+            message: msg,
+            statusCode: response.statusCode,
+            rawResponse: decoded,
+          );
+        }
         if (decoded.containsKey('data')) {
           return decoded['data'];
         }
@@ -78,7 +89,7 @@ class ApiClient {
     String message = 'Request failed with status ${response.statusCode}';
     List<dynamic> errors = const [];
 
-    if (decoded is Map<String, dynamic>) {
+    if (decoded is Map) {
       if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
         message = decoded['message'].toString().trim();
       } else if (decoded['error'] != null && decoded['error'].toString().trim().isNotEmpty) {

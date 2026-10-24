@@ -12,6 +12,7 @@ import 'package:raigon_art/core/network/auth_token_manager.dart';
 import 'package:raigon_art/features/authentication/models/auth_model.dart';
 import 'package:raigon_art/features/authentication/providers/auth_provider.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -85,6 +86,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
     if (ok) {
       AppSnackBar.success(context, 'Signed in successfully. Welcome back!');
+      context.read<CustomerAndOrderProvider>().refresh().catchError((e) {
+        debugPrint('[AuthScreen] Initial customer fetch on login note: $e');
+      });
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRouter.dashboard,

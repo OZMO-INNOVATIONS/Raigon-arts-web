@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/customer_dialog_kit.dart';
 import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/core/widgets/status_pill.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
+import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 
 enum _ViewAction { edit }
 
@@ -24,7 +29,9 @@ Future<void> showViewCustomerDialog(
     builder: (_) => ViewCustomerDialog(customer: customer),
   );
   if (action == _ViewAction.edit && context.mounted) {
-    await showEditCustomerDialog(context, customer);
+    final latest =
+        context.read<CustomerAndOrderProvider>().findById(customer.id) ?? customer;
+    await showEditCustomerDialog(context, latest);
   }
 }
 
@@ -190,17 +197,57 @@ class ViewCustomerDialog extends StatefulWidget {
 
 class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
   final _scroll = ScrollController();
+  late Customer _c;
+  bool _isLoadingFresh = false;
+  String? _freshError;
 
   static const _green = AppPalette.statusGreen;
   static const _red = Color(0xFFE0605E);
+
+  @override
+  void initState() {
+    super.initState();
+    _c = widget.customer;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFreshCustomerDetails();
+    });
+  }
+
+  Future<void> _loadFreshCustomerDetails() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingFresh = true;
+      _freshError = null;
+    });
+
+    try {
+      final fresh = await context
+          .read<CustomerAndOrderProvider>()
+          .fetchCustomerDetails(_c.id);
+      if (mounted) {
+        setState(() {
+          _c = fresh;
+          _isLoadingFresh = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[ViewCustomerDialog] Fetch customer details error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingFresh = false;
+          _freshError = e is ApiException
+              ? e.userFriendlyMessage
+              : 'Could not load fresh details from server.';
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
     _scroll.dispose();
     super.dispose();
   }
-
-  Customer get _c => widget.customer;
 
   @override
   Widget build(BuildContext context) {
@@ -247,18 +294,60 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Customer Order Profile & Summary',
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Customer Order Profile & Summary',
+                      style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    if (_isLoadingFresh) ...[
+                      const SizedBox(width: 10),
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Syncing...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Complete details and workshop framing specifications',
-                  style: TextStyle(fontSize: 13.5, color: p.textMuted),
+                Row(
+                  children: [
+                    Text(
+                      'Complete details and workshop framing specifications',
+                      style: TextStyle(fontSize: 13.5, color: p.textMuted),
+                    ),
+                    if (_freshError != null) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _loadFreshCustomerDetails,
+                        child: Text(
+                          '· Tap to retry sync',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFE0605E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -961,7 +1050,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                   onPressed: () => _showPhotoViewerDialog(
                                     ctx,
                                     photo,
-                                    customer: widget.customer,
+                                    customer: _c,
                                     initialIndex: index,
                                   ),
                                   style: OutlinedButton.styleFrom(
@@ -1020,7 +1109,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       child: _VaultCard(
                         photo: photos[i],
                         index: i,
-                        customer: widget.customer,
+                        customer: _c,
                       ),
                     ),
                 ],
@@ -1052,7 +1141,30 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
           const SizedBox(width: 10),
 
           InkWell(
-            onTap: () {},
+            onTap: () async {
+              try {
+                final opened =
+                    await CustomerWhatsAppService.openOrderConfirmation(_c);
+                if (!mounted) return;
+                if (opened) {
+                  AppSnackBar.success(
+                    context,
+                    'WhatsApp opened with order receipt.',
+                  );
+                } else {
+                  AppSnackBar.error(
+                    context,
+                    'Could not open WhatsApp. Check customer phone number.',
+                  );
+                }
+              } catch (e) {
+                if (!mounted) return;
+                AppSnackBar.error(
+                  context,
+                  'Could not open WhatsApp for ${_c.name}.',
+                );
+              }
+            },
             borderRadius: BorderRadius.circular(8),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),

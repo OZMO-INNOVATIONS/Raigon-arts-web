@@ -53,24 +53,43 @@ class FrameSpec {
     // Do not save image bytes directly in Firestore.
   };
 
-  factory FrameSpec.fromJson(Map<String, dynamic> j) => FrameSpec(
-    size: j['size'] as String? ?? '',
-    unit: j['unit'] as String? ?? 'Inch',
-    customWidth: j['customWidth'] as String? ?? '',
-    customHeight: j['customHeight'] as String? ?? '',
-    frameType: j['frameType'] as String? ?? '',
-    material: j['material'] as String? ?? '',
-    finish: j['finish'] as String? ?? '',
-    orientation: j['orientation'] as String? ?? '',
-    qty: (j['qty'] as num?)?.toInt() ?? 1,
-    notes: j['notes'] as String? ?? '',
-    photoName: j['photoName'] as String?,
-    photoUrl: (j['photoUrl'] != null && j['photoUrl'].toString().isNotEmpty) ? ImageUrlHelper.resolve(j['photoUrl'].toString()) : null,
-    // Supports older documents that contain Base64 image bytes.
-    photoBytes: j['photoBytes'] == null
-        ? null
-        : base64Decode(j['photoBytes'] as String),
-  );
+  factory FrameSpec.fromJson(Map<String, dynamic> j) {
+    int parseQty(dynamic v) {
+      if (v == null) return 1;
+      if (v is num) return v.toInt();
+      if (v is String) return num.tryParse(v)?.toInt() ?? 1;
+      return 1;
+    }
+
+    final pUrl = j['photoUrl'] ?? j['photo_url'];
+    final pName = j['photoName'] ?? j['photo_name'];
+    final pBytes = j['photoBytes'] ?? j['photo_bytes'];
+
+    Uint8List? decodedBytes;
+    if (pBytes != null && pBytes is String && pBytes.isNotEmpty) {
+      try {
+        decodedBytes = base64Decode(pBytes);
+      } catch (_) {}
+    }
+
+    return FrameSpec(
+      size: (j['size'] ?? '')?.toString() ?? '',
+      unit: (j['unit'] ?? 'Inch')?.toString() ?? 'Inch',
+      customWidth: (j['customWidth'] ?? j['custom_width'] ?? '')?.toString() ?? '',
+      customHeight: (j['customHeight'] ?? j['custom_height'] ?? '')?.toString() ?? '',
+      frameType: (j['frameType'] ?? j['frame_type'] ?? '')?.toString() ?? '',
+      material: (j['material'] ?? '')?.toString() ?? '',
+      finish: (j['finish'] ?? '')?.toString() ?? '',
+      orientation: (j['orientation'] ?? '')?.toString() ?? '',
+      qty: parseQty(j['qty']),
+      notes: (j['notes'] ?? '')?.toString() ?? '',
+      photoName: pName?.toString(),
+      photoUrl: (pUrl != null && pUrl.toString().trim().isNotEmpty)
+          ? ImageUrlHelper.resolve(pUrl.toString().trim())
+          : null,
+      photoBytes: decodedBytes,
+    );
+  }
 }
 
 class PickedPhoto {

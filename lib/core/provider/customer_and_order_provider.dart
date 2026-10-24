@@ -66,16 +66,45 @@ class CustomerAndOrderProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    _isLoading = true;
     _error = null;
+    notifyListeners();
 
     try {
       _customers = await _repository.getAll();
       _initialized = true;
-      notifyListeners();
       _notifyOrderChange();
     } catch (error) {
       _error = error;
+      rethrow;
+    } finally {
+      _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Customer? findById(String id) {
+    try {
+      return _customers.firstWhere((c) => c.id.toLowerCase() == id.toLowerCase());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Customer> fetchCustomerDetails(String id) async {
+    try {
+      final customer = await _repository.getById(id);
+      final index = _customers.indexWhere((c) => c.id.toLowerCase() == id.toLowerCase());
+      if (index != -1) {
+        _customers[index] = customer;
+      } else {
+        _customers.insert(0, customer);
+      }
+      notifyListeners();
+      _notifyOrderChange();
+      return customer;
+    } catch (error) {
+      debugPrint('[CustomerProvider] fetchCustomerDetails failed ($id): $error');
       rethrow;
     }
   }
@@ -115,8 +144,9 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
     try {
       final created = await _repository.create(customer);
+      final safeCreated = created.id.isNotEmpty ? created : customer;
       _customers = [
-        for (final c in _customers) c.id == customer.id ? created : c,
+        for (final c in _customers) c.id == customer.id ? safeCreated : c,
       ];
       notifyListeners();
       _notifyOrderChange();
@@ -146,8 +176,9 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
     try {
       final updated = await _repository.update(customer);
+      final safeUpdated = updated.id.isNotEmpty ? updated : customer;
       _customers = [
-        for (final c in _customers) c.id == customer.id ? updated : c,
+        for (final c in _customers) c.id == customer.id ? safeUpdated : c,
       ];
       notifyListeners();
       _notifyOrderChange();

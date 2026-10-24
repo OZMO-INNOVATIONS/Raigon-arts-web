@@ -41,6 +41,19 @@ class RestCustomerRepository implements CustomerRepository {
 
   final ApiClient _api;
 
+  Map<String, dynamic> _extractDataMap(dynamic response) {
+    if (response is Map) {
+      if (response['data'] is Map) {
+        return Map<String, dynamic>.from(response['data'] as Map);
+      }
+      if (response['customer'] is Map) {
+        return Map<String, dynamic>.from(response['customer'] as Map);
+      }
+      return Map<String, dynamic>.from(response);
+    }
+    throw StateError('Expected customer Map object but received: ${response.runtimeType}');
+  }
+
   @override
   Future<List<Customer>> getAll({
     String? search,
@@ -76,11 +89,20 @@ class RestCustomerRepository implements CustomerRepository {
           ? response
           : (response is Map && response['data'] is List
               ? response['data'] as List
-              : const []);
+              : (response is Map && response['customers'] is List
+                  ? response['customers'] as List
+                  : const []));
 
-      final customers = items
-          .map((item) => Customer.fromJson(Map<String, dynamic>.from(item as Map)))
-          .toList();
+      final customers = <Customer>[];
+      for (final item in items) {
+        if (item is Map) {
+          try {
+            customers.add(Customer.fromJson(Map<String, dynamic>.from(item)));
+          } catch (e) {
+            debugPrint('[RestCustomerRepository] Skipping invalid customer record: $e');
+          }
+        }
+      }
 
       debugPrint('[RestCustomerRepository] Loaded ${customers.length} customers.');
       return customers;
@@ -113,9 +135,7 @@ class RestCustomerRepository implements CustomerRepository {
   Future<Customer> getById(String id) async {
     try {
       final response = await _api.get(ApiConstants.customer(id));
-      final map = response is Map<String, dynamic>
-          ? response
-          : Map<String, dynamic>.from(response as Map);
+      final map = _extractDataMap(response);
       return Customer.fromJson(map);
     } catch (e) {
       debugPrint('[RestCustomerRepository] getById failed ($id): $e');
@@ -169,9 +189,7 @@ class RestCustomerRepository implements CustomerRepository {
           files: files,
         );
 
-        final map = response is Map<String, dynamic>
-            ? response
-            : Map<String, dynamic>.from(response as Map);
+        final map = _extractDataMap(response);
         debugPrint('[RestCustomerRepository] Created customer ${customer.id} with photos.');
         return Customer.fromJson(map);
       } else {
@@ -179,9 +197,7 @@ class RestCustomerRepository implements CustomerRepository {
           ApiConstants.customers,
           body: customer.toApiJson(),
         );
-        final map = response is Map<String, dynamic>
-            ? response
-            : Map<String, dynamic>.from(response as Map);
+        final map = _extractDataMap(response);
         debugPrint('[RestCustomerRepository] Created customer ${customer.id}.');
         return Customer.fromJson(map);
       }
@@ -237,9 +253,7 @@ class RestCustomerRepository implements CustomerRepository {
           files: files,
         );
 
-        final map = response is Map<String, dynamic>
-            ? response
-            : Map<String, dynamic>.from(response as Map);
+        final map = _extractDataMap(response);
         debugPrint('[RestCustomerRepository] Updated customer ${customer.id} with photos.');
         return Customer.fromJson(map);
       } else {
@@ -247,9 +261,7 @@ class RestCustomerRepository implements CustomerRepository {
           ApiConstants.customer(customer.id),
           body: customer.toApiJson(),
         );
-        final map = response is Map<String, dynamic>
-            ? response
-            : Map<String, dynamic>.from(response as Map);
+        final map = _extractDataMap(response);
         debugPrint('[RestCustomerRepository] Updated customer ${customer.id}.');
         return Customer.fromJson(map);
       }

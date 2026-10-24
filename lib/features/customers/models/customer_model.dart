@@ -136,14 +136,34 @@ class Customer {
     ],
   };
 
-  factory Customer.fromJson(Map<String, dynamic> j) {
-    List<String> strings(String key) => [
-      for (final v in (j[key] as List? ?? const [])) v.toString(),
-    ];
+  factory Customer.fromJson(Map<String, dynamic> raw) {
+    var j = raw;
+    if (j.containsKey('data') && j['data'] is Map && !j.containsKey('id')) {
+      j = Map<String, dynamic>.from(j['data'] as Map);
+    } else if (j.containsKey('customer') && j['customer'] is Map && !j.containsKey('id')) {
+      j = Map<String, dynamic>.from(j['customer'] as Map);
+    }
+
+    int toInt(dynamic v, [int fallback = 0]) {
+      if (v == null) return fallback;
+      if (v is num) return v.toInt();
+      if (v is String) return num.tryParse(v)?.toInt() ?? fallback;
+      return fallback;
+    }
+
+    List<String> extractStrings(List<String> keys) {
+      for (final k in keys) {
+        final list = j[k];
+        if (list is List) {
+          return [for (final v in list) if (v != null) v.toString()];
+        }
+      }
+      return [];
+    }
 
     Status parseStatus(dynamic value) {
-      final s = value?.toString().toLowerCase() ?? '';
-      if (s == 'inprogress' || s == 'in_progress') return Status.inProgress;
+      final s = value?.toString().toLowerCase().replaceAll('-', '').replaceAll('_', '') ?? '';
+      if (s == 'inprogress') return Status.inProgress;
       if (s == 'completed') return Status.completed;
       if (s == 'cancelled') return Status.cancelled;
       return Status.pending;
@@ -154,18 +174,37 @@ class Customer {
       return DateTime.tryParse(value.toString()) ?? DateTime.now();
     }
 
+    final rawFrames = j['frames'] ?? j['customer_frames'];
     final frames = [
-      for (final f in (j['frames'] as List? ?? const []))
+      for (final f in (rawFrames is List ? rawFrames : const []))
         if (f is Map)
           FrameSpec.fromJson(Map<String, dynamic>.from(f)),
     ];
 
-    final pNames = strings('photoNames');
-    final rawUrls = strings('photoUrls');
+    final pNames = extractStrings(['photoNames', 'photo_names']);
+    final rawUrls = extractStrings(['photoUrls', 'photo_urls']);
+
+    // Fallback: If customer_photos table objects are passed
+    final rawCustPhotos = j['customer_photos'];
+    if (rawUrls.isEmpty && rawCustPhotos is List) {
+      for (final p in rawCustPhotos) {
+        if (p is Map) {
+          final u = p['file_url'] ?? p['fileUrl'] ?? p['url'];
+          if (u != null && u.toString().trim().isNotEmpty) {
+            rawUrls.add(u.toString().trim());
+          }
+          final n = p['file_name'] ?? p['fileName'] ?? p['name'];
+          if (n != null && n.toString().trim().isNotEmpty) {
+            pNames.add(n.toString().trim());
+          }
+        }
+      }
+    }
+
     var pUrls = [
       for (final u in rawUrls) ImageUrlHelper.resolve(u),
     ].where((u) => u.isNotEmpty).toList();
-    final pSizeLabels = strings('photoSizeLabels');
+    final pSizeLabels = extractStrings(['photoSizeLabels', 'photo_size_labels']);
 
     // Collect any frame photos that might not be in pUrls
     for (var i = 0; i < frames.length; i++) {
@@ -209,38 +248,50 @@ class Customer {
       }
     }
 
-    final rawPhotoCount = (j['photoCount'] as num?)?.toInt() ?? 0;
+    final rawPhotoCount = toInt(j['photoCount'] ?? j['photo_count'], 0);
     final photoCount = rawPhotoCount > 0
         ? rawPhotoCount
         : (pUrls.isNotEmpty ? pUrls.length : pNames.length);
 
+    final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
+    final bytesList = <Uint8List>[];
+    if (rawBytes is List) {
+      for (final s in rawBytes) {
+        if (s is String && s.isNotEmpty) {
+          try {
+            bytesList.add(base64Decode(s));
+          } catch (_) {}
+        }
+      }
+    }
+
+    final rawOrderDate = j['orderDate'] ?? j['order_date'];
+    final rawExpectedDelivery = j['expectedDelivery'] ?? j['expected_delivery'];
+
     return Customer(
-      id: j['id'] as String? ?? '',
-      name: j['name'] as String? ?? '',
-      city: j['city'] as String? ?? '',
-      phone: j['phone'] as String? ?? '',
-      altPhone: j['altPhone'] as String? ?? '',
-      address: j['address'] as String? ?? '',
-      pincode: j['pincode'] as String? ?? '',
+      id: (j['id'] ?? '')?.toString() ?? '',
+      name: (j['name'] ?? '')?.toString() ?? '',
+      city: (j['city'] ?? '')?.toString() ?? '',
+      phone: (j['phone'] ?? '')?.toString() ?? '',
+      altPhone: (j['altPhone'] ?? j['alt_phone'] ?? '')?.toString() ?? '',
+      address: (j['address'] ?? '')?.toString() ?? '',
+      pincode: (j['pincode'] ?? '')?.toString() ?? '',
       photoCount: photoCount,
       photoNames: pNames,
       photoUrls: pUrls,
       photoSizeLabels: pSizeLabels,
-      photoBytes: [
-        for (final s in (j['photoBytes'] as List? ?? const []))
-          if (s is String) base64Decode(s),
-      ],
-      frameSize: j['frameSize'] as String? ?? '',
-      frameType: j['frameType'] as String? ?? '',
-      qty: (j['qty'] as num?)?.toInt() ?? 1,
-      total: (j['total'] as num?)?.toInt() ?? 0,
-      advance: (j['advance'] as num?)?.toInt() ?? 0,
-      paymentStatus: j['paymentStatus'] as String? ?? 'Unpaid',
+      photoBytes: bytesList,
+      frameSize: (j['frameSize'] ?? j['frame_size'] ?? j['frame_size_summary'] ?? '')?.toString() ?? '',
+      frameType: (j['frameType'] ?? j['frame_type'] ?? j['frame_type_summary'] ?? '')?.toString() ?? '',
+      qty: toInt(j['qty'], 1),
+      total: toInt(j['total'], 0),
+      advance: toInt(j['advance'], 0),
+      paymentStatus: (j['paymentStatus'] ?? j['payment_status'] ?? 'Unpaid')?.toString() ?? 'Unpaid',
       status: parseStatus(j['status']),
-      orderDate: parseDate(j['orderDate']),
-      expectedDelivery: j['expectedDelivery'] == null
+      orderDate: parseDate(rawOrderDate),
+      expectedDelivery: rawExpectedDelivery == null
           ? null
-          : DateTime.tryParse(j['expectedDelivery'].toString()),
+          : DateTime.tryParse(rawExpectedDelivery.toString()),
       frames: resolvedFrames,
     );
   }

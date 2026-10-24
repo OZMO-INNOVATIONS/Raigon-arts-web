@@ -30,8 +30,18 @@ class CustomersScreen extends StatefulWidget {
 
 class _CustomersScreenState extends State<CustomersScreen> {
   final _searchCtrl = TextEditingController();
-  Status? _status;
-  final SortOption _sort = SortOption.newest;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<CustomerAndOrderProvider>();
+      if (!provider.initialized && !provider.isLoading) {
+        provider.init();
+      }
+    });
+  }
 
   Future<void> _edit(Customer c) => showEditCustomerDialog(context, c);
 
@@ -91,50 +101,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
     super.dispose();
   }
 
-  List<Customer> get _filtered {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    final provider = context.read<CustomerAndOrderProvider>();
-
-    final list = provider.customers.where((c) {
-      final statusOk = _status == null || c.status == _status;
-
-      final searchOk =
-          q.isEmpty ||
-          [
-            c.id,
-            c.name,
-            c.phone,
-            c.city,
-            c.address,
-          ].any((value) => value.toLowerCase().contains(q));
-
-      return statusOk && searchOk;
-    }).toList();
-
-    switch (_sort) {
-      case SortOption.newest:
-        list.sort((a, b) => b.orderDate.compareTo(a.orderDate));
-      case SortOption.oldest:
-        list.sort((a, b) => a.orderDate.compareTo(b.orderDate));
-      case SortOption.name:
-        list.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-        );
-      case SortOption.amount:
-        list.sort((a, b) => b.total.compareTo(a.total));
-    }
-
-    return list;
-  }
-
   Future<void> _exportCsv() async {
-    final list = _filtered;
+    final provider = context.read<CustomerAndOrderProvider>();
+    final screenProvider = context.read<CustomersScreenProvider>();
+    final list = screenProvider.filteredCustomers(provider.customers);
+
     if (list.isEmpty) {
       AppSnackBar.error(context, 'No customers to export.');
       return;
     }
     try {
-      final provider = context.read<CustomerAndOrderProvider>();
       await downloadCsv(
         provider.csvFileName(),
         provider.buildCustomersCsv(list),
@@ -149,7 +125,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<CustomerAndOrderProvider>();
     final p = AppPalette.of(context);
     final screenProvider = context.watch<CustomersScreenProvider>();
     final customerProvider = context.watch<CustomerAndOrderProvider>();
@@ -184,7 +159,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: _toolbar(p, wide),
                       ),
 
-                      if (customerProvider.error != null && customerProvider.customers.isEmpty)
+                      if (customerProvider.isLoading && !customerProvider.initialized)
+                        const Expanded(
+                          child: Center(
+                            child: CircularProgressIndicator(color: AppColors.gold),
+                          ),
+                        )
+                      else if (customerProvider.error != null && customerProvider.customers.isEmpty)
                         Expanded(
                           child: Center(
                             child: Padding(

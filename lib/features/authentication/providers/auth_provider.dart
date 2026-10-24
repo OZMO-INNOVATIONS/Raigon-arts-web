@@ -5,6 +5,7 @@ import 'package:raigon_art/core/network/api_client.dart';
 import 'package:raigon_art/core/network/auth_token_manager.dart';
 import 'package:raigon_art/features/authentication/models/auth_model.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthProvider extends ChangeNotifier {
   AuthProvider() {
@@ -35,27 +36,53 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _init() async {
     ApiClient.onSessionExpired = () {
-      debugPrint('[AuthProvider] Session expired from ApiClient. Signing out...');
+      debugPrint('[AuthProvider] Render session expired. Signing out...');
       signOut();
     };
 
     await AuthTokenManager.instance.init();
-    if (AuthTokenManager.instance.isAuthenticated) {
-      _update(
-        _state.copyWith(
-          isAuthenticated: true,
-          userRole: AuthTokenManager.instance.currentUser?.role,
-        ),
-      );
 
-      try {
-        final profile = await AuthService.fetchProfile();
-        if (profile != null) {
-          _update(_state.copyWith(userRole: profile.role));
+    final renderUser = AuthTokenManager.instance.currentUser;
+    final renderAuthenticated = AuthTokenManager.instance.isAuthenticated;
+
+    final supabaseUser = Supabase.instance.client.auth.currentUser;
+
+    // Both sessions must exist.
+    if (!renderAuthenticated || renderUser == null || supabaseUser == null) {
+      await AuthService.signOut();
+      _update(const AuthModel());
+      return;
+    }
+
+    // Both sessions must belong to the same email account.
+    final renderEmail = renderUser.email.trim().toLowerCase();
+    final supabaseEmail = (supabaseUser.email ?? '').trim().toLowerCase();
+
+    if (renderEmail.isEmpty ||
+        supabaseEmail.isEmpty ||
+        renderEmail != supabaseEmail) {
+      await AuthService.signOut();
+      _update(const AuthModel());
+      return;
+    }
+
+    _update(_state.copyWith(isAuthenticated: true, userRole: renderUser.role));
+
+    try {
+      final profile = await AuthService.fetchProfile();
+
+      if (profile != null) {
+        final profileEmail = profile.email.trim().toLowerCase();
+
+        if (profileEmail.isNotEmpty && profileEmail != supabaseEmail) {
+          await signOut();
+          return;
         }
-      } catch (e) {
-        debugPrint('[AuthProvider] Background profile check notice: $e');
+
+        _update(_state.copyWith(userRole: profile.role));
       }
+    } catch (e) {
+      debugPrint('[AuthProvider] Profile check notice: $e');
     }
   }
 
@@ -64,7 +91,6 @@ class AuthProvider extends ChangeNotifier {
     _stopTimer();
     _update(const AuthModel());
   }
-
 
   void _update(AuthModel newState) {
     _state = newState;
@@ -87,7 +113,9 @@ class AuthProvider extends ChangeNotifier {
       _update(
         _state.copyWith(
           isLoading: false,
-          errorMessage: success ? null : (AuthService.lastError ?? failureMessage),
+          errorMessage: success
+              ? null
+              : (AuthService.lastError ?? failureMessage),
           clearError: success,
         ),
       );
@@ -156,7 +184,7 @@ class AuthProvider extends ChangeNotifier {
           errorMessage: success
               ? null
               : (AuthService.lastError ??
-                  'Invalid mobile number/email or password.'),
+                    'Invalid mobile number/email or password.'),
           clearError: success,
         ),
       );

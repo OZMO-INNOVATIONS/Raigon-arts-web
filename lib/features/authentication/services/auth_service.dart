@@ -3,6 +3,7 @@ import 'package:raigon_art/core/network/api_client.dart';
 import 'package:raigon_art/core/network/api_constants.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
 import 'package:raigon_art/core/network/auth_token_manager.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 class AuthService {
   AuthService._();
@@ -20,13 +21,12 @@ class AuthService {
 
   static Future<String?> signIn(String identifier, String password) async {
     _lastError = null;
+
     try {
+      // First: authenticate using the existing Render API.
       final response = await _api.post(
         ApiConstants.login,
-        body: {
-          'identifier': identifier.trim(),
-          'password': password,
-        },
+        body: {'identifier': identifier.trim(), 'password': password},
         requiresAuth: false,
       );
 
@@ -40,13 +40,50 @@ class AuthService {
       }
 
       final user = AuthUser.fromJson(userData);
+      final email = userData['email']?.toString().trim() ?? '';
+
+      if (email.isEmpty) {
+        _lastError =
+            'This account has no email address for Supabase authentication.';
+        return null;
+      }
+
+      // Save the existing Render session temporarily.
       await AuthTokenManager.instance.saveSession(
         token: token,
         refreshToken: refreshToken,
         user: user,
       );
 
-      debugPrint('[AuthService] Login successful. User: ${user.name}, Role: ${user.role}');
+      try {
+        // Second: authenticate the same account with Supabase.
+        final supabaseResponse = await Supabase.instance.client.auth
+            .signInWithPassword(email: email, password: password);
+
+        final supabaseUser = supabaseResponse.user;
+
+        if (supabaseResponse.session == null ||
+            supabaseUser == null ||
+            supabaseUser.email?.toLowerCase() != email.toLowerCase()) {
+          throw const AuthException(
+            'Supabase authentication could not be verified.',
+          );
+        }
+      } catch (error) {
+        // Both checks are required. Do not retain a Render-only session.
+        try {
+          await Supabase.instance.client.auth.signOut();
+        } catch (_) {}
+
+        await AuthTokenManager.instance.clear();
+
+        _lastError = 'Supabase authentication failed. Please contact your administrator.';
+        debugPrint('[AuthService] Supabase sign-in failed: $error');
+        return null;
+      }
+
+      debugPrint('[AuthService] Render and Supabase authentication succeeded.');
+
       return user.role;
     } on ApiException catch (e) {
       _lastError = e.userFriendlyMessage;
@@ -79,7 +116,9 @@ class AuthService {
       return true;
     } on ApiException catch (e) {
       _lastError = e.userFriendlyMessage;
-      debugPrint('[AuthService] sendWhatsAppOtp API error: ${e.userFriendlyMessage}');
+      debugPrint(
+        '[AuthService] sendWhatsAppOtp API error: ${e.userFriendlyMessage}',
+      );
       return false;
     } catch (e) {
       _lastError = 'Connection failure: $e';
@@ -94,10 +133,7 @@ class AuthService {
       final cleanPhone = phone.replaceAll(RegExp(r'[\s-]'), '');
       final response = await _api.post(
         ApiConstants.verifyOtp,
-        body: {
-          'phone': cleanPhone,
-          'otp': otp.trim(),
-        },
+        body: {'phone': cleanPhone, 'otp': otp.trim()},
         requiresAuth: false,
       );
 
@@ -137,7 +173,9 @@ class AuthService {
       return true;
     } on ApiException catch (e) {
       _lastError = e.userFriendlyMessage;
-      debugPrint('[AuthService] resetPassword API error: ${e.userFriendlyMessage}');
+      debugPrint(
+        '[AuthService] resetPassword API error: ${e.userFriendlyMessage}',
+      );
       return false;
     } catch (e) {
       _lastError = 'Connection failure: $e';
@@ -162,9 +200,16 @@ class AuthService {
   }
 
   static Future<void> signOut() async {
-    await AuthTokenManager.instance.clear();
-    _lastResetToken = null;
-    _lastDevOtp = null;
-    _lastError = null;
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (e) {
+      debugPrint('[AuthService] Supabase sign-out notice: $e');
+    } finally {
+      await AuthTokenManager.instance.clear();
+
+      _lastResetToken = null;
+      _lastDevOtp = null;
+      _lastError = null;
+    }
   }
 }

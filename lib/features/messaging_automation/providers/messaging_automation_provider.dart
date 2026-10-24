@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum AutomationChannel { instagram, whatsapp }
 
 extension AutomationChannelX on AutomationChannel {
-  String get label => this == AutomationChannel.instagram ? 'Instagram' : 'WhatsApp';
+  String get label =>
+      this == AutomationChannel.instagram ? 'Instagram' : 'WhatsApp';
 }
 
 enum AutomationStage { channelSelect, connect, firstMove, builder, dashboard }
@@ -83,13 +86,13 @@ class FlowNode {
   Offset position;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type.name,
-        'title': title,
-        'subtitle': subtitle,
-        'x': position.dx,
-        'y': position.dy,
-      };
+    'id': id,
+    'type': type.name,
+    'title': title,
+    'subtitle': subtitle,
+    'x': position.dx,
+    'y': position.dy,
+  };
 }
 
 class FlowEdge {
@@ -124,13 +127,72 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
   /// Simulated connect. Replace body with real OAuth / Cloud API call later.
   Future<void> connect() async {
+    if (connecting) return;
+
+    // Keep the existing WhatsApp behavior unchanged for now.
+    if (channel == AutomationChannel.whatsapp) {
+      connecting = true;
+      notifyListeners();
+
+      try {
+        await Future.delayed(const Duration(seconds: 1));
+        connected = true;
+        stage = AutomationStage.firstMove;
+      } finally {
+        connecting = false;
+        notifyListeners();
+      }
+      return;
+    }
+
     connecting = true;
     notifyListeners();
-    await Future.delayed(const Duration(seconds: 1));
-    connecting = false;
-    connected = true;
-    stage = AutomationStage.firstMove;
-    notifyListeners();
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      if (supabase.auth.currentSession == null) {
+        throw Exception('Please sign in before connecting Instagram.');
+      }
+
+      final response = await supabase.functions.invoke(
+        'instagram-oauth',
+        body: {'action': 'start'},
+      );
+
+      final data = response.data;
+      debugPrint('Instagram OAuth response: ${response.data}');
+
+      if (response.status < 200 ||
+          response.status >= 300 ||
+          data is! Map ||
+          data['authorization_url'] is! String) {
+        throw Exception(
+          data is Map
+              ? '${data['error'] ?? 'Could not start Instagram authorization.'}'
+              : 'Invalid response from Instagram OAuth.',
+        );
+      }
+
+      final uri = Uri.tryParse(data['authorization_url'] as String);
+
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          uri.host != 'www.instagram.com') {
+        throw Exception('The Instagram authorization URL is invalid.');
+      }
+
+      final opened = await launchUrl(uri, webOnlyWindowName: '_self');
+
+      if (!opened) {
+        throw Exception('Could not open Instagram authorization.');
+      }
+    } catch (_) {
+      rethrow;
+    } finally {
+      connecting = false;
+      notifyListeners();
+    }
   }
 
   void skipToDashboard() {
@@ -160,7 +222,8 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
   bool get canGoLive =>
       draftMessage.trim().isNotEmpty &&
-      (draftTrigger == AutomationTrigger.welcome || draftKeywordList.isNotEmpty);
+      (draftTrigger == AutomationTrigger.welcome ||
+          draftKeywordList.isNotEmpty);
 
   void _resetDraft(AutomationTrigger t) {
     draftTrigger = t;
@@ -259,7 +322,11 @@ class MessagingAutomationProvider extends ChangeNotifier {
     f.active = on;
     logs.insert(
       0,
-      ActivityLog(flowName: f.name, contact: 'You', detail: on ? 'Resumed' : 'Paused'),
+      ActivityLog(
+        flowName: f.name,
+        contact: 'You',
+        detail: on ? 'Resumed' : 'Paused',
+      ),
     );
     notifyListeners();
   }
@@ -299,27 +366,33 @@ class MessagingAutomationProvider extends ChangeNotifier {
   DateTime? flowSavedAt;
 
   List<FlowNode> _defaultNodes() => [
-        FlowNode(
-            id: 'n1',
-            type: NodeType.trigger,
-            title: 'Trigger',
-            subtitle: 'DM received',
-            position: const Offset(40, 170)),
-        FlowNode(
-            id: 'n2',
-            type: NodeType.condition,
-            title: 'Condition',
-            subtitle: 'Keyword matches',
-            position: const Offset(360, 170)),
-        FlowNode(
-            id: 'n3',
-            type: NodeType.message,
-            title: 'Send message',
-            subtitle: 'Reply with link',
-            position: const Offset(680, 170)),
-      ];
+    FlowNode(
+      id: 'n1',
+      type: NodeType.trigger,
+      title: 'Trigger',
+      subtitle: 'DM received',
+      position: const Offset(40, 170),
+    ),
+    FlowNode(
+      id: 'n2',
+      type: NodeType.condition,
+      title: 'Condition',
+      subtitle: 'Keyword matches',
+      position: const Offset(360, 170),
+    ),
+    FlowNode(
+      id: 'n3',
+      type: NodeType.message,
+      title: 'Send message',
+      subtitle: 'Reply with link',
+      position: const Offset(680, 170),
+    ),
+  ];
 
-  List<FlowEdge> _defaultEdges() => const [FlowEdge('n1', 'n2'), FlowEdge('n2', 'n3')];
+  List<FlowEdge> _defaultEdges() => const [
+    FlowEdge('n1', 'n2'),
+    FlowEdge('n2', 'n3'),
+  ];
 
   FlowNode? nodeById(String id) {
     for (final n in nodes) {
@@ -340,13 +413,15 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
   void addNode(NodeType t) {
     final i = nodes.length;
-    nodes.add(FlowNode(
-      id: 'n${DateTime.now().microsecondsSinceEpoch}',
-      type: t,
-      title: t == NodeType.condition ? 'Condition' : 'Send message',
-      subtitle: t == NodeType.condition ? 'Add a rule' : 'Write a reply',
-      position: Offset(60.0 + (i % 4) * 40, 40.0 + (i % 3) * 30),
-    ));
+    nodes.add(
+      FlowNode(
+        id: 'n${DateTime.now().microsecondsSinceEpoch}',
+        type: t,
+        title: t == NodeType.condition ? 'Condition' : 'Send message',
+        subtitle: t == NodeType.condition ? 'Add a rule' : 'Write a reply',
+        position: Offset(60.0 + (i % 4) * 40, 40.0 + (i % 3) * 30),
+      ),
+    );
     notifyListeners();
   }
 
@@ -394,9 +469,9 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
   /// In-memory for now. Persist `flowJson` with shared_preferences / Hive next.
   Map<String, dynamic> get flowJson => {
-        'nodes': nodes.map((n) => n.toJson()).toList(),
-        'edges': edges.map((e) => e.toJson()).toList(),
-      };
+    'nodes': nodes.map((n) => n.toJson()).toList(),
+    'edges': edges.map((e) => e.toJson()).toList(),
+  };
 
   void saveFlow() {
     flowSavedAt = DateTime.now();

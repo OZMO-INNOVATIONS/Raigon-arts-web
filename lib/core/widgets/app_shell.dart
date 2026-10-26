@@ -16,7 +16,7 @@ import 'package:raigon_art/features/customers/presentation/widgets/add_customer_
 import 'package:raigon_art/features/customers/presentation/screens/customers_screen.dart';
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
-import 'package:raigon_art/features/messaging_automation/presentation/screens/messaging_automation_screen.dart';
+import 'package:raigon_art/features/messaging/presentation/screens/messaging_automation_screen.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
 import 'package:raigon_art/features/photo_collection/presentation/screens/photo_collection_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';

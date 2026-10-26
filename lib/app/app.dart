@@ -9,7 +9,7 @@ import 'package:raigon_art/features/authentication/providers/auth_provider.dart'
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/provider/customers_screen_provider.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
-import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
+import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
 class RaigonartApp extends StatelessWidget {
   const RaigonartApp({super.key});

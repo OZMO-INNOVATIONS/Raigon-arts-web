@@ -10,14 +10,14 @@ import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
+import 'package:raigon_art/features/messaging/services/inbox_read_state_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../widgets/channel_badge.dart';
 import '../widgets/channel_style.dart';
 import '../widgets/inbox_widgets.dart';
 
 // ─────────────────────────────────────────────────────────────
-// Instagram
+// Instagram data layer (unchanged)
 // ─────────────────────────────────────────────────────────────
 
 class InstagramInboxMessage {
@@ -44,11 +44,6 @@ class InstagramInboxMessage {
   bool get fromBot => direction == 'outgoing';
 
   factory InstagramInboxMessage.fromJson(Map<String, dynamic> json) {
-    debugPrint(
-      'Instagram inbox response: '
-      '${json['sender_username']} -> '
-      '${json['sender_profile_picture']}',
-    );
     return InstagramInboxMessage(
       id: int.tryParse('${json['id']}') ?? 0,
       senderId: '${json['sender_id'] ?? ''}',
@@ -155,583 +150,8 @@ class InstagramInboxService {
   }
 }
 
-class InstagramInboxContent extends StatefulWidget {
-  const InstagramInboxContent({super.key, required this.s});
-
-  final MessagingAutomationProvider s;
-
-  @override
-  State<InstagramInboxContent> createState() => _InstagramInboxContentState();
-}
-
-class _InstagramInboxContentState extends State<InstagramInboxContent> {
-  final InstagramInboxService _service = InstagramInboxService();
-
-  List<InstagramInboxMessage> _messages = [];
-  String? _error;
-  bool _loading = false;
-  String? _selectedSender;
-  int _requestVersion = 0;
-
-  final TextEditingController _messageController = TextEditingController();
-
-  bool _sendingMessage = false;
-  Timer? _instagramPollTimer;
-  bool _instagramPollRunning = false;
-  dynamic _instagramRealtimeChannel;
-  Timer? _instagramRealtimeDebounce;
-
-  AppPalette get p => AppPalette.of(context);
-
-  @override
-  void initState() {
-    super.initState();
-    refreshMessages();
-    _subscribeToInstagramUpdates();
-
-    // Keep polling as a fallback if Realtime is unavailable.
-    _instagramPollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      if (!mounted || _instagramPollRunning || _loading || _sendingMessage) {
-        return;
-      }
-
-      _instagramPollRunning = true;
-      try {
-        await refreshMessages(silent: true);
-      } finally {
-        _instagramPollRunning = false;
-      }
-    });
-  }
-
-  void _subscribeToInstagramUpdates() {
-    // Listen for new messages and message changes saved by the Instagram webhook.
-    // Realtime must be enabled for public.instagram_messages.
-    _instagramRealtimeChannel = Supabase.instance.client
-        .channel('instagram-inbox-live-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'instagram_messages',
-          callback: (payload) {
-            // Coalesce nearby INSERT/UPDATE events into one inbox refresh.
-            _instagramRealtimeDebounce?.cancel();
-            _instagramRealtimeDebounce = Timer(
-              const Duration(milliseconds: 250),
-              () {
-                if (mounted) refreshMessages(silent: true);
-              },
-            );
-          },
-        )
-        .subscribe();
-  }
-
-  @override
-  void dispose() {
-    _instagramRealtimeDebounce?.cancel();
-    _instagramPollTimer?.cancel();
-    if (_instagramRealtimeChannel != null) {
-      Supabase.instance.client.removeChannel(_instagramRealtimeChannel);
-    }
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  Future<void> refreshMessages({bool silent = false}) async {
-    final requestVersion = ++_requestVersion;
-
-    if (mounted && !silent) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
-
-    try {
-      final messages = await _service.fetchMessages();
-
-      if (!mounted || requestVersion != _requestVersion) return;
-
-      setState(() {
-        _messages = messages;
-        if (!silent) _loading = false;
-        _error = null;
-        final senders = _groupMessages(messages).keys.toList();
-
-        if (_selectedSender == null || !senders.contains(_selectedSender)) {
-          _selectedSender = senders.isEmpty ? null : senders.first;
-        }
-      });
-    } catch (e) {
-      if (!mounted || requestVersion != _requestVersion) return;
-
-      if (silent) {
-        debugPrint('Instagram auto-refresh failed: $e');
-        return;
-      }
-
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
-    }
-  }
-
-  Future<void> _sendMessage() async {
-    final recipientId = _selectedSender;
-    final message = _messageController.text.trim();
-
-    if (recipientId == null || recipientId.isEmpty) return;
-    if (message.isEmpty || _sendingMessage) return;
-
-    setState(() => _sendingMessage = true);
-
-    try {
-      await _service.sendMessage(recipientId: recipientId, message: message);
-
-      if (!mounted) return;
-
-      _messageController.clear();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Instagram message sent successfully.')),
-      );
-
-      await refreshMessages();
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not send message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _sendingMessage = false);
-      }
-    }
-  }
-
-  Map<String, List<InstagramInboxMessage>> _groupMessages(
-    List<InstagramInboxMessage> messages,
-  ) {
-    final groups = <String, List<InstagramInboxMessage>>{};
-
-    for (final message in messages) {
-      if (message.senderId.isEmpty) continue;
-
-      groups.putIfAbsent(message.senderId, () => []);
-      groups[message.senderId]!.add(message);
-    }
-
-    for (final group in groups.values) {
-      group.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    }
-
-    return groups;
-  }
-
-  String _senderDisplayName(
-    String senderId,
-    List<InstagramInboxMessage> messages,
-  ) {
-    for (final message in messages) {
-      final username = message.senderUsername?.trim();
-      if (username != null && username.isNotEmpty) {
-        return username.startsWith('@') ? username : '@$username';
-      }
-    }
-    return senderId;
-  }
-
-  Widget _tile(
-    String sender,
-    Map<String, List<InstagramInboxMessage>> groups,
-    String? selected,
-    bool wide,
-  ) {
-    final messages = groups[sender]!;
-    final latest = messages.last;
-    final display = _senderDisplayName(sender, messages);
-    return ConversationTile(
-      wide: wide,
-      selected: sender == selected,
-      name: display,
-      time: formatInboxTime(latest.createdAt),
-      preview: latest.text,
-      onTap: () => setState(() => _selectedSender = sender),
-      avatar: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ChatAvatar(
-            display,
-            size: 42,
-            gradient: ChannelColors.igGradient,
-            imageUrl: latest.senderProfilePicture,
-          ),
-          const Positioned(
-            right: -3,
-            bottom: -3,
-            child: ChannelBadge(Channel.instagram, size: 18),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bubble(InstagramInboxMessage message) {
-    final bot = message.fromBot;
-    final who = message.senderUsername?.trim().isNotEmpty == true
-        ? (message.senderUsername!.startsWith('@')
-              ? message.senderUsername!
-              : '@${message.senderUsername}')
-        : '@${message.senderId}';
-    return Align(
-      alignment: bot ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 420),
-        decoration: BoxDecoration(
-          gradient: bot ? ChannelColors.igBubble : null,
-          color: bot ? null : p.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft: Radius.circular(bot ? 18 : 4),
-            bottomRight: Radius.circular(bot ? 4 : 18),
-          ),
-          border: bot ? null : Border.all(color: p.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              who,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: bot ? Colors.white70 : p.textMuted,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              message.text,
-              style: TextStyle(
-                height: 1.35,
-                color: bot ? Colors.white : p.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              formatInboxTime(message.createdAt),
-              style: TextStyle(
-                fontSize: 10,
-                color: bot ? Colors.white70 : p.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final groups = _groupMessages(_messages);
-    final senders = groups.keys.toList();
-    final selected = _selectedSender;
-    final conversation = selected == null
-        ? <InstagramInboxMessage>[]
-        : groups[selected] ?? [];
-
-    final wide = MediaQuery.sizeOf(context).width >= 860;
-
-    if (_loading && _messages.isEmpty) {
-      return Center(child: CircularProgressIndicator(color: p.accent));
-    }
-
-    if (_error != null && _messages.isEmpty) {
-      return InboxEmptyState(
-        icon: Icons.cloud_off_outlined,
-        title: 'Could not load Inbox',
-        message: _error!,
-        color: ChannelColors.ig,
-        action: TintedButton(
-          onPressed: refreshMessages,
-          icon: Icons.refresh,
-          label: 'Try again',
-          gradient: ChannelColors.igBubble,
-          color: ChannelColors.ig,
-        ),
-      );
-    }
-
-    if (_messages.isEmpty) {
-      return InboxEmptyState(
-        icon: Icons.forum_outlined,
-        title: 'No Instagram messages yet',
-        message:
-            _error ??
-            'New messages received by your connected Instagram account '
-                'will appear here.',
-        color: ChannelColors.ig,
-        action: TintedButton(
-          onPressed: refreshMessages,
-          icon: Icons.refresh,
-          label: 'Refresh Inbox',
-          gradient: ChannelColors.igBubble,
-          color: ChannelColors.ig,
-        ),
-      );
-    }
-
-    final conversationList = ListView(
-      padding: wide
-          ? const EdgeInsets.all(10)
-          : const EdgeInsets.fromLTRB(10, 10, 4, 10),
-      scrollDirection: wide ? Axis.vertical : Axis.horizontal,
-      children: [
-        for (final sender in senders) _tile(sender, groups, selected, wide),
-      ],
-    );
-
-    final selectedName = selected == null
-        ? 'Instagram conversation'
-        : _senderDisplayName(selected, groups[selected] ?? const []);
-
-    final thread = Column(
-      children: [
-        ThreadHeader(
-          avatar: ChatAvatar(
-            selectedName,
-            size: 38,
-            gradient: ChannelColors.igGradient,
-          ),
-          title: selectedName,
-          subtitle: 'Instagram DM',
-        ),
-        if (_error != null)
-          MaterialBanner(
-            backgroundColor: p.amberSoft,
-            content: Text('Refresh failed: $_error'),
-            actions: [
-              TextButton(
-                onPressed: refreshMessages,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        Expanded(
-          child: ColoredBox(
-            color: p.pageBg,
-            child: ListView(
-              key: ValueKey(selected),
-              reverse: true,
-              padding: const EdgeInsets.all(20),
-              children: [
-                for (final message in conversation.reversed) _bubble(message),
-              ],
-            ),
-          ),
-        ),
-        ComposerBar(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  minLines: 1,
-                  maxLines: 4,
-                  maxLength: 1000,
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _sendMessage(),
-                  decoration: inboxPillField(p, 'Message on Instagram…'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SendButton(
-                tooltip: 'Send Instagram message',
-                busy: _sendingMessage,
-                onPressed: _sendingMessage ? null : _sendMessage,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    return Column(
-      children: [
-        InboxToolbar(
-          title:
-              '${senders.length} conversation${senders.length == 1 ? '' : 's'}',
-          loading: _loading,
-          onRefresh: refreshMessages,
-          tooltip: 'Refresh Inbox',
-        ),
-        Expanded(
-          child: InboxFrame(
-            child: wide
-                ? Row(
-                    children: [
-                      SizedBox(width: 320, child: conversationList),
-                      VerticalDivider(width: 1, color: p.border),
-                      Expanded(child: thread),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      SizedBox(height: 86, child: conversationList),
-                      Divider(height: 1, color: p.border),
-                      Expanded(child: thread),
-                    ],
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────
-// Inbox page (tabs)
-// ─────────────────────────────────────────────────────────────
-
-/// Shared Inbox page with independent Instagram and WhatsApp tabs.
-/// Instagram uses InstagramInboxService; WhatsApp uses the separate
-/// whatsapp_inbox Edge Function.
-class InboxPage extends StatelessWidget {
-  const InboxPage({super.key, required this.s});
-
-  final MessagingAutomationProvider s;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-
-    Widget tab(IconData icon, String text, Color c) => Tab(
-      height: 40,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 17, color: c),
-          const SizedBox(width: 8),
-          Text(text),
-        ],
-      ),
-    );
-
-    return DefaultTabController(
-      length: 2,
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 28, 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Inbox',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.9,
-                            color: p.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Manage Instagram DMs and WhatsApp conversations',
-                          style: TextStyle(color: p.textMuted, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 380),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: p.chipFill,
-                      border: Border.all(color: p.border),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: TabBar(
-                      dividerColor: Colors.transparent,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      overlayColor: const WidgetStatePropertyAll(
-                        Colors.transparent,
-                      ),
-                      indicator: BoxDecoration(
-                        color: p.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: p.border),
-                        boxShadow: p.softShadow,
-                      ),
-                      labelColor: p.textPrimary,
-                      unselectedLabelColor: p.textMuted,
-                      labelStyle: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                      tabs: [
-                        tab(
-                          Icons.camera_alt_outlined,
-                          'Instagram',
-                          ChannelColors.ig,
-                        ),
-                        tab(
-                          Icons.chat_bubble_outline_rounded,
-                          'WhatsApp',
-                          ChannelColors.waDeep,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: TabBarView(
-                // Swiping would fight with the horizontal conversation list.
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  InstagramInboxContent(s: s),
-                  const WhatsAppInboxContent(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// WhatsApp
+// WhatsApp data layer (unchanged)
 // ─────────────────────────────────────────────────────────────
 
 class WhatsAppInboxMessage {
@@ -946,30 +366,139 @@ class WhatsAppInboxService {
   }
 }
 
-class WhatsAppInboxContent extends StatefulWidget {
-  const WhatsAppInboxContent({super.key});
+// ─────────────────────────────────────────────────────────────
+// Inbox page
+// ─────────────────────────────────────────────────────────────
+
+/// Inbox page. The "Inbox" page header is unchanged; everything below it
+/// is the new Messages workspace (list panel + thread).
+class InboxPage extends StatelessWidget {
+  const InboxPage({super.key, required this.s});
+
+  final MessagingAutomationProvider s;
 
   @override
-  State<WhatsAppInboxContent> createState() => _WhatsAppInboxContentState();
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Inbox',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.9,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage Instagram DMs and WhatsApp conversations',
+                        style: TextStyle(color: p.textMuted, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Expanded(child: _InboxWorkspace()),
+        ],
+      ),
+    );
+  }
 }
 
-class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
-  final WhatsAppInboxService _service = WhatsAppInboxService();
-  final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+/// One row of the left conversation list (either channel).
+class _Convo {
+  const _Convo({
+    required this.channel,
+    required this.key,
+    required this.name,
+    required this.preview,
+    required this.time,
+    required this.incoming,
+    this.avatarUrl,
+  });
 
-  List<WhatsAppInboxMessage> _conversations = [];
-  List<WhatsAppInboxMessage> _messages = [];
-  String? _selectedPhone;
-  String? _error;
-  bool _loading = false;
-  bool _loadingMessages = false;
-  bool _sending = false;
-  int _requestVersion = 0;
-  dynamic _realtimeChannel;
-  Timer? _realtimeDebounce;
-  Timer? _pollTimer;
-  bool _pollRequestRunning = false;
+  final Channel channel;
+  final String key; // Instagram sender id / WhatsApp phone
+  final String name;
+  final String preview;
+  final DateTime time;
+  final bool incoming; // latest message came from the customer
+  final String? avatarUrl;
+
+  String get id => '${channel.name}:$key';
+}
+
+class _InboxWorkspace extends StatefulWidget {
+  const _InboxWorkspace();
+
+  @override
+  State<_InboxWorkspace> createState() => _InboxWorkspaceState();
+}
+
+class _InboxWorkspaceState extends State<_InboxWorkspace> {
+  static const _pollEvery = Duration(seconds: 3);
+
+  final InstagramInboxService _igService = InstagramInboxService();
+  final WhatsAppInboxService _waService = WhatsAppInboxService();
+  final InboxReadStateService _readStateService = InboxReadStateService();
+
+  final Map<String, DateTime> _readAt = {};
+  bool _readStatesLoaded = false;
+
+  // ── shared UI state
+  Channel _tab = Channel.instagram; // which list is the primary one
+  Channel _open = Channel.instagram; // which thread is on screen
+  bool _unreadOnly = false;
+  bool _latestFirst = true;
+  bool _mobileThread = false; // narrow layout: showing thread instead of list
+  bool _confirmed = false; // user has picked a conversation themselves
+  final Map<String, DateTime> _seen = {};
+  // Chats opened while the unread filter is on stay in the list; only their
+  // unread dot is cleared.
+  final Set<String> _keepVisible = {};
+
+  // ── Instagram
+  List<InstagramInboxMessage> _igMessages = [];
+  String? _igError;
+  bool _igLoading = false;
+  String? _igSelected;
+  int _igVersion = 0;
+  final TextEditingController _igText = TextEditingController();
+  bool _igSending = false;
+  Timer? _igPoll;
+  bool _igPolling = false;
+  dynamic _igChannel;
+  Timer? _igDebounce;
+
+  // ── WhatsApp
+  List<WhatsAppInboxMessage> _waConvos = [];
+  List<WhatsAppInboxMessage> _waMessages = [];
+  String? _waSelected;
+  String? _waError;
+  bool _waLoading = false;
+  bool _waLoadingMessages = false;
+  bool _waSending = false;
+  int _waVersion = 0;
+  final TextEditingController _waText = TextEditingController();
+  dynamic _waChannel;
+  Timer? _waDebounce;
+  Timer? _waPoll;
+  bool _waPolling = false;
   html.MediaStream? _recordingStream;
   html.MediaRecorder? _mediaRecorder;
   final List<html.Blob> _recordingChunks = [];
@@ -983,172 +512,361 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
 
   AppPalette get p => AppPalette.of(context);
 
+  // ───────────────────────── lifecycle ─────────────────────────
+
   @override
   void initState() {
     super.initState();
-    refreshInbox();
-    _subscribeToWhatsAppUpdates();
 
-    // Fallback in case Supabase Realtime is not enabled/configured correctly.
-    // The inbox checks for new rows every 2 seconds without user interaction.
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+    _loadReadStates();
+    _refreshIg();
+    _refreshWa();
+    _subscribeIg();
+    _subscribeWa();
+    _refreshIg();
+    _refreshWa();
+    _subscribeIg();
+    _subscribeWa();
+
+    // Polling is a fallback in case Supabase Realtime is unavailable.
+    _igPoll = Timer.periodic(_pollEvery, (_) async {
+      if (!mounted || _igPolling || _igLoading || _igSending) return;
+      _igPolling = true;
+      try {
+        await _refreshIg(silent: true);
+      } finally {
+        _igPolling = false;
+      }
+    });
+
+    _waPoll = Timer.periodic(_pollEvery, (_) async {
       if (!mounted ||
-          _pollRequestRunning ||
-          _loading ||
-          _loadingMessages ||
-          _sending) {
+          _waPolling ||
+          _waLoading ||
+          _waLoadingMessages ||
+          _waSending) {
         return;
       }
-      _pollRequestRunning = true;
+      _waPolling = true;
       try {
-        await refreshInbox(silent: true);
+        await _refreshWa(silent: true);
       } finally {
-        _pollRequestRunning = false;
+        _waPolling = false;
       }
     });
   }
 
-  void _subscribeToWhatsAppUpdates() {
-    // Listen for new incoming/outgoing messages and status updates in Supabase.
-    // Realtime must be enabled for public.whatsapp_inbox_messages.
-    _realtimeChannel = Supabase.instance.client
-        .channel('whatsapp-inbox-live-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'whatsapp_inbox_messages',
-          callback: (payload) {
-            // Coalesce bursts (e.g. message insert + status updates) into one fetch.
-            _realtimeDebounce?.cancel();
-            _realtimeDebounce = Timer(const Duration(milliseconds: 250), () {
-              if (mounted) refreshInbox(silent: true);
-            });
-          },
-        )
-        .subscribe();
-  }
-
   @override
   void dispose() {
-    _realtimeDebounce?.cancel();
-    _pollTimer?.cancel();
-    if (_realtimeChannel != null) {
-      Supabase.instance.client.removeChannel(_realtimeChannel);
+    _igDebounce?.cancel();
+    _waDebounce?.cancel();
+    _igPoll?.cancel();
+    _waPoll?.cancel();
+    if (_igChannel != null) {
+      Supabase.instance.client.removeChannel(_igChannel);
+    }
+    if (_waChannel != null) {
+      Supabase.instance.client.removeChannel(_waChannel);
     }
     _recordingTimer?.cancel();
     _stopTracks();
     for (final url in _audioObjectUrls.values) {
       html.Url.revokeObjectUrl(url);
     }
-    _controller.dispose();
-    _scrollController.dispose();
+    _igText.dispose();
+    _waText.dispose();
     super.dispose();
   }
 
-  Future<void> refreshInbox({bool silent = false}) async {
-    final version = ++_requestVersion;
-    if (!mounted) return;
-    if (!silent) {
+  void _subscribeIg() {
+    // Realtime must be enabled for public.instagram_messages.
+    _igChannel = Supabase.instance.client
+        .channel('instagram-inbox-live-updates')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'instagram_messages',
+          callback: (payload) {
+            _igDebounce?.cancel();
+            _igDebounce = Timer(const Duration(milliseconds: 250), () {
+              if (mounted) _refreshIg(silent: true);
+            });
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _loadReadStates() async {
+    try {
+      final states = await _readStateService.loadReadStates();
+
+      if (!mounted) return;
+
       setState(() {
-        _loading = true;
-        _error = null;
+        _readAt
+          ..clear()
+          ..addAll(states);
+        _readStatesLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('Could not load inbox read states: $e');
+    }
+  }
+
+  void _subscribeWa() {
+    // Realtime must be enabled for public.whatsapp_inbox_messages.
+    _waChannel = Supabase.instance.client
+        .channel('whatsapp-inbox-live-updates')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'whatsapp_inbox_messages',
+          callback: (payload) {
+            _waDebounce?.cancel();
+            _waDebounce = Timer(const Duration(milliseconds: 250), () {
+              if (mounted) _refreshWa(silent: true);
+            });
+          },
+        )
+        .subscribe();
+  }
+
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red : null,
+      ),
+    );
+  }
+
+  // ───────────────────────── Instagram logic ─────────────────────────
+
+  Map<String, List<InstagramInboxMessage>> _igGroups(
+    List<InstagramInboxMessage> messages,
+  ) {
+    final groups = <String, List<InstagramInboxMessage>>{};
+    for (final message in messages) {
+      if (message.senderId.isEmpty) continue;
+      groups.putIfAbsent(message.senderId, () => []).add(message);
+    }
+    for (final group in groups.values) {
+      group.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    }
+    return groups;
+  }
+
+  String _igName(String senderId, List<InstagramInboxMessage> messages) {
+    for (final message in messages) {
+      final username = message.senderUsername?.trim();
+      if (username != null && username.isNotEmpty) {
+        return username.startsWith('@') ? username : '@$username';
+      }
+    }
+    return senderId;
+  }
+
+  String? _igAvatar(List<InstagramInboxMessage> messages) {
+    for (final message in messages.reversed) {
+      final url = message.senderProfilePicture?.trim();
+      if (url != null && url.isNotEmpty && url != 'null') return url;
+    }
+    return null;
+  }
+
+  String? _latestIgSender(List<InstagramInboxMessage> messages) {
+    for (final message in messages.reversed) {
+      if (message.senderId.isNotEmpty) return message.senderId;
+    }
+    return null;
+  }
+
+  Future<void> _refreshIg({bool silent = false}) async {
+    final version = ++_igVersion;
+
+    if (mounted && !silent) {
+      setState(() {
+        _igLoading = true;
+        _igError = null;
       });
     }
 
     try {
-      final rows = await _service.fetchConversations();
-      if (!mounted || version != _requestVersion) return;
+      final messages = await _igService.fetchMessages();
+      if (!mounted || version != _igVersion) return;
 
-      final oldPhone = _selectedPhone;
+      setState(() {
+        _igMessages = messages;
+        _igLoading = false;
+        _igError = null;
+
+        final ids = _igGroups(messages).keys.toSet();
+        if (_igSelected == null || !ids.contains(_igSelected)) {
+          _igSelected = _latestIgSender(messages);
+        }
+        _markOpenSeen();
+      });
+    } catch (e) {
+      if (!mounted || version != _igVersion) return;
+
+      if (silent) {
+        debugPrint('Instagram auto-refresh failed: $e');
+        return;
+      }
+
+      setState(() {
+        _igLoading = false;
+        _igError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _sendIg() async {
+    final recipientId = _igSelected;
+    final message = _igText.text.trim();
+
+    if (recipientId == null || recipientId.isEmpty) return;
+    if (message.isEmpty || _igSending) return;
+
+    setState(() => _igSending = true);
+
+    try {
+      await _igService.sendMessage(recipientId: recipientId, message: message);
+      if (!mounted) return;
+      _igText.clear();
+      _snack('Instagram message sent successfully.');
+      await _refreshIg();
+    } catch (e) {
+      _snack('Could not send message: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _igSending = false);
+    }
+  }
+
+  List<_Convo> _igItems() {
+    final items = <_Convo>[];
+    _igGroups(_igMessages).forEach((id, messages) {
+      final last = messages.last;
+      items.add(
+        _Convo(
+          channel: Channel.instagram,
+          key: id,
+          name: _igName(id, messages),
+          preview: last.text.isEmpty ? 'Message' : last.text,
+          time: last.createdAt,
+          incoming: !last.fromBot,
+          avatarUrl: _igAvatar(messages),
+        ),
+      );
+    });
+    return items;
+  }
+
+  // ───────────────────────── WhatsApp logic ─────────────────────────
+
+  String _waName(WhatsAppInboxMessage m) {
+    final name = m.customerName?.trim();
+    return name != null && name.isNotEmpty ? name : '+${m.phone}';
+  }
+
+  List<_Convo> _waItems() {
+    return [
+      for (final m in _waConvos)
+        _Convo(
+          channel: Channel.whatsapp,
+          key: m.phone,
+          name: _waName(m),
+          preview: m.isAudio
+              ? '🎤 Voice message'
+              : (m.text.isEmpty ? 'No text preview' : m.text),
+          time: m.createdAt,
+          incoming: !m.isOutgoing,
+        ),
+    ];
+  }
+
+  Future<void> _refreshWa({bool silent = false}) async {
+    final version = ++_waVersion;
+    if (!mounted) return;
+    if (!silent) {
+      setState(() {
+        _waLoading = true;
+        _waError = null;
+      });
+    }
+
+    try {
+      final rows = await _waService.fetchConversations();
+      if (!mounted || version != _waVersion) return;
+
+      final oldPhone = _waSelected;
       final phones = rows.map((e) => e.phone).toSet();
       final nextPhone = oldPhone != null && phones.contains(oldPhone)
           ? oldPhone
           : (rows.isEmpty ? null : rows.first.phone);
 
       setState(() {
-        _conversations = rows;
-        _selectedPhone = nextPhone;
-        if (!silent) _loading = false;
+        _waConvos = rows;
+        _waSelected = nextPhone;
+        _waLoading = false;
+        _markOpenSeen();
       });
 
       if (nextPhone != null) {
-        await _loadMessages(nextPhone, silent: silent);
-      } else {
-        setState(() {
-          _messages = [];
-          if (!silent) _loading = false;
-        });
+        await _loadWaMessages(nextPhone, silent: silent);
+      } else if (mounted) {
+        setState(() => _waMessages = []);
       }
     } catch (e) {
-      if (!mounted || version != _requestVersion) return;
+      if (!mounted || version != _waVersion) return;
       setState(() {
-        if (!silent) _loading = false;
-        _error = e.toString();
+        _waLoading = false;
+        _waError = e.toString();
       });
     }
   }
 
-  Future<void> _selectPhone(String phone) async {
-    if (_selectedPhone == phone) return;
-    setState(() {
-      _selectedPhone = phone;
-      _messages = [];
-      _error = null;
-    });
-    await _loadMessages(phone);
-  }
-
-  Future<void> _loadMessages(String phone, {bool silent = false}) async {
+  Future<void> _loadWaMessages(String phone, {bool silent = false}) async {
     if (!mounted) return;
-    if (!silent) setState(() => _loadingMessages = true);
+    if (!silent) setState(() => _waLoadingMessages = true);
     try {
-      final rows = await _service.fetchMessages(phone);
-      if (!mounted || _selectedPhone != phone) return;
+      final rows = await _waService.fetchMessages(phone);
+      if (!mounted || _waSelected != phone) return;
       setState(() {
-        _messages = rows;
-        if (!silent) _loadingMessages = false;
-        if (silent) _error = null;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
+        _waMessages = rows;
+        _waLoadingMessages = false;
+        _waError = null;
       });
     } catch (e) {
-      if (!mounted || _selectedPhone != phone) return;
+      if (!mounted || _waSelected != phone) return;
       setState(() {
-        if (!silent) _loadingMessages = false;
-        _error = e.toString();
+        _waLoadingMessages = false;
+        _waError = e.toString();
       });
     }
   }
 
-  Future<void> _sendMessage() async {
-    final phone = _selectedPhone;
-    final text = _controller.text.trim();
-    if (phone == null || text.isEmpty || _sending) return;
+  Future<void> _sendWa() async {
+    final phone = _waSelected;
+    final text = _waText.text.trim();
+    if (phone == null || text.isEmpty || _waSending) return;
 
-    setState(() => _sending = true);
+    setState(() => _waSending = true);
     try {
-      await _service.sendMessage(phone: phone, message: text);
+      await _waService.sendMessage(phone: phone, message: text);
       if (!mounted) return;
-      _controller.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WhatsApp message sent successfully.')),
-      );
-      await refreshInbox();
+      _waText.clear();
+      _snack('WhatsApp message sent successfully.');
+      await _refreshWa();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not send WhatsApp message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _snack('Could not send WhatsApp message: $e', error: true);
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) setState(() => _waSending = false);
     }
   }
+
+  // ── voice recording / playback (web)
 
   void _stopTracks() {
     try {
@@ -1175,15 +893,12 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
   }
 
   Future<void> _startRecording() async {
-    if (_recording || _sendingAudio || _selectedPhone == null) return;
+    if (_recording || _sendingAudio || _waSelected == null) return;
     final mimeType = _supportedRecordingMime();
     if (mimeType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This browser cannot record a WhatsApp-compatible audio format. Try Safari or use an audio file in a supported format.',
-          ),
-        ),
+      _snack(
+        'This browser cannot record a WhatsApp-compatible audio format. '
+        'Try Safari or use an audio file in a supported format.',
       );
       return;
     }
@@ -1193,8 +908,8 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
       });
       final recorder = html.MediaRecorder(stream, {'mimeType': mimeType});
       _recordingChunks.clear();
-      // Use DOM event listeners because dart:html's MediaRecorder stream
-      // accessors are not exposed consistently by the current Dart SDK.
+      // DOM listeners: dart:html's MediaRecorder stream accessors are not
+      // exposed consistently by the current Dart SDK.
       recorder.addEventListener('dataavailable', (html.Event event) {
         final data = (event as dynamic).data as html.Blob?;
         if (data != null && data.size > 0) {
@@ -1222,16 +937,13 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
       });
     } catch (e) {
       _stopTracks();
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Microphone access failed: $e')));
+      _snack('Microphone access failed: $e');
     }
   }
 
   Future<void> _stopRecordingAndSend() async {
     final recorder = _mediaRecorder;
-    final phone = _selectedPhone;
+    final phone = _waSelected;
     if (recorder == null || phone == null || !_recording || _sendingAudio) {
       return;
     }
@@ -1266,25 +978,16 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
         _recording = false;
         _sendingAudio = true;
       });
-      await _service.sendAudio(
+      await _waService.sendAudio(
         phone: phone,
         bytes: bytes,
         mimeType: mimeType,
         voice: true,
       );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WhatsApp voice message sent.')),
-      );
-      await refreshInbox();
+      _snack('WhatsApp voice message sent.');
+      await _refreshWa();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not send voice message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _snack('Could not send voice message: $e', error: true);
     } finally {
       _recordingTimer?.cancel();
       _stopTracks();
@@ -1327,17 +1030,13 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
   Future<void> _playAudio(WhatsAppInboxMessage message) async {
     final id = message.messageId;
     if (id == null || id.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This audio message has no WhatsApp message ID.'),
-        ),
-      );
+      _snack('This audio message has no WhatsApp message ID.');
       return;
     }
     try {
       String? objectUrl = _audioObjectUrls[id];
       if (objectUrl == null) {
-        final bytes = await _service.fetchAudioBytes(id);
+        final bytes = await _waService.fetchAudioBytes(id);
         final blob = html.Blob([bytes], message.audioMimeType ?? 'audio/ogg');
         objectUrl = html.Url.createObjectUrlFromBlob(blob);
         _audioObjectUrls[id] = objectUrl;
@@ -1351,367 +1050,590 @@ class _WhatsAppInboxContentState extends State<WhatsAppInboxContent> {
       audio.onEnded.first.then((_) {
         if (mounted) setState(() => _playingAudio.remove(id));
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Playing voice message.')));
+      _snack('Playing voice message.');
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not play voice message: $e')),
-      );
+      _snack('Could not play voice message: $e');
     }
   }
 
-  String _name(WhatsAppInboxMessage m) {
-    final name = m.customerName?.trim();
-    return name != null && name.isNotEmpty ? name : '+${m.phone}';
+  // ───────────────────────── list state helpers ─────────────────────────
+
+  DateTime? _latestIncomingAt(_Convo c) {
+    if (c.channel == Channel.instagram) {
+      final messages =
+          _igGroups(_igMessages)[c.key] ?? const <InstagramInboxMessage>[];
+
+      DateTime? latest;
+
+      for (final message in messages) {
+        if (message.fromBot) continue;
+
+        if (latest == null || message.createdAt.isAfter(latest)) {
+          latest = message.createdAt;
+        }
+      }
+
+      return latest;
+    }
+
+    // WhatsApp's full message history is available for the open conversation.
+    if (_waSelected == c.key) {
+      DateTime? latest;
+
+      for (final message in _waMessages) {
+        if (message.isOutgoing) continue;
+
+        if (latest == null || message.createdAt.isAfter(latest)) {
+          latest = message.createdAt;
+        }
+      }
+
+      return latest;
+    }
+
+    // For other WhatsApp conversations, the list endpoint only provides
+    // the conversation row, so use it when its latest message is incoming.
+    return c.incoming ? c.time : null;
   }
 
-  Widget _empty(String title, String subtitle) {
-    return InboxEmptyState(
-      icon: Icons.chat_bubble_outline,
-      title: title,
-      message: subtitle,
-      color: ChannelColors.waDeep,
-      action: TintedButton(
-        onPressed: refreshInbox,
-        icon: Icons.refresh,
-        label: 'Refresh WhatsApp',
-        gradient: ChannelColors.waGradient,
-        color: ChannelColors.waDeep,
+  bool _isUnread(_Convo c) {
+    if (!_readStatesLoaded) return false;
+
+    final latestIncoming = _latestIncomingAt(c);
+    if (latestIncoming == null) return false;
+
+    final lastRead = _readAt[c.id];
+    return lastRead == null || latestIncoming.isAfter(lastRead);
+  }
+
+  int _unreadCount(List<_Convo> items) => items.where(_isUnread).length;
+
+  List<_Convo> _view(List<_Convo> items) {
+    final list = _unreadOnly
+        ? items
+              .where((c) => _isUnread(c) || _keepVisible.contains(c.id))
+              .toList()
+        : [...items];
+    list.sort(
+      (a, b) =>
+          _latestFirst ? b.time.compareTo(a.time) : a.time.compareTo(b.time),
+    );
+    return list;
+  }
+
+  /// Once the user has opened a conversation, keep it marked as read while
+  /// new messages arrive in it.
+  void _markOpenSeen() {
+    if (!_confirmed) return;
+    final isIg = _open == Channel.instagram;
+    final key = isIg ? _igSelected : _waSelected;
+    if (key == null) return;
+    for (final c in isIg ? _igItems() : _waItems()) {
+      if (c.key == key) {
+        _seen[c.id] = c.time;
+        break;
+      }
+    }
+  }
+
+  void _select(_Convo c) {
+    _confirmed = true;
+    _keepVisible.add(c.id);
+    if (c.channel == Channel.instagram) {
+      setState(() {
+        _open = Channel.instagram;
+        _igSelected = c.key;
+        _mobileThread = true;
+        _seen[c.id] = c.time;
+      });
+      return;
+    }
+
+    final changed = _waSelected != c.key;
+    setState(() {
+      _open = Channel.whatsapp;
+      _waSelected = c.key;
+      _mobileThread = true;
+      _seen[c.id] = c.time;
+      if (changed) {
+        _waMessages = [];
+        _waError = null;
+      }
+    });
+    if (changed) _loadWaMessages(c.key);
+  }
+
+  void _setTab(Channel channel) {
+    setState(() {
+      _tab = channel;
+      _open = channel;
+      _markOpenSeen();
+    });
+  }
+
+  // ───────────────────────── left panel ─────────────────────────
+
+  Widget _tile(_Convo c) {
+    final selectedKey = c.channel == Channel.instagram
+        ? _igSelected
+        : _waSelected;
+    final selected = c.channel == _open && c.key == selectedKey;
+    final unread = _isUnread(c);
+
+    return ConversationTile(
+      selected: selected,
+      unread: unread,
+      name: c.name,
+      time: formatInboxListTime(c.time),
+      preview: c.preview,
+      indicatorColor: unread
+          ? (c.channel.isIg ? p.accent : ChannelColors.wa)
+          : null,
+      onTap: () => _select(c),
+      avatar: AvatarWithBadge(
+        label: c.name,
+        channel: c.channel,
+        imageUrl: c.avatarUrl,
       ),
     );
   }
 
-  Widget _conversationList(bool wide) {
-    return ListView(
-      padding: wide
-          ? const EdgeInsets.all(10)
-          : const EdgeInsets.fromLTRB(10, 10, 4, 10),
-      scrollDirection: wide ? Axis.vertical : Axis.horizontal,
-      children: [
-        for (final item in _conversations)
-          ConversationTile(
-            wide: wide,
-            selected: item.phone == _selectedPhone,
-            name: _name(item),
-            time: formatInboxTime(item.createdAt),
-            preview: item.isAudio
-                ? '🎤 Voice message'
-                : (item.text.isEmpty ? 'No text preview' : item.text),
-            previewLines: 2,
-            onTap: () => _selectPhone(item.phone),
-            avatar: ChatAvatar(
-              _name(item),
-              size: 42,
-              gradient: ChannelColors.waGradient,
+  Widget _channelHint(Channel channel, List<_Convo> all) {
+    final isIg = channel == Channel.instagram;
+    final loading = isIg ? _igLoading : _waLoading;
+    final error = isIg ? _igError : _waError;
+
+    if (all.isEmpty && loading) {
+      return const InboxListHint(message: '', loading: true);
+    }
+    if (all.isEmpty && error != null) {
+      return InboxListHint(
+        message: error,
+        onRetry: isIg ? _refreshIg : _refreshWa,
+      );
+    }
+    if (all.isEmpty) {
+      return InboxListHint(
+        message: isIg
+            ? 'No Instagram messages yet.'
+            : 'No WhatsApp conversations yet.',
+      );
+    }
+    return const InboxListHint(message: 'No unread conversations.');
+  }
+
+  Widget _listPanel() {
+    final activeAll = _tab == Channel.instagram ? _igItems() : _waItems();
+    final active = _view(activeAll);
+
+    return ColoredBox(
+      color: p.surface,
+      child: Column(
+        children: [
+          MessagesPanelHeader(
+            filterActive: _unreadOnly,
+            onFilter: () => setState(() {
+              _unreadOnly = !_unreadOnly;
+              _keepVisible.clear();
+            }),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ChannelTabs(
+              active: _tab,
+              onChanged: _setTab,
+              badge: _unreadCount(activeAll),
             ),
           ),
-      ],
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: SortRow(
+              count: active.length,
+              latestFirst: _latestFirst,
+              onChanged: (v) => setState(() => _latestFirst = v),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 18),
+              children: [
+                if (active.isEmpty)
+                  _channelHint(_tab, activeAll)
+                else
+                  for (final c in active) _tile(c),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // WhatsApp-style bubbles: soft green outgoing (deep green in dark mode).
+  // ───────────────────────── thread ─────────────────────────
+
+  // WhatsApp-style outgoing bubble: soft green (deep green in dark mode).
   Color get _outBubble =>
       p.isDark ? const Color(0xFF005C4B) : const Color(0xFFDCF8C6);
   Color get _outText => p.isDark ? Colors.white : const Color(0xFF17212B);
   Color get _outMeta => p.isDark ? Colors.white70 : const Color(0xFF607078);
 
-  Widget _bubble(WhatsAppInboxMessage message) {
-    final outgoing = message.isOutgoing;
+  List<Widget> _dayList<T>(
+    List<T> items,
+    DateTime Function(T) at,
+    Widget Function(T) build,
+  ) {
+    final out = <Widget>[];
+    DateTime? previous;
+    for (final item in items) {
+      final date = at(item);
+      if (previous == null || !isSameInboxDay(previous, date)) {
+        out.add(DateChip(formatInboxDay(date)));
+      }
+      out.add(build(item));
+      previous = date;
+    }
+    // The thread ListView is reversed so it opens at the newest message.
+    return out.reversed.toList();
+  }
 
-    if (message.isAudio) {
-      return Align(
-        alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          constraints: const BoxConstraints(maxWidth: 430),
-          decoration: BoxDecoration(
-            color: outgoing ? _outBubble : p.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: outgoing ? null : Border.all(color: p.border),
+  Widget _igBubble(InstagramInboxMessage m, String display, String? avatarUrl) {
+    final bot = m.fromBot;
+    return InboxBubble(
+      outgoing: bot,
+      sender: bot ? null : display,
+      text: m.text,
+      time: formatInboxTime(m.createdAt),
+      outgoingGradient: ChannelColors.igBubble,
+      avatar: bot
+          ? null
+          : AvatarWithBadge(
+              label: display,
+              channel: Channel.instagram,
+              size: 38,
+              imageUrl: avatarUrl,
+            ),
+    );
+  }
+
+  Widget _audioBody(WhatsAppInboxMessage m) {
+    final out = m.isOutgoing;
+    final playing = m.messageId != null && _playingAudio.contains(m.messageId);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Play voice message',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          onPressed: m.messageId == null ? null : () => _playAudio(m),
+          icon: Icon(
+            playing ? Icons.graphic_eq_rounded : Icons.play_circle_fill_rounded,
+            size: 34,
+            color: ChannelColors.waDeep,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: 'Play voice message',
-                onPressed: message.messageId == null
-                    ? null
-                    : () => _playAudio(message),
-                icon: const Icon(
-                  Icons.play_circle_fill_rounded,
-                  size: 36,
-                  color: ChannelColors.waDeep,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Voice message',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: outgoing ? _outText : p.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatInboxTime(message.createdAt),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: outgoing ? _outMeta : p.textMuted,
-                    ),
-                  ),
-                  if (outgoing && message.status != null)
-                    Text(
-                      message.status!,
-                      style: TextStyle(fontSize: 10, color: _outMeta),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 8),
-            ],
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Voice message',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: out ? _outText : p.textPrimary,
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _waBubble(WhatsAppInboxMessage m, String display) {
+    final out = m.isOutgoing;
+    return InboxBubble(
+      outgoing: out,
+      sender: out ? null : display,
+      text: m.isAudio ? '' : m.text,
+      body: m.isAudio ? _audioBody(m) : null,
+      time: formatInboxTime(m.createdAt),
+      status: m.status,
+      outgoingColor: _outBubble,
+      outgoingText: _outText,
+      outgoingMeta: _outMeta,
+      avatar: out
+          ? null
+          : AvatarWithBadge(
+              label: display,
+              channel: Channel.whatsapp,
+              size: 38,
+            ),
+    );
+  }
+
+  Widget _backButton() => IconButton(
+    tooltip: 'Back to messages',
+    onPressed: () => setState(() => _mobileThread = false),
+    icon: Icon(Icons.arrow_back_rounded, color: p.textPrimary),
+  );
+
+  Widget _thread(bool narrow) {
+    final isIg = _open == Channel.instagram;
+    final key = isIg ? _igSelected : _waSelected;
+    final accent = isIg ? ChannelColors.ig : ChannelColors.waDeep;
+
+    if (key == null) {
+      final loading = isIg ? _igLoading : _waLoading;
+      return ColoredBox(
+        color: p.pageBg,
+        child: Column(
+          children: [
+            if (narrow)
+              Align(alignment: Alignment.centerLeft, child: _backButton()),
+            Expanded(
+              child: loading
+                  ? Center(child: CircularProgressIndicator(color: p.accent))
+                  : InboxEmptyState(
+                      icon: isIg
+                          ? Icons.forum_outlined
+                          : Icons.chat_bubble_outline,
+                      title: 'No conversation selected',
+                      message: isIg
+                          ? 'New messages received by your connected Instagram '
+                                'account will appear here.'
+                          : 'When your WhatsApp webhook saves incoming messages '
+                                'to Supabase, customers will appear here.',
+                      color: accent,
+                      action: TintedButton(
+                        onPressed: isIg ? _refreshIg : _refreshWa,
+                        icon: Icons.refresh,
+                        label: 'Refresh',
+                        gradient: isIg
+                            ? ChannelColors.igBubble
+                            : ChannelColors.waGradient,
+                        color: accent,
+                      ),
+                    ),
+            ),
+          ],
         ),
       );
     }
 
-    return Align(
-      alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 430),
-        decoration: BoxDecoration(
-          color: outgoing ? _outBubble : p.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(outgoing ? 16 : 4),
-            bottomRight: Radius.circular(outgoing ? 4 : 16),
-          ),
-          border: outgoing ? null : Border.all(color: p.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                color: outgoing ? _outText : p.textPrimary,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  formatInboxTime(message.createdAt),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: outgoing ? _outMeta : p.textMuted,
-                  ),
-                ),
-                if (outgoing && message.status != null) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    message.status!,
-                    style: TextStyle(fontSize: 10, color: _outMeta),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    late final String display;
+    late final String? avatarUrl;
+    late final List<Widget> items;
+    late final String subtitle;
+    late final String? error;
+    var loadingMessages = false;
 
-  Widget _thread() {
-    final phone = _selectedPhone;
-    final selected = _conversations.where((e) => e.phone == phone);
-    final display = selected.isEmpty
-        ? (phone == null ? 'WhatsApp conversation' : '+$phone')
-        : _name(selected.first);
+    if (isIg) {
+      final messages =
+          _igGroups(_igMessages)[key] ?? const <InstagramInboxMessage>[];
+      display = _igName(key, messages);
+      avatarUrl = _igAvatar(messages);
+      subtitle = 'Instagram DM';
+      error = _igError == null ? null : 'Refresh failed: $_igError';
+      items = _dayList<InstagramInboxMessage>(
+        messages,
+        (m) => m.createdAt,
+        (m) => _igBubble(m, display, avatarUrl),
+      );
+    } else {
+      final match = _waConvos.where((e) => e.phone == key);
+      display = match.isEmpty ? '+$key' : _waName(match.first);
+      avatarUrl = null;
+      subtitle = 'WhatsApp · +$key';
+      error = _waError;
+      loadingMessages = _waLoadingMessages;
+      items = _dayList<WhatsAppInboxMessage>(
+        _waMessages,
+        (m) => m.createdAt,
+        (m) => _waBubble(m, display),
+      );
+    }
+
+    Widget body;
+    if (loadingMessages && items.isEmpty) {
+      body = Center(child: CircularProgressIndicator(color: p.accent));
+    } else if (items.isEmpty) {
+      body = InboxEmptyState(
+        icon: Icons.chat_bubble_outline,
+        title: 'No messages yet',
+        message: isIg
+            ? 'Messages from this Instagram user will appear here.'
+            : 'Messages saved by your WhatsApp webhook will appear here.',
+        color: accent,
+      );
+    } else {
+      body = ListView(
+        key: ValueKey('${_open.name}:$key'),
+        reverse: true,
+        padding: const EdgeInsets.fromLTRB(28, 22, 28, 12),
+        children: items,
+      );
+    }
 
     return Column(
       children: [
         ThreadHeader(
-          avatar: ChatAvatar(
-            display,
-            size: 40,
-            gradient: ChannelColors.waGradient,
+          leading: narrow ? _backButton() : null,
+          avatar: AvatarWithBadge(
+            label: display,
+            channel: _open,
+            size: 48,
+            imageUrl: avatarUrl,
           ),
           title: display,
-          subtitle: '+$_selectedPhone',
-          trailing: IconButton(
-            tooltip: 'Refresh messages',
-            onPressed: phone == null || _loadingMessages
-                ? null
-                : () => _loadMessages(phone),
-            icon: Icon(Icons.refresh_rounded, color: p.textMuted),
-          ),
+          subtitle: subtitle,
         ),
-        if (_error != null)
+        if (error != null)
           MaterialBanner(
             backgroundColor: p.amberSoft,
-            content: Text(_error!),
+            content: Text(error),
             actions: [
-              TextButton(onPressed: refreshInbox, child: const Text('Retry')),
-            ],
-          ),
-        Expanded(
-          child: ColoredBox(
-            color: p.isDark
-                ? p.pageBg
-                : const Color(0xFFEFE7DD).withValues(alpha: .55),
-            child: _loadingMessages && _messages.isEmpty
-                ? Center(child: CircularProgressIndicator(color: p.accent))
-                : _messages.isEmpty
-                ? _empty(
-                    'No messages yet',
-                    'Messages saved by your WhatsApp webhook will appear here.',
-                  )
-                : ListView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(20),
-                    children: _messages.map(_bubble).toList(),
-                  ),
-          ),
-        ),
-        ComposerBar(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (_recording)
-                IconButton(
-                  tooltip: 'Cancel recording',
-                  onPressed: _cancelRecording,
-                  icon: const Icon(Icons.close_rounded, color: Colors.red),
-                )
-              else
-                IconButton(
-                  tooltip: 'Record voice message',
-                  onPressed: phone == null || _sending || _sendingAudio
-                      ? null
-                      : _startRecording,
-                  icon: Icon(Icons.mic_none_rounded, color: p.accent),
-                ),
-              if (_recording)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: .10),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.fiber_manual_record,
-                          size: 12,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Recording ${_durationLabel(_recordingSeconds)}',
-                            style: TextStyle(color: p.textPrimary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    minLines: 1,
-                    maxLines: 4,
-                    maxLength: 4096,
-                    enabled: phone != null && !_sending,
-                    textCapitalization: TextCapitalization.sentences,
-                    onSubmitted: (_) => _sendMessage(),
-                    decoration: inboxPillField(
-                      p,
-                      phone == null
-                          ? 'Select a conversation'
-                          : 'Message on WhatsApp…',
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 10),
-              SendButton(
-                tooltip: _recording
-                    ? 'Send voice message'
-                    : 'Send WhatsApp message',
-                busy: _sending || _sendingAudio,
-                onPressed: phone == null || _sending || _sendingAudio
-                    ? null
-                    : (_recording ? _stopRecordingAndSend : _sendMessage),
+              TextButton(
+                onPressed: isIg ? _refreshIg : _refreshWa,
+                child: const Text('Retry'),
               ),
             ],
           ),
+        Expanded(
+          child: ColoredBox(color: p.pageBg, child: body),
         ),
+        _composer(),
       ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 860;
-
-    if (_loading && _conversations.isEmpty) {
-      return Center(child: CircularProgressIndicator(color: p.accent));
-    }
-    if (_error != null && _conversations.isEmpty) {
-      return _empty('Could not load WhatsApp Inbox', _error!);
-    }
-    if (_conversations.isEmpty) {
-      return _empty(
-        'No WhatsApp conversations yet',
-        'When your WhatsApp webhook saves incoming messages to Supabase, customers will appear here.',
+  Widget _composer() {
+    if (_open == Channel.instagram) {
+      final ready = _igSelected != null;
+      return ComposerBar(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _igText,
+                minLines: 1,
+                maxLines: 4,
+                maxLength: 1000,
+                enabled: _igSelected != null && !_igSending,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.send,
+                keyboardType: TextInputType.text,
+                onSubmitted: (_) => _sendIg(),
+                decoration: inboxPillField(p, 'Message on Instagram…'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SendButton(
+              tooltip: 'Send Instagram message',
+              busy: _igSending,
+              onPressed: !ready || _igSending ? null : _sendIg,
+            ),
+          ],
+        ),
       );
     }
 
-    return Column(
-      children: [
-        InboxToolbar(
-          title:
-              '${_conversations.length} conversation${_conversations.length == 1 ? '' : 's'}',
-          loading: _loading,
-          onRefresh: refreshInbox,
-          tooltip: 'Refresh WhatsApp',
-        ),
-        Expanded(
-          child: InboxFrame(
-            child: wide
-                ? Row(
-                    children: [
-                      SizedBox(width: 320, child: _conversationList(true)),
-                      VerticalDivider(width: 1, color: p.border),
-                      Expanded(child: _thread()),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      SizedBox(height: 92, child: _conversationList(false)),
-                      Divider(height: 1, color: p.border),
-                      Expanded(child: _thread()),
-                    ],
-                  ),
+    final phone = _waSelected;
+    return ComposerBar(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_recording)
+            IconButton(
+              tooltip: 'Cancel recording',
+              onPressed: _cancelRecording,
+              icon: const Icon(Icons.close_rounded, color: Colors.red),
+            )
+          else
+            IconButton(
+              tooltip: 'Record voice message',
+              onPressed: phone == null || _waSending || _sendingAudio
+                  ? null
+                  : _startRecording,
+              icon: Icon(Icons.mic_none_rounded, color: p.accent),
+            ),
+          if (_recording)
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.fiber_manual_record,
+                      size: 12,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Recording ${_durationLabel(_recordingSeconds)}',
+                        style: TextStyle(color: p.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: TextField(
+                controller: _waText,
+                minLines: 1,
+                maxLines: 4,
+                maxLength: 4096,
+                enabled: phone != null && !_waSending && !_sendingAudio,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.send,
+                keyboardType: TextInputType.text,
+                onSubmitted: (_) => _sendWa(),
+                decoration: inboxPillField(
+                  p,
+                  phone == null
+                      ? 'Select a conversation'
+                      : 'Message on WhatsApp…',
+                ),
+              ),
+            ),
+          const SizedBox(width: 10),
+          SendButton(
+            tooltip: _recording
+                ? 'Send voice message'
+                : 'Send WhatsApp message',
+            busy: _waSending || _sendingAudio,
+            onPressed: phone == null || _waSending || _sendingAudio
+                ? null
+                : (_recording ? _stopRecordingAndSend : _sendWa),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────── build ─────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 860;
+
+    return InboxFrame(
+      child: narrow
+          ? (_mobileThread ? _thread(true) : _listPanel())
+          : Row(
+              children: [
+                SizedBox(width: 344, child: _listPanel()),
+                VerticalDivider(width: 1, color: p.border),
+                Expanded(child: _thread(false)),
+              ],
+            ),
     );
   }
 }

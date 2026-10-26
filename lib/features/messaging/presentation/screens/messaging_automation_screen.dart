@@ -8,7 +8,7 @@ import 'automations_page.dart';
 
 const _nav = [
   ('Automations', Icons.bolt_rounded),
-  ('Inbox', Icons.inbox_rounded),
+  ('Messages', Icons.inbox_rounded),
   // ('Channels', Icons.hub_rounded),
 ];
 
@@ -91,6 +91,7 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.s, required this.narrow});
+
   final MessagingAutomationProvider s;
   final bool narrow;
 
@@ -99,6 +100,7 @@ class _TopBar extends StatelessWidget {
     final p = AppPalette.of(context);
 
     final tabs = Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: p.chipFill,
@@ -122,12 +124,7 @@ class _TopBar extends StatelessWidget {
         narrow ? 18 : 36,
         0,
       ),
-      child: SizedBox(
-        width: double.infinity,
-        child: narrow
-            ? tabs
-            : Row(children: [SizedBox(width: 440, child: tabs)]),
-      ),
+      child: SizedBox(width: double.infinity, child: tabs),
     );
   }
 }
@@ -208,67 +205,3 @@ class _TabItem extends StatelessWidget {
     );
   }
 }
-
-// /// Connection status chips (tap to open the Channels tab).
-// class _ChannelStatus extends StatelessWidget {
-//   const _ChannelStatus({required this.s});
-//   final MessagingAutomationProvider s;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final p = AppPalette.of(context);
-//     return Row(
-//       mainAxisSize: MainAxisSize.min,
-//       children: [
-//         for (final c in Channel.values)
-//           Padding(
-//             padding: const EdgeInsets.only(left: 8),
-//             child: Tooltip(
-//               message: s.accounts[c] != null
-//                   ? '${c.label} connected'
-//                   : 'Connect ${c.label}',
-//               child: InkWell(
-//                 borderRadius: BorderRadius.circular(20),
-//                 onTap: () => s.setTab(2),
-//                 child: Container(
-//                   padding: const EdgeInsets.symmetric(
-//                     horizontal: 12,
-//                     vertical: 8,
-//                   ),
-//                   decoration: BoxDecoration(
-//                     color: p.surface,
-//                     borderRadius: BorderRadius.circular(20),
-//                     border: Border.all(color: p.border),
-//                   ),
-//                   child: Row(
-//                     mainAxisSize: MainAxisSize.min,
-//                     children: [
-//                       Container(
-//                         width: 8,
-//                         height: 8,
-//                         decoration: BoxDecoration(
-//                           shape: BoxShape.circle,
-//                           color: s.accounts[c] != null
-//                               ? p.mint
-//                               : p.textMuted.withValues(alpha: .4),
-//                         ),
-//                       ),
-//                       const SizedBox(width: 7),
-//                       Text(
-//                         c.label,
-//                         style: TextStyle(
-//                           fontSize: 12.5,
-//                           fontWeight: FontWeight.w600,
-//                           color: p.textMuted,
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
-//       ],
-//     );
-//   }
-// }

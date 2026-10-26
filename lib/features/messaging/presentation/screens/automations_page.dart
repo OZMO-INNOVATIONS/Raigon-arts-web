@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:raigon_art/core/constants/asset_constants.dart';
+import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/automation.dart';
@@ -59,15 +62,76 @@ void showTest(
   );
 }
 
-class AutomationsPage extends StatelessWidget {
+String _triggerLabel(TriggerType t) {
+  switch (t) {
+    case TriggerType.keyword:
+      return 'Keyword';
+    case TriggerType.anyMessage:
+      return 'Any message';
+    case TriggerType.postComment:
+      return 'Post comment';
+    case TriggerType.storyReply:
+      return 'Story reply';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────
+
+class AutomationsPage extends StatefulWidget {
   const AutomationsPage({super.key, required this.s});
   final MessagingAutomationProvider s;
+
+  @override
+  State<AutomationsPage> createState() => _AutomationsPageState();
+}
+
+class _AutomationsPageState extends State<AutomationsPage> {
+  final TextEditingController _search = TextEditingController();
+  int _status = 0; // 0 all, 1 active, 2 paused
+  Channel? _channel; // null = all channels
+  String _query = '';
+
+  MessagingAutomationProvider get s => widget.s;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  bool _isLive(Automation a) => a.live && s.accounts[a.channel] != null;
+
+  List<Automation> _filtered() {
+    final q = _query.trim().toLowerCase();
+    return s.automations.where((a) {
+      final live = _isLive(a);
+      if (_status == 1 && !live) return false;
+      if (_status == 2 && live) return false;
+      if (_channel != null && a.channel != _channel) return false;
+      if (q.isEmpty) return true;
+      return a.name.toLowerCase().contains(q) ||
+          a.summary.toLowerCase().contains(q) ||
+          a.keywords.any((k) => k.toLowerCase().contains(q));
+    }).toList();
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _status = 0;
+      _channel = null;
+      _query = '';
+      _search.clear();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final empty = s.automations.isEmpty;
     final firstLoad = empty && s.loadingAutomations;
+    final shown = _filtered();
 
     return PageShell(
       title: empty ? 'Let’s get started' : 'Automations',
@@ -102,35 +166,134 @@ class AutomationsPage extends StatelessWidget {
                 ),
               ),
             ),
-          LayoutBuilder(
-            builder: (context, c) {
-              final w = c.maxWidth >= 700 ? (c.maxWidth - 16) / 2 : c.maxWidth;
-              return Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  for (final ch in Channel.values)
-                    SizedBox(
-                      width: w,
-                      child: _ChannelCard(
-                        channel: ch,
-                        account: s.accounts[ch],
-                        onConnect: () => s.connectChannel(context, ch),
-                        onDisconnect: () => s.disconnect(ch),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-
+          _ConnectPanel(s: s),
+          const SizedBox(height: 22),
           if (!firstLoad)
             if (empty)
               _EmptyState(s: s)
             else ...[
-              for (final a in s.automations) _AutoCard(s: s, a: a),
+              _FilterBar(
+                status: _status,
+                channel: _channel,
+                controller: _search,
+                onStatus: (v) => setState(() => _status = v),
+                onChannel: (v) => setState(() => _channel = v),
+                onQuery: (v) => setState(() => _query = v),
+              ),
+              const SizedBox(height: 16),
+              if (shown.isEmpty)
+                _NoMatches(onClear: _clearFilters)
+              else
+                for (final a in shown) _AutoCard(s: s, a: a),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Connect Your Channels panel
+// ─────────────────────────────────────────────────────────────
+
+class _ConnectPanel extends StatelessWidget {
+  const _ConnectPanel({required this.s});
+  final MessagingAutomationProvider s;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            p.mintSoft.withValues(alpha: p.isDark ? .55 : .8),
+            p.surface,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: p.mint.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Connect Your Channels',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+              color: p.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Link your Instagram and WhatsApp to start automating conversations.',
+            style: TextStyle(color: p.textMuted, fontSize: 13.5),
+          ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, c) {
+              Widget card(Channel ch) => _ChannelCard(
+                channel: ch,
+                account: s.accounts[ch],
+                onConnect: () => s.connectChannel(context, ch),
+                onDisconnect: () => s.disconnect(ch),
+              );
+
+              final wa = card(Channel.whatsapp);
+              final ig = card(Channel.instagram);
+              const why = _WhyConnect();
+
+              if (c.maxWidth >= 980) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 5, child: wa),
+                      const SizedBox(width: 14),
+                      Expanded(flex: 5, child: ig),
+                      const SizedBox(width: 14),
+                      const Expanded(flex: 4, child: why),
+                    ],
+                  ),
+                );
+              }
+
+              if (c.maxWidth >= 700) {
+                return Column(
+                  children: [
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: wa),
+                          const SizedBox(width: 14),
+                          Expanded(child: ig),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    why,
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  wa,
+                  const SizedBox(height: 14),
+                  ig,
+                  const SizedBox(height: 14),
+                  why,
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -154,110 +317,121 @@ class _ChannelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final c = channel;
-    final isConnected = account != null;
+    final connected = account != null;
+    final title = c.isIg ? 'Instagram' : 'WhatsApp Business';
+    final accountText = connected
+        ? (c.isIg && !account!.startsWith('@') ? '@$account' : account!)
+        : 'Not connected';
+
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isConnected ? p.mint.withValues(alpha: .5) : p.border,
-        ),
+        border: Border.all(color: p.border),
         boxShadow: p.softShadow,
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Soft channel-tinted header: identity + connection state.
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  c.brandColor.withValues(alpha: .12),
-                  c.brandColor.withValues(alpha: .02),
-                ],
-              ),
-            ),
-            child: Row(
+          ChannelBadge(c, size: 60),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ChannelBadge(c, size: 52),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        c.label,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          fontSize: 16.5,
+                          fontSize: 16,
                           color: p.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isConnected
-                                  ? p.mint
-                                  : p.textMuted.withValues(alpha: .4),
-                            ),
+                    ),
+                    const Spacer(),
+                    connected
+                        ? Pill('Connected', color: p.mint, soft: p.mintSoft)
+                        : Pill(
+                            'Not connected',
+                            color: p.textMuted,
+                            soft: p.chipFill,
                           ),
-                          const SizedBox(width: 7),
-                          Flexible(
-                            child: Text(
-                              isConnected
-                                  ? 'Connected · $account'
-                                  : 'Not connected',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: isConnected ? p.mint : p.textMuted,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  c.blurb,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textMuted,
+                    fontSize: 12.5,
+                    height: 1.45,
                   ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(
+                      connected
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      size: 15,
+                      color: connected ? p.mint : p.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        accountText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: connected ? p.textPrimary : p.textMuted,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Spacer(),
+                    connected
+                        ? _PillButton(
+                            label: 'Disconnect',
+                            icon: Icons.link_off_rounded,
+                            foreground: AppPalette.statusRed,
+                            background: AppPalette.statusRed.withValues(
+                              alpha: .10,
+                            ),
+                            onPressed: onDisconnect,
+                          )
+                        : _PillButton(
+                            label: 'Connect',
+                            icon: Icons.link_rounded,
+                            foreground: p.onBrand,
+                            gradient: p.brand,
+                            onPressed: onConnect,
+                          ),
+                  ],
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 6),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  c.blurb,
-                  style: TextStyle(
-                    color: p.textMuted,
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: isConnected
-                      ? SoftOutlineButton(
-                          onPressed: onDisconnect,
-                          label: 'Disconnect',
-                        )
-                      : GradientButton(label: 'Connect', onPressed: onConnect),
-                ),
-              ],
+            padding: const EdgeInsets.only(top: 40),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onConnect,
+              child: Tooltip(
+                message: 'Check connection',
+                child: Icon(Icons.chevron_right_rounded, color: p.textMuted),
+              ),
             ),
           ),
         ],
@@ -266,80 +440,355 @@ class _ChannelCard extends StatelessWidget {
   }
 }
 
-// /// One card with three divided stats.
-// class _StatsStrip extends StatelessWidget {
-//   const _StatsStrip({
-//     required this.total,
-//     required this.live,
-//     required this.replies,
-//   });
-//   final int total, live, replies;
+class _PillButton extends StatelessWidget {
+  const _PillButton({
+    required this.label,
+    required this.icon,
+    required this.foreground,
+    required this.onPressed,
+    this.background,
+    this.gradient,
+  });
 
-//   @override
-//   Widget build(BuildContext context) {
-//     final p = AppPalette.of(context);
+  final String label;
+  final IconData icon;
+  final Color foreground;
+  final Color? background;
+  final Gradient? gradient;
+  final VoidCallback onPressed;
 
-//     Widget stat(
-//       IconData icon,
-//       String label,
-//       String value,
-//       Color c,
-//       Color soft,
-//     ) {
-//       return Expanded(
-//         child: Column(
-//           children: [
-//             IconTile(icon, size: 38, color: c, background: soft),
-//             const SizedBox(height: 10),
-//             Text(
-//               value,
-//               style: TextStyle(
-//                 fontSize: 24,
-//                 fontWeight: FontWeight.w800,
-//                 letterSpacing: -0.5,
-//                 color: p.textPrimary,
-//               ),
-//             ),
-//             const SizedBox(height: 2),
-//             Text(
-//               label,
-//               maxLines: 1,
-//               overflow: TextOverflow.ellipsis,
-//               style: TextStyle(color: p.textMuted, fontSize: 12),
-//             ),
-//           ],
-//         ),
-//       );
-//     }
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: background,
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 15, color: foreground),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-//     Widget divider() => Container(width: 1, height: 64, color: p.border);
+class _WhyConnect extends StatelessWidget {
+  const _WhyConnect();
 
-//     return SectionCard(
-//       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-//       child: Row(
-//         children: [
-//           stat(
-//             Icons.layers_rounded,
-//             'Automations',
-//             '$total',
-//             p.tileNeutralIcon,
-//             p.tileNeutral,
-//           ),
-//           divider(),
-//           stat(Icons.bolt_rounded, 'Live now', '$live', p.mint, p.mintSoft),
-//           divider(),
-//           stat(
-//             Icons.reply_all_rounded,
-//             'Replies sent',
-//             '$replies',
-//             p.sky,
-//             p.skySoft,
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    const items = [
+      'Auto-reply to messages',
+      'Trigger workflows & automations',
+      'Collect customer data',
+      'Track performance & analytics',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: p.isDark ? .6 : .7),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: p.mint.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: p.chipFill,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: p.border),
+                ),
+                child: Icon(Icons.link_rounded, size: 19, color: p.textPrimary),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Why Connect?',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15.5,
+                  color: p.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (final t in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 16, color: p.mint),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      t,
+                      style: TextStyle(fontSize: 12.5, color: p.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Filter bar
+// ─────────────────────────────────────────────────────────────
+
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.status,
+    required this.channel,
+    required this.controller,
+    required this.onStatus,
+    required this.onChannel,
+    required this.onQuery,
+  });
+
+  final int status;
+  final Channel? channel;
+  final TextEditingController controller;
+  final ValueChanged<int> onStatus;
+  final ValueChanged<Channel?> onChannel;
+  final ValueChanged<String> onQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+
+    final segmented = Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _seg(p, 0, 'All', null),
+          _seg(p, 1, 'Active', p.mint),
+          _seg(p, 2, 'Paused', p.textMuted),
+        ],
+      ),
+    );
+
+    final search = TextField(
+      controller: controller,
+      onChanged: onQuery,
+      decoration: InputDecoration(
+        hintText: 'Search automations…',
+        hintStyle: TextStyle(color: p.textMuted, fontSize: 13.5),
+        prefixIcon: Icon(Icons.search_rounded, size: 20, color: p.textMuted),
+        filled: true,
+        fillColor: p.surface,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        border: _border(p.border),
+        enabledBorder: _border(p.border),
+        focusedBorder: _border(p.accent),
+      ),
+    );
+
+    final filter = PopupMenuButton<int>(
+      tooltip: 'Filter by channel',
+      onSelected: (v) => onChannel(
+        v == 0 ? null : (v == 1 ? Channel.instagram : Channel.whatsapp),
+      ),
+      itemBuilder: (_) => const <PopupMenuEntry<int>>[
+        PopupMenuItem<int>(value: 0, child: Text('All channels')),
+        PopupMenuItem<int>(value: 1, child: Text('Instagram')),
+        PopupMenuItem<int>(value: 2, child: Text('WhatsApp')),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: channel == null ? p.surface : p.accentSoft,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: channel == null ? p.border : p.accent.withValues(alpha: .4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_alt_outlined, size: 18, color: p.textPrimary),
+            const SizedBox(width: 8),
+            Text(
+              channel == null
+                  ? 'Filter'
+                  : (channel == Channel.instagram ? 'Instagram' : 'WhatsApp'),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: p.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        if (c.maxWidth >= 760) {
+          return Row(
+            children: [
+              segmented,
+              const Spacer(),
+              SizedBox(width: 320, child: search),
+              const SizedBox(width: 12),
+              filter,
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            segmented,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: search),
+                const SizedBox(width: 10),
+                filter,
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(26),
+    borderSide: BorderSide(color: c),
+  );
+
+  Widget _seg(AppPalette p, int value, String label, Color? dot) {
+    final selected = status == value;
+    final bg = p.isDark ? p.accent : AppColors.black;
+    final fg = selected
+        ? (p.isDark ? AppColors.black : Colors.white)
+        : p.textMuted;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onStatus(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? bg : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dot != null) ...[
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? dot : dot.withValues(alpha: .8),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoMatches extends StatelessWidget {
+  const _NoMatches({required this.onClear});
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.search_off_rounded, size: 32, color: p.textMuted),
+            const SizedBox(height: 10),
+            Text(
+              'No automations match your filters',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: p.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: onClear,
+              style: TextButton.styleFrom(foregroundColor: p.accent),
+              child: const Text('Clear filters'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Banner + empty state (unchanged behaviour)
+// ─────────────────────────────────────────────────────────────
 
 class _Banner extends StatelessWidget {
   const _Banner({required this.text, required this.onRetry});
@@ -436,7 +885,6 @@ class _EmptyState extends StatelessWidget {
             decoration: BoxDecoration(gradient: p.brandDeep, boxShadow: p.glow),
             child: Stack(
               children: [
-                // One quiet decorative circle, nothing else.
                 Positioned(
                   right: -50,
                   top: -50,
@@ -533,7 +981,7 @@ class _EmptyState extends StatelessWidget {
                   tag: 'Loved by creators',
                   tagColor: ChannelColors.ig,
                   gradient: ChannelColors.igBubble,
-                  icon: Icons.camera_alt_rounded,
+                  icon: AssetConstants.instagram,
                   title: 'Send a DM with your link every time someone comments on your post',
                   cta: 'Send a link from comments',
                   user: 'link pls!',
@@ -546,7 +994,7 @@ class _EmptyState extends StatelessWidget {
                   tag: 'Boosts engagement',
                   tagColor: ChannelColors.waDeep,
                   gradient: ChannelColors.waGradient,
-                  icon: Icons.chat_rounded,
+                  icon: AssetConstants.whatsApp,
                   title: 'Send customized replies when people DM you specific keywords',
                   cta: 'Respond to your DMs',
                   user: 'INFO',
@@ -580,7 +1028,7 @@ class _StartCard extends StatelessWidget {
   final String tag, title, cta, user, bot;
   final Color tagColor;
   final LinearGradient gradient;
-  final IconData icon;
+  final String icon;
   final VoidCallback onTap;
 
   Widget _bubble(AppPalette p, String t, {bool right = false}) => Align(
@@ -614,12 +1062,7 @@ class _StartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Pill(
-              tag,
-              color: tagColor,
-              soft: tagColor.withValues(alpha: .12),
-              icon: icon,
-            ),
+            SvgPicture.asset(icon, width: 20, height: 20, fit: BoxFit.contain),
             const SizedBox(height: 12),
             Text(
               title,
@@ -657,8 +1100,13 @@ class _StartCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Automation card
+// ─────────────────────────────────────────────────────────────
+
 class _AutoCard extends StatelessWidget {
   const _AutoCard({required this.s, required this.a});
+
   final MessagingAutomationProvider s;
   final Automation a;
 
@@ -667,191 +1115,327 @@ class _AutoCard extends StatelessWidget {
     final p = AppPalette.of(context);
     final connected = s.accounts[a.channel] != null;
     final isLive = a.live && connected;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SectionCard(
-        padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
-        child: Row(
+
+    // Fixed-size tile with the SVG badge centered.
+    final tile = SizedBox(
+      width: 60,
+      height: 60,
+      child: Center(child: ChannelBadge(a.channel, size: 60)),
+    );
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            ChannelBadge(a.channel, size: 46),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          a.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: p.textPrimary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      isLive
-                          ? Pill(
-                              'Live',
-                              color: p.mint,
-                              soft: p.mintSoft,
-                              icon: Icons.circle,
-                              iconSize: 8,
-                            )
-                          : Pill(
-                              'Paused',
-                              color: p.textMuted,
-                              soft: p.chipFill,
-                              icon: Icons.pause_rounded,
-                            ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    a.summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textMuted, fontSize: 13),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Pill(
-                        '${a.runs} replies',
-                        color: p.textMuted,
-                        soft: p.chipFill,
-                        icon: Icons.reply_rounded,
-                      ),
-                      if (!connected)
-                        GestureDetector(
-                          onTap: () => s.setTab(2),
-                          child: Pill(
-                            'Channel disconnected · Fix',
-                            color: p.amber,
-                            soft: p.amberSoft,
-                            icon: Icons.link_off_rounded,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+            Text(
+              a.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: p.textPrimary,
               ),
             ),
-            const SizedBox(width: 6),
-            Switch(
-              value: a.live && connected,
-              activeThumbColor: Colors.white,
-              activeTrackColor: p.mint,
-              onChanged: connected
-                  ? (_) async {
-                      try {
-                        await s.toggleAsync(a);
-
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Automation status updated.'),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Could not update automation: $e'),
-                          ),
-                        );
-                      }
-                    }
-                  : null,
-            ),
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded, color: p.textMuted),
-              onSelected: (v) async {
-                if (v == 'test') showTest(context, s, a);
-                if (v == 'edit') openBuilder(context, s, existing: a);
-                if (v == 'delete') {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete automation?'),
-                      content: Text(
-                        '“${a.name}” will stop replying and be removed.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Keep'),
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red.shade600,
-                          ),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (ok == true) {
-                    try {
-                      await s.removeAsync(a);
-
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Automation deleted.')),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Could not delete automation: $e'),
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'test',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.phone_iphone_rounded),
-                    title: Text('Test in preview'),
+            isLive
+                ? Pill(
+                    'Active',
+                    color: p.mint,
+                    soft: p.mintSoft,
+                    icon: Icons.circle,
+                    iconSize: 7,
+                  )
+                : Pill(
+                    'Paused',
+                    color: p.textMuted,
+                    soft: p.chipFill,
+                    icon: Icons.pause_rounded,
                   ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          a.summary,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: p.textMuted, fontSize: 12.5, height: 1.4),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _Tag(a.channel.isIg ? 'Instagram' : 'WhatsApp'),
+            _Tag(_triggerLabel(a.trigger)),
+            for (final k in a.keywords.take(2)) _Tag(k),
+            if (!connected)
+              GestureDetector(
+                onTap: () => s.setTab(2),
+                child: Pill(
+                  'Channel disconnected · Fix',
+                  color: p.amber,
+                  soft: p.amberSoft,
+                  icon: Icons.link_off_rounded,
                 ),
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.edit_rounded),
-                    title: Text('Edit'),
-                  ),
+              ),
+          ],
+        ),
+      ],
+    );
+
+    Widget stat(IconData icon, String value, String label) {
+      return _Stat(icon: icon, value: value, label: label);
+    }
+
+    Widget vline() => Container(
+      width: 1,
+      height: 40,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: p.border,
+    );
+
+    final statReplies = stat(
+      Icons.chat_bubble_outline_rounded,
+      '${a.runs}',
+      'Replies',
+    );
+
+    final statTrigger = stat(
+      Icons.bolt_rounded,
+      _triggerLabel(a.trigger),
+      'Trigger',
+    );
+
+    final statStatus = stat(
+      Icons.power_settings_new_rounded,
+      isLive ? 'Live' : 'Paused',
+      'Status',
+    );
+
+    final toggle = Switch(
+      value: isLive,
+      activeThumbColor: Colors.white,
+      activeTrackColor: p.mint,
+      onChanged: connected
+          ? (_) async {
+              try {
+                await s.toggleAsync(a);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Automation status updated.')),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not update automation: $e')),
+                );
+              }
+            }
+          : null,
+    );
+
+    final menu = _menu(context, p);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: SectionCard(
+        radius: 22,
+        padding: const EdgeInsets.fromLTRB(20, 18, 10, 18),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            if (c.maxWidth >= 900) {
+              return Row(
+                children: [
+                  tile,
+                  const SizedBox(width: 20),
+                  Expanded(child: info),
+                  const SizedBox(width: 18),
+                  Container(width: 1, height: 52, color: p.border),
+                  const SizedBox(width: 18),
+                  SizedBox(width: 118, child: statReplies),
+                  vline(),
+                  SizedBox(width: 128, child: statTrigger),
+                  vline(),
+                  SizedBox(width: 110, child: statStatus),
+                  const SizedBox(width: 20),
+                  toggle,
+                  menu,
+                ],
+              );
+            }
+
+            return Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    tile,
+                    const SizedBox(width: 16),
+                    Expanded(child: info),
+                    toggle,
+                    menu,
+                  ],
                 ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.delete_outline_rounded),
-                    title: Text('Delete'),
+                const SizedBox(height: 14),
+                Divider(height: 1, color: p.border),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Row(
+                    children: [
+                      Expanded(child: statReplies),
+                      vline(),
+                      Expanded(child: statTrigger),
+                      vline(),
+                      Expanded(child: statStatus),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ],
+            );
+          },
         ),
       ),
+    );
+  }
+
+  Widget _menu(BuildContext context, AppPalette p) {
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert_rounded, color: p.textMuted),
+      onSelected: (v) async {
+        if (v == 'test') showTest(context, s, a);
+        if (v == 'edit') openBuilder(context, s, existing: a);
+
+        if (v == 'delete') {
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete automation?'),
+              content: Text('“${a.name}” will stop replying and be removed.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Keep'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+
+          if (ok == true) {
+            try {
+              await s.removeAsync(a);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Automation deleted.')),
+              );
+            } catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not delete automation: $e')),
+              );
+            }
+          }
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: 'test',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.phone_iphone_rounded),
+            title: Text('Test in preview'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.edit_rounded),
+            title: Text('Edit'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.delete_outline_rounded),
+            title: Text('Delete'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: p.chipFill,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: p.textMuted,
+        ),
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.icon, required this.value, required this.label});
+  final IconData icon;
+  final String value, label;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 19, color: p.textMuted),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: p.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(fontSize: 12, color: p.textMuted)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

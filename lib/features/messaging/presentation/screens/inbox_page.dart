@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/channel.dart';
@@ -168,6 +169,7 @@ class WhatsAppInboxMessage {
     this.audioMediaId,
     this.audioMimeType,
     this.audioVoice = false,
+    this.unreadCount = 0,
   });
 
   final int id;
@@ -182,6 +184,7 @@ class WhatsAppInboxMessage {
   final String? audioMediaId;
   final String? audioMimeType;
   final bool audioVoice;
+  final int unreadCount;
 
   bool get isOutgoing => direction == 'outgoing';
   bool get isAudio =>
@@ -200,6 +203,7 @@ class WhatsAppInboxMessage {
       audioMediaId: json['audio_media_id']?.toString(),
       audioMimeType: json['audio_mime_type']?.toString(),
       audioVoice: json['audio_voice'] == true,
+      unreadCount: int.tryParse('${json['unread_count'] ?? 0}') ?? 0,
       createdAt:
           DateTime.tryParse('${json['created_at'] ?? ''}')?.toLocal() ??
           DateTime.now(),
@@ -379,7 +383,7 @@ class InboxPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
+    AppPalette.of(context);
 
     return SizedBox(
       width: double.infinity,
@@ -439,8 +443,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   bool _unreadOnly = false;
   bool _latestFirst = true;
   bool _mobileThread = false; // narrow layout: showing thread instead of list
-  bool _confirmed = false; // user has picked a conversation themselves
-  final Map<String, DateTime> _seen = {};
+  // user has picked a conversation themselves
   // Chats opened while the unread filter is on stay in the list; only their
   // unread dot is cleared.
   final Set<String> _keepVisible = {};
@@ -492,14 +495,10 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     super.initState();
 
     _loadReadStates();
-    _refreshIg();
     _refreshWa();
     _subscribeIg();
     _subscribeWa();
     _refreshIg();
-    _refreshWa();
-    _subscribeIg();
-    _subscribeWa();
 
     // Polling is a fallback in case Supabase Realtime is unavailable.
     _igPoll = Timer.periodic(_pollEvery, (_) async {
@@ -604,6 +603,34 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         .subscribe();
   }
 
+  Future<void> _markConversationRead(_Convo c) async {
+    final latestIncoming = _latestIncomingAt(c);
+    if (latestIncoming == null) return;
+
+    final previousRead = _readAt[c.id];
+
+    // Don't save the same timestamp repeatedly.
+    if (previousRead != null && !latestIncoming.isAfter(previousRead)) {
+      return;
+    }
+
+    // Update immediately so the badge disappears without waiting for
+    // the database request.
+    setState(() {
+      _readAt[c.id] = latestIncoming;
+    });
+
+    try {
+      await _readStateService.markRead(
+        channel: c.channel.name,
+        conversationKey: c.key,
+        lastReadAt: latestIncoming,
+      );
+    } catch (e) {
+      debugPrint('Could not save inbox read state: $e');
+    }
+  }
+
   void _snack(String message, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -678,7 +705,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         if (_igSelected == null || !ids.contains(_igSelected)) {
           _igSelected = _latestIgSender(messages);
         }
-        _markOpenSeen();
       });
     } catch (e) {
       if (!mounted || version != _igVersion) return;
@@ -783,7 +809,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         _waConvos = rows;
         _waSelected = nextPhone;
         _waLoading = false;
-        _markOpenSeen();
       });
 
       if (nextPhone != null) {
@@ -1069,15 +1094,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     return c.incoming ? c.time : null;
   }
 
-  bool _isUnread(_Convo c) {
-    if (!_readStatesLoaded) return false;
-
-    final latestIncoming = _latestIncomingAt(c);
-    if (latestIncoming == null) return false;
-
-    final lastRead = _readAt[c.id];
-    return lastRead == null || latestIncoming.isAfter(lastRead);
-  }
+  bool _isUnread(_Convo c) => _unreadMessageCount(c) > 0;
 
   int _unreadCount(List<_Convo> items) => items.where(_isUnread).length;
 
@@ -1094,53 +1111,53 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     return list;
   }
 
-  /// Once the user has opened a conversation, keep it marked as read while
-  /// new messages arrive in it.
-  void _markOpenSeen() {
-    if (!_confirmed) return;
-    final isIg = _open == Channel.instagram;
-    final key = isIg ? _igSelected : _waSelected;
-    if (key == null) return;
-    for (final c in isIg ? _igItems() : _waItems()) {
-      if (c.key == key) {
-        _seen[c.id] = c.time;
-        break;
-      }
-    }
-  }
-
   void _select(_Convo c) {
-    _confirmed = true;
     _keepVisible.add(c.id);
+
     if (c.channel == Channel.instagram) {
       setState(() {
         _open = Channel.instagram;
         _igSelected = c.key;
         _mobileThread = true;
-        _seen[c.id] = c.time;
       });
+
+      // Save the incoming-message timestamp for this conversation.
+      _markConversationRead(c);
       return;
     }
 
     final changed = _waSelected != c.key;
+
     setState(() {
       _open = Channel.whatsapp;
       _waSelected = c.key;
       _mobileThread = true;
-      _seen[c.id] = c.time;
+
       if (changed) {
         _waMessages = [];
         _waError = null;
       }
     });
-    if (changed) _loadWaMessages(c.key);
+
+    // Load the actual WhatsApp history before marking messages as read.
+    _loadWaMessages(c.key).then((_) {
+      if (!mounted || _waSelected != c.key || _open != Channel.whatsapp) {
+        return;
+      }
+
+      for (final conversation in _waItems()) {
+        if (conversation.key == c.key) {
+          _markConversationRead(conversation);
+          break;
+        }
+      }
+    });
   }
 
   void _setTab(Channel channel) {
     setState(() {
       _tab = channel;
       _open = channel;
-      _markOpenSeen();
     });
   }
 
@@ -1151,17 +1168,18 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         ? _igSelected
         : _waSelected;
     final selected = c.channel == _open && c.key == selectedKey;
-    final unread = _isUnread(c);
+    _isUnread(c);
+    final unreadCount = _unreadMessageCount(c);
 
     return ConversationTile(
       selected: selected,
-      unread: unread,
+      unread: unreadCount > 0,
+      unreadCount: unreadCount,
+      isInstagram: c.channel == Channel.instagram,
       name: c.name,
       time: formatInboxListTime(c.time),
       preview: c.preview,
-      indicatorColor: unread
-          ? (c.channel.isIg ? p.accent : ChannelColors.wa)
-          : null,
+      indicatorColor: c.channel.isIg ? p.accent : ChannelColors.wa,
       onTap: () => _select(c),
       avatar: AvatarWithBadge(
         label: c.name,
@@ -1169,6 +1187,53 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         imageUrl: c.avatarUrl,
       ),
     );
+  }
+
+  int _unreadMessageCount(_Convo c) {
+    if (!_readStatesLoaded) return 0;
+
+    final lastRead = _readAt[c.id];
+
+    // Instagram: show an unread dot if any incoming message
+    // arrived after the conversation was last read.
+    if (c.channel == Channel.instagram) {
+      return _igMessages.where((message) {
+        if (message.senderId != c.key || message.fromBot) {
+          return false;
+        }
+
+        return lastRead == null || message.createdAt.isAfter(lastRead);
+      }).length;
+    }
+
+    // WhatsApp: count incoming messages only.
+    // Automatic replies and other outgoing messages must not
+    // clear or increase the unread count.
+
+    if (c.channel == Channel.whatsapp) {
+      final lastRead = _readAt[c.id];
+
+      // Use loaded history for the selected conversation so the
+      // badge clears immediately when its read state is saved.
+      if (_waSelected == c.key && _waMessages.isNotEmpty) {
+        return _waMessages.where((message) {
+          if (message.isOutgoing) return false;
+
+          return lastRead == null || message.createdAt.isAfter(lastRead);
+        }).length;
+      }
+
+      // Other conversations use the accurate backend count.
+      final conversation = _waConvos.where((message) => message.phone == c.key);
+
+      if (conversation.isNotEmpty) {
+        return conversation.first.unreadCount;
+      }
+
+      return 0;
+    }
+
+    return 0;
   }
 
   Widget _channelHint(Channel channel, List<_Convo> all) {
@@ -1468,9 +1533,31 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
               ),
             ],
           ),
+
         Expanded(
-          child: ColoredBox(color: p.pageBg, child: body),
+          child: isIg
+              ? ColoredBox(color: p.pageBg, child: body)
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(color: p.pageBg),
+                    Opacity(
+                      opacity: 0.50,
+                      child: Image.asset(
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AssetConstants.whatsappChatbgDark
+                            : AssetConstants.whatsappChatbgLight,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                    body,
+                  ],
+                ),
         ),
+
         _composer(),
       ],
     );

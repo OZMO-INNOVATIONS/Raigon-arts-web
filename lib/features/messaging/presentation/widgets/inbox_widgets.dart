@@ -543,6 +543,8 @@ class ConversationTile extends StatelessWidget {
     this.unread = false,
     this.indicatorColor,
     this.previewLines = 1,
+    this.unreadCount = 0,
+    this.isInstagram = false,
   });
 
   final Widget avatar;
@@ -551,6 +553,8 @@ class ConversationTile extends StatelessWidget {
   final Color? indicatorColor;
   final VoidCallback onTap;
   final int previewLines;
+  final int unreadCount;
+  final bool isInstagram;
 
   @override
   Widget build(BuildContext context) {
@@ -617,17 +621,49 @@ class ConversationTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (indicatorColor != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: indicatorColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
+                          if (unread)
+                            isInstagram
+                                ? Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFFFEDA75),
+                                          Color(0xFFFA7E1E),
+                                          Color(0xFFD62976),
+                                          Color(0xFF962FBF),
+                                          Color(0xFF4F5BD5),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 20,
+                                      minHeight: 20,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF25D366),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      unreadCount > 99 ? '99+' : '$unreadCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
                         ],
                       ),
                     ],

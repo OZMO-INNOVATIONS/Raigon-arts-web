@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
@@ -101,7 +101,7 @@ class _CustomersTableState extends State<CustomersTable> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.folder_open,
+                                      RemixIcons.folder_open_line,
                                       size: 46,
                                       color: p.textMuted,
                                     ),
@@ -276,13 +276,17 @@ class _CustomersTableState extends State<CustomersTable> {
               onTap: () => widget.onView?.call(c),
             ),
             Text(
-              c.frameSize,
+              c.frameSize.isNotEmpty
+                  ? c.frameSize
+                  : (c.effectiveFrames.isNotEmpty ? c.effectiveFrames.first.size : '-'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cell,
             ),
             Text(
-              c.frameType,
+              c.frameType.isNotEmpty
+                  ? c.frameType
+                  : (c.effectiveFrames.isNotEmpty ? c.effectiveFrames.first.frameType : '-'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cell,
@@ -299,15 +303,15 @@ class _CustomersTableState extends State<CustomersTable> {
             children: [
               _action(
                 onTap: () => widget.onView?.call(c),
-                child: Icon(Icons.visibility, size: 21, color: p.textPrimary),
+                child: Icon(RemixIcons.eye_line, size: 20, color: p.textPrimary),
               ),
               const SizedBox(width: 10),
               _action(
                 onTap: () => widget.onWhatsApp?.call(c),
                 fill: AppColors.green.withValues(alpha: p.isDark ? 0.25 : 0.18),
-                child: const FaIcon(
-                  FontAwesomeIcons.whatsapp,
-                  size: 19,
+                child: const Icon(
+                  RemixIcons.whatsapp_fill,
+                  size: 20,
                   color: AppColors.green,
                 ),
               ),
@@ -315,7 +319,7 @@ class _CustomersTableState extends State<CustomersTable> {
               _action(
                 onTap: () => widget.onEdit?.call(c),
                 child: Icon(
-                  Icons.edit_outlined,
+                  RemixIcons.edit_line,
                   size: 20,
                   color: p.textPrimary,
                 ),
@@ -323,9 +327,9 @@ class _CustomersTableState extends State<CustomersTable> {
               const SizedBox(width: 10),
               _action(
                 onTap: () => widget.onDelete?.call(c),
-                child: FaIcon(
-                  FontAwesomeIcons.trash,
-                  size: 17,
+                child: Icon(
+                  RemixIcons.delete_bin_line,
+                  size: 19,
                   color: p.isDark ? p.textMuted : AppColors.black,
                 ),
               ),
@@ -518,7 +522,7 @@ class PhotoStrip extends StatelessWidget {
         errorBuilder: (_, _, _) => Container(
           color: p.chipFill,
           alignment: Alignment.center,
-          child: Icon(Icons.broken_image_outlined, size: 14, color: p.textMuted),
+          child: Icon(RemixIcons.image_line, size: 14, color: p.textMuted),
         ),
       );
     } else {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:remixicon/remixicon.dart';
 
 class FormColors {
   FormColors._(this.p);
@@ -314,11 +315,11 @@ class _Stepper extends StatelessWidget {
         children: [
           InkWell(
             onTap: enabled ? onUp : null,
-            child: Icon(Icons.keyboard_arrow_up, size: 17, color: color),
+            child: Icon(RemixIcons.arrow_up_s_line, size: 17, color: color),
           ),
           InkWell(
             onTap: enabled ? onDown : null,
-            child: Icon(Icons.keyboard_arrow_down, size: 17, color: color),
+            child: Icon(RemixIcons.arrow_down_s_line, size: 17, color: color),
           ),
         ],
       ),
@@ -498,7 +499,7 @@ class _FormDropdownState<T> extends State<FormDropdown<T>> {
                   ),
                 ),
                 Icon(
-                  _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  _open ? RemixIcons.arrow_up_s_line : RemixIcons.arrow_down_s_line,
                   size: 22,
                   color: p.textPrimary,
                 ),
@@ -627,7 +628,7 @@ class _DateFieldState extends State<DateField> {
                 ),
               ),
               if (widget.showIcon)
-                Icon(Icons.calendar_month, size: 20, color: p.textPrimary),
+                Icon(RemixIcons.calendar_line, size: 20, color: p.textPrimary),
             ],
           ),
         ),
@@ -773,7 +774,7 @@ class _CalendarCardState extends State<_CalendarCard> {
           children: [
             Row(
               children: [
-                navButton(Icons.chevron_left, () => _shift(-1)),
+                navButton(RemixIcons.arrow_left_s_line, () => _shift(-1)),
                 Expanded(
                   child: Text(
                     '${_monthsFull[_month.month - 1]} ${_month.year}',
@@ -785,7 +786,7 @@ class _CalendarCardState extends State<_CalendarCard> {
                     ),
                   ),
                 ),
-                navButton(Icons.chevron_right, () => _shift(1)),
+                navButton(RemixIcons.arrow_right_s_line, () => _shift(1)),
               ],
             ),
             const SizedBox(height: 14),

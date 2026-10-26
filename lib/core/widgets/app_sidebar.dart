@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -67,7 +68,7 @@ class AppSidebar extends StatelessWidget {
                 child: _item(
                   p: p,
                   label: 'Logout',
-                  icon: Icons.power_settings_new,
+                  icon: RemixIcons.logout_box_r_line,
                   active: false,
                   showLabels: showLabels,
                   color: AppPalette.red,
@@ -142,7 +143,7 @@ class AppSidebar extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: onToggle,
-                    icon: Icon(Icons.menu, color: p.textPrimary, size: 22),
+                    icon: Icon(RemixIcons.menu_line, color: p.textPrimary, size: 22),
                   ),
                 ],
               ),

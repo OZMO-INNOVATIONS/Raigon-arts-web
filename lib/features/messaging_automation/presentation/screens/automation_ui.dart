@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 class AutoInk {
   static Color text(BuildContext c) => AppPalette.of(c).textPrimary;
@@ -154,7 +155,7 @@ class ChannelIcon extends StatelessWidget {
             : null,
       ),
       child: Icon(
-        ig ? Icons.camera_alt_outlined : Icons.chat_rounded,
+        ig ? RemixIcons.instagram_line : RemixIcons.whatsapp_fill,
         color: Colors.white,
         size: size * 0.55,
       ),

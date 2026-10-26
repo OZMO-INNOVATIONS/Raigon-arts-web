@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -86,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded, size: 54, color: AppColors.error),
+              const Icon(RemixIcons.cloud_off_line, size: 54, color: AppColors.error),
               const SizedBox(height: 16),
               Text(
                 'Connection Issue',
@@ -108,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               AppPrimaryButton(
                 label: 'Retry Connection',
-                icon: Icons.refresh,
+                icon: RemixIcons.refresh_line,
                 onPressed: () {
                   customerAndOrderProvider.refresh().then((_) {
                     if (context.mounted) {
@@ -209,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final addButton = AppPrimaryButton(
       label: 'Add New Customer',
-      icon: Icons.person_add,
+      icon: RemixIcons.user_add_line,
       onPressed: () => ShellScope.of(context).openAddCustomer(),
     );
 
@@ -249,10 +250,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   static (IconData, String) _trend(num cur, num prev) {
-    if (prev == 0) return (Icons.arrow_upward, cur > 0 ? 'New' : '0%');
+    if (prev == 0) return (RemixIcons.arrow_up_line, cur > 0 ? 'New' : '0%');
     final pct = ((cur - prev) / prev * 100).round();
     return (
-      pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+      pct >= 0 ? RemixIcons.arrow_up_line : RemixIcons.arrow_down_line,
       '${pct >= 0 ? '+' : ''}$pct%',
     );
   }
@@ -306,7 +307,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             title: 'Total Frame Orders',
             value: '${customers.length}',
-            icon: Icons.move_to_inbox,
+            icon: RemixIcons.inbox_line,
             tileBg: p.tileNeutral,
             tileIcon: p.tileNeutralIcon,
             footIcon: ordersTrend.$1,
@@ -317,10 +318,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             title: 'In Progress',
             value: '${count(Status.inProgress)}',
-            icon: Icons.handyman,
+            icon: RemixIcons.hammer_line,
             tileBg: p.tileTeal,
             tileIcon: AppPalette.teal,
-            footIcon: Icons.sync,
+            footIcon: RemixIcons.refresh_line,
             footStrong: 'Active',
             footLight: 'in workshop',
             footColor: AppPalette.teal,
@@ -328,10 +329,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             title: 'Completed Orders',
             value: '${count(Status.completed)}',
-            icon: Icons.check_circle,
+            icon: RemixIcons.checkbox_circle_line,
             tileBg: p.tileGreen,
             tileIcon: AppColors.green,
-            footIcon: Icons.check,
+            footIcon: RemixIcons.check_line,
             footStrong: 'Ready',
             footLight: 'for delivery',
             footColor: AppColors.green,
@@ -339,10 +340,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             title: 'Pending Orders',
             value: '${count(Status.pending)}',
-            icon: Icons.watch_later,
+            icon: RemixIcons.time_line,
             tileBg: p.tileOrange,
             tileIcon: AppPalette.orange,
-            footIcon: Icons.warning,
+            footIcon: RemixIcons.error_warning_line,
             footStrong: 'Urgent',
             footLight: 'action needed',
             footColor: AppPalette.orange,
@@ -350,7 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             title: 'Total Revenue',
             value: _inr(revenue),
-            icon: Icons.currency_rupee,
+            icon: RemixIcons.money_rupee_circle_line,
             tileBg: p.tileNeutral,
             tileIcon: p.tileNeutralIcon,
             footIcon: revTrend.$1,
@@ -660,7 +661,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       InkWell(
                         onTap: () => showViewCustomerDialog(context, o),
                         child: Icon(
-                          Icons.visibility,
+                          RemixIcons.eye_line,
                           size: 21,
                           color: p.textPrimary,
                         ),
@@ -669,7 +670,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       InkWell(
                         onTap: () => showEditCustomerDialog(context, o),
                         child: Icon(
-                          Icons.edit_outlined,
+                          RemixIcons.edit_line,
                           size: 20,
                           color: p.textPrimary,
                         ),
@@ -717,7 +718,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.arrow_forward, size: 17, color: p.textPrimary),
+            Icon(RemixIcons.arrow_right_line, size: 17, color: p.textPrimary),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/theme_controller.dart';
@@ -23,7 +24,7 @@ class AppTopBar extends StatelessWidget {
       decoration: p.card(radius: 16),
       child: Row(
         children: [
-          Icon(Icons.search, size: 24, color: p.textMuted),
+          Icon(RemixIcons.search_line, size: 22, color: p.textMuted),
           const SizedBox(width: 14),
           Expanded(
             child: TextField(
@@ -40,7 +41,7 @@ class AppTopBar extends StatelessWidget {
             tooltip: p.isDark ? 'Light mode' : 'Dark mode',
             onPressed: ThemeController.toggle,
             icon: Icon(
-              p.isDark ? Icons.wb_sunny : Icons.dark_mode,
+              p.isDark ? RemixIcons.sun_line : RemixIcons.moon_line,
               size: 22,
               color: p.isDark ? const Color(0xFFF5B301) : p.textPrimary,
             ),
@@ -51,7 +52,7 @@ class AppTopBar extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onBellTap,
-                icon: Icon(Icons.notifications, size: 24, color: p.textPrimary),
+                icon: Icon(RemixIcons.notification_3_line, size: 22, color: p.textPrimary),
               ),
               if (notificationCount > 0)
                 Positioned(

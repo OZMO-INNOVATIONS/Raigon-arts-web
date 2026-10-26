@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 
 class AppPaginationFooter extends StatelessWidget {
@@ -95,7 +96,7 @@ class AppPaginationFooter extends StatelessWidget {
             children: [
               pageButton(
                 label: 'Previous',
-                icon: Icons.chevron_left,
+                icon: RemixIcons.arrow_left_s_line,
                 enabled: currentPage > 1,
                 previous: true,
                 onTap: () => onPageChanged(currentPage - 1),
@@ -112,7 +113,7 @@ class AppPaginationFooter extends StatelessWidget {
               const SizedBox(width: 14),
               pageButton(
                 label: 'Next',
-                icon: Icons.chevron_right,
+                icon: RemixIcons.arrow_right_s_line,
                 enabled: currentPage < totalPages,
                 previous: false,
                 onTap: () => onPageChanged(currentPage + 1),

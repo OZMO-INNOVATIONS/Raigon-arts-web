@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/notification_model.dart';
@@ -109,7 +110,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                             border: Border.all(color: p.border),
                           ),
                           child: Icon(
-                            Icons.close,
+                            RemixIcons.close_line,
                             size: 17,
                             color: p.textPrimary,
                           ),
@@ -131,14 +132,14 @@ class _NotificationPanelState extends State<NotificationPanel> {
                         p,
                         _Filter.completed,
                         'Completed (${_count(NotificationType.completed)})',
-                        Icons.check_circle,
+                        RemixIcons.checkbox_circle_line,
                       ),
                       const SizedBox(width: 8),
                       _chip(
                         p,
                         _Filter.dues,
                         'Dues (${_count(NotificationType.due)})',
-                        Icons.warning,
+                        RemixIcons.error_warning_line,
                       ),
                     ],
                   ),
@@ -164,7 +165,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.notifications_none_rounded,
+                            RemixIcons.notification_line,
                             size: 40,
                             color: p.textMuted,
                           ),
@@ -214,7 +215,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 18, color: p.textPrimary),
+                    Icon(RemixIcons.arrow_right_line, size: 18, color: p.textPrimary),
                   ],
                 ),
               ),
@@ -281,7 +282,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isDue ? Icons.warning : Icons.check_circle,
+              isDue ? RemixIcons.error_warning_fill : RemixIcons.checkbox_circle_fill,
               size: 22,
               color: accent,
             ),
@@ -346,7 +347,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.visibility,
+                              RemixIcons.eye_line,
                               size: 16,
                               color: Colors.white,
                             ),
@@ -386,7 +387,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
-                              Icons.chat_bubble_outline,
+                              RemixIcons.whatsapp_fill,
                               size: 15,
                               color: AppColors.green,
                             ),

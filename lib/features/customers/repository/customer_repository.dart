@@ -74,10 +74,10 @@ class RestCustomerRepository implements CustomerRepository {
           'paymentStatus': paymentStatus,
         if (startDate != null) 'startDate': startDate.toIso8601String(),
         if (endDate != null) 'endDate': endDate.toIso8601String(),
-        'page': ?page,
-        'limit': ?limit,
-        'sortBy': ?sortBy,
-        'sortOrder': ?sortOrder,
+        'page': page ?? 1,
+        'limit': limit ?? 1000,
+        'sortBy': sortBy ?? 'createdAt',
+        'sortOrder': sortOrder ?? 'desc',
       };
 
       final response = await _api.get(

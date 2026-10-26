@@ -69,11 +69,43 @@ class CustomersScreenProvider extends ChangeNotifier {
       return statusMatches && searchMatches;
     }).toList();
 
+    int parseIdNum(String id) {
+      final match = RegExp(r'(\d+)').allMatches(id);
+      if (match.isNotEmpty) {
+        return int.tryParse(match.last.group(1) ?? '0') ?? 0;
+      }
+      return 0;
+    }
+
     switch (_sort) {
       case SortOption.newest:
-        result.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+        result.sort((a, b) {
+          if (a.createdAt != null && b.createdAt != null) {
+            final cmp = b.createdAt!.compareTo(a.createdAt!);
+            if (cmp != 0) return cmp;
+          } else if (b.createdAt != null) {
+            return 1;
+          } else if (a.createdAt != null) {
+            return -1;
+          }
+          final orderCmp = b.orderDate.compareTo(a.orderDate);
+          if (orderCmp != 0) return orderCmp;
+          return parseIdNum(b.id).compareTo(parseIdNum(a.id));
+        });
       case SortOption.oldest:
-        result.sort((a, b) => a.orderDate.compareTo(b.orderDate));
+        result.sort((a, b) {
+          if (a.createdAt != null && b.createdAt != null) {
+            final cmp = a.createdAt!.compareTo(b.createdAt!);
+            if (cmp != 0) return cmp;
+          } else if (a.createdAt != null) {
+            return -1;
+          } else if (b.createdAt != null) {
+            return 1;
+          }
+          final orderCmp = a.orderDate.compareTo(b.orderDate);
+          if (orderCmp != 0) return orderCmp;
+          return parseIdNum(a.id).compareTo(parseIdNum(b.id));
+        });
       case SortOption.name:
         result.sort(
           (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),

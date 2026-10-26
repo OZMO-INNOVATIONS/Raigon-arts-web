@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:pdf/pdf.dart' as pdf;
+import 'package:remixicon/remixicon.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
@@ -614,7 +614,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         const SizedBox(width: 10),
         _GradientButton(
-          icon: Icons.picture_as_pdf,
+          icon: RemixIcons.file_pdf_line,
           label: 'Export PDF Summary',
           onTap: () => _exportPdf(d, active, arch),
           fontSize: 15.5,
@@ -652,7 +652,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.event_available, size: 15, color: Colors.white),
+          Icon(RemixIcons.calendar_check_line, size: 15, color: Colors.white),
           SizedBox(width: 8),
           Text(
             'Filter Mode',
@@ -668,7 +668,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final policy = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.info, size: 14, color: p.textMuted),
+        Icon(RemixIcons.information_line, size: 14, color: p.textMuted),
         const SizedBox(width: 8),
         Flexible(
           child: Text(
@@ -711,14 +711,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         value: _money(d.billed),
         tile: _tile(
           const Color(0xFFDDF6E7),
-          Icons.show_chart,
+          RemixIcons.line_chart_line,
           AppPalette.statusGreen,
         ),
         badge: _badge(
           p,
           d.growthLabel,
           growthColor,
-          icon: d.growthPositive ? Icons.trending_up : Icons.trending_down,
+          icon: d.growthPositive ? RemixIcons.arrow_up_line : RemixIcons.arrow_down_line,
         ),
       ),
       _MetricCard(
@@ -731,7 +731,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             gradient: AppColors.darkGradient,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.savings, size: 22, color: Colors.white),
+          child: const Icon(RemixIcons.hand_coin_line, size: 22, color: Colors.white),
         ),
         badge: _badge(p, '${d.ratioLabel} Collection Ratio', _goldText),
       ),
@@ -739,12 +739,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         label: 'OUTSTANDING BALANCE DUE',
         value: _money(d.outstanding),
         danger: true,
-        tile: _tile(const Color(0xFFFBE3E3), Icons.volunteer_activism, _red),
+        tile: _tile(const Color(0xFFFBE3E3), RemixIcons.funds_line, _red),
         badge: _badge(
           p,
           'Actionable Dues',
           _red,
-          icon: Icons.warning_amber_rounded,
+          icon: RemixIcons.error_warning_line,
         ),
       ),
       _MetricCard(
@@ -756,7 +756,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         tile: _tile(
           const Color(0xFFF7EFD9),
-          Icons.workspace_premium,
+          RemixIcons.vip_crown_line,
           _goldText,
         ),
         badge: _badge(
@@ -764,7 +764,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           '${d.periodCustomers.isEmpty ? 0 : d.periodCustomers.length} '
           '${d.periodCustomers.length == 1 ? 'Order' : 'Orders'} Analyzed',
           _goldText,
-          icon: Icons.shopping_bag,
+          icon: RemixIcons.shopping_bag_line,
         ),
       ),
     ];
@@ -1111,7 +1111,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.storage, size: 22, color: AppColors.gold),
+                const Icon(RemixIcons.database_2_line, size: 22, color: AppColors.gold),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -1238,14 +1238,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           btn(
-            Icons.groups,
+            RemixIcons.team_line,
             'Active Customers ($activeN)',
             !_showArchived,
             () => setState(() => _showArchived = false),
           ),
           const SizedBox(width: 4),
           btn(
-            Icons.archive,
+            RemixIcons.archive_line,
             'Archived Completed (>7 Days) ($archivedN)',
             _showArchived,
             () => setState(() => _showArchived = true),
@@ -1267,7 +1267,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         children: [
           const Icon(
-            Icons.check_circle,
+            RemixIcons.checkbox_circle_line,
             size: 20,
             color: AppPalette.statusGreen,
           ),
@@ -1450,11 +1450,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           c.balance <= 0
               ? _paidButton(p)
               : _GradientButton(
-                  iconWidget: const FaIcon(
-                    FontAwesomeIcons.whatsapp,
-                    size: 16,
-                    color: Colors.white,
-                  ),
+                  icon: RemixIcons.whatsapp_fill,
                   label: 'Remind',
                   onTap: () {},
                   fontSize: 14.5,
@@ -1533,7 +1529,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check, size: 18, color: p.textPrimary),
+          Icon(RemixIcons.check_line, size: 18, color: p.textPrimary),
           const SizedBox(width: 8),
           Text(
             'Paid',
@@ -1591,7 +1587,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.archive, size: 15, color: green),
+                Icon(RemixIcons.archive_line, size: 15, color: green),
                 SizedBox(width: 8),
                 Text(
                   'Archived (> 7d)',
@@ -1618,7 +1614,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.description, size: 17, color: p.textPrimary),
+                  Icon(RemixIcons.file_text_line, size: 17, color: p.textPrimary),
                   const SizedBox(width: 8),
                   Text(
                     'View Record',
@@ -1944,7 +1940,6 @@ class _GradientButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.icon,
-    this.iconWidget,
     this.fontSize = 15,
     this.vPad = 13,
     this.radius = 10,
@@ -1952,7 +1947,6 @@ class _GradientButton extends StatelessWidget {
 
   final String label;
   final IconData? icon;
-  final Widget? iconWidget;
   final VoidCallback onTap;
   final double fontSize;
   final double vPad;
@@ -1982,9 +1976,7 @@ class _GradientButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (iconWidget != null)
-                  iconWidget!
-                else if (icon != null)
+                if (icon != null)
                   Icon(icon, size: 20, color: Colors.white),
                 const SizedBox(width: 10),
                 Text(

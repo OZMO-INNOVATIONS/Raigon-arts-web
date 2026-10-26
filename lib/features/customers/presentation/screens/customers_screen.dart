@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/provider/pagination_provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
@@ -173,7 +173,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.error),
+                                  const Icon(RemixIcons.cloud_off_line, size: 48, color: AppColors.error),
                                   const SizedBox(height: 14),
                                   Text(
                                     'Failed to load customers',
@@ -205,7 +205,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         }
                                       });
                                     },
-                                    icon: const Icon(Icons.refresh, size: 16),
+                                    icon: const Icon(RemixIcons.refresh_line, size: 16),
                                     label: const Text('Retry'),
                                   ),
                                 ],
@@ -286,9 +286,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                FaIcon(
-                  FontAwesomeIcons.fileExport,
-                  size: 17,
+                Icon(
+                  RemixIcons.file_download_line,
+                  size: 18,
                   color: p.textPrimary,
                 ),
                 if (wide) ...[
@@ -309,7 +309,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         const SizedBox(width: 12),
         AppPrimaryButton(
           label: 'Add New Customer',
-          icon: Icons.person_add,
+          icon: RemixIcons.user_add_line,
           onPressed: () => ShellScope.of(context).openAddCustomer(),
         ),
       ],
@@ -335,7 +335,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         decoration: InputDecoration(
           hintText: 'Search customer, phone, ID...',
           hintStyle: TextStyle(fontSize: 15, color: p.textMuted),
-          prefixIcon: Icon(Icons.search, size: 21, color: p.textMuted),
+          prefixIcon: Icon(RemixIcons.search_line, size: 20, color: p.textMuted),
           filled: true,
           fillColor: p.surface,
           contentPadding: const EdgeInsets.symmetric(vertical: 12),

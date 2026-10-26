@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 
 class AppSnackBar {
@@ -41,7 +42,7 @@ class AppSnackBar {
           content: Row(
             children: [
               Icon(
-                isError ? Icons.error : Icons.check_circle,
+                isError ? RemixIcons.error_warning_fill : RemixIcons.checkbox_circle_fill,
                 color: isError ? AppColors.error : AppColors.white,
                 size: 22,
               ),

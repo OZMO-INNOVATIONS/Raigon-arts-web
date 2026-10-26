@@ -30,6 +30,8 @@ class Customer {
     this.photoBytes = const [],
     this.photoNames = const [],
     this.photoSizeLabels = const [],
+    this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -54,6 +56,8 @@ class Customer {
   final List<FrameSpec> frames;
   final List<Uint8List> photoBytes;
   final List<String> photoSizeLabels;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   int get balance => total - advance;
   String get orderDateLabel => Helper.formatDate(orderDate);
@@ -94,6 +98,8 @@ class Customer {
     'status': status.name,
     'orderDate': orderDate.toIso8601String(),
     'expectedDelivery': expectedDelivery?.toIso8601String(),
+    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     'frames': [for (final f in frames) f.toJson()],
   };
 
@@ -115,6 +121,8 @@ class Customer {
     'orderDate': orderDate.toIso8601String(),
     if (expectedDelivery != null)
       'expectedDelivery': expectedDelivery!.toIso8601String(),
+    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     'frames': [
       for (final f in effectiveFrames)
         {
@@ -267,6 +275,8 @@ class Customer {
 
     final rawOrderDate = j['orderDate'] ?? j['order_date'];
     final rawExpectedDelivery = j['expectedDelivery'] ?? j['expected_delivery'];
+    final rawCreatedAt = j['createdAt'] ?? j['created_at'];
+    final rawUpdatedAt = j['updatedAt'] ?? j['updated_at'];
 
     return Customer(
       id: (j['id'] ?? '')?.toString() ?? '',
@@ -293,10 +303,17 @@ class Customer {
           ? null
           : DateTime.tryParse(rawExpectedDelivery.toString()),
       frames: resolvedFrames,
+      createdAt: rawCreatedAt != null ? DateTime.tryParse(rawCreatedAt.toString()) : null,
+      updatedAt: rawUpdatedAt != null ? DateTime.tryParse(rawUpdatedAt.toString()) : null,
     );
   }
 
-  Customer copyWith({Status? status, String? paymentStatus}) => Customer(
+  Customer copyWith({
+    Status? status,
+    String? paymentStatus,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Customer(
     id: id,
     name: name,
     city: city,
@@ -319,6 +336,8 @@ class Customer {
     photoBytes: photoBytes,
     photoNames: photoNames,
     photoSizeLabels: photoSizeLabels,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
 
   Customer copyWithImages({
@@ -327,6 +346,8 @@ class Customer {
     List<String>? photoUrls,
     List<FrameSpec>? frames,
     int? photoCount,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) => Customer(
     id: id,
     name: name,
@@ -350,5 +371,7 @@ class Customer {
     frames: frames ?? this.frames,
     photoBytes: photoBytes ?? this.photoBytes,
     photoSizeLabels: photoSizeLabels,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
 }

@@ -3,6 +3,7 @@ import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/features/profile/services/workshop_settings_service.dart';
+import 'package:remixicon/remixicon.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,32 +36,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   static const List<_Service> _services = [
     _Service(
-      icon: Icons.photo_size_select_actual_outlined,
+      icon: RemixIcons.aspect_ratio_line,
       title: 'Custom Photo Framing',
       desc: 'Frames made to your photo size, style and finish.',
     ),
     _Service(
-      icon: Icons.crop_original_outlined,
+      icon: RemixIcons.crop_line,
       title: 'Ready-made Frames',
       desc: 'Standard sizes available for instant pickup.',
     ),
     _Service(
-      icon: Icons.palette_outlined,
+      icon: RemixIcons.palette_line,
       title: 'Canvas & Wall Art',
       desc: 'Canvas stretching, art framing and wall décor pieces.',
     ),
     _Service(
-      icon: Icons.workspace_premium_outlined,
+      icon: RemixIcons.medal_line,
       title: 'Certificate Framing',
       desc: 'Certificates, documents and awards framed neatly.',
     ),
     _Service(
-      icon: Icons.print_outlined,
+      icon: RemixIcons.printer_line,
       title: 'Photo Printing',
       desc: 'Photo prints and enlargements ready for framing.',
     ),
     _Service(
-      icon: Icons.build_outlined,
+      icon: RemixIcons.tools_line,
       title: 'Repair & Restoration',
       desc: 'Frame repair, glass replacement and re-mounting.',
     ),
@@ -163,12 +164,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               title: 'CONTACT',
                               rows: [
                                 _InfoItem(
-                                  icon: Icons.phone_outlined,
+                                  icon: RemixIcons.phone_line,
                                   label: 'Phone',
                                   value: _businessPhone,
                                 ),
                                 _InfoItem(
-                                  icon: Icons.mail_outline,
+                                  icon: RemixIcons.mail_line,
                                   label: 'Email',
                                   value: _businessEmail,
                                 ),
@@ -179,17 +180,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               title: 'LOCATION',
                               rows: [
                                 _InfoItem(
-                                  icon: Icons.location_on_outlined,
+                                  icon: RemixIcons.map_pin_line,
                                   label: 'Workshop Address',
                                   value: _workshopAddress,
                                 ),
                                 const _InfoItem(
-                                  icon: Icons.location_city_outlined,
+                                  icon: RemixIcons.building_line,
                                   label: 'City & State',
                                   value: 'Trivandrum, Kerala',
                                 ),
                                 const _InfoItem(
-                                  icon: Icons.markunread_mailbox_outlined,
+                                  icon: RemixIcons.mail_send_line,
                                   label: 'PIN Code',
                                   value: '695001',
                                 ),
@@ -206,32 +207,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               title: 'BUSINESS DETAILS',
                               rows: [
                                 const _InfoItem(
-                                  icon: Icons.storefront_outlined,
+                                  icon: RemixIcons.store_2_line,
                                   label: 'Business Type',
                                   value: _businessType,
                                 ),
                                 const _InfoItem(
-                                  icon: Icons.star_outline,
+                                  icon: RemixIcons.star_line,
                                   label: 'Specialization',
                                   value: _specialization,
                                 ),
                                 const _InfoItem(
-                                  icon: Icons.layers_outlined,
+                                  icon: RemixIcons.stack_line,
                                   label: 'Frame Materials',
                                   value: _materials,
                                 ),
                                 const _InfoItem(
-                                  icon: Icons.shopping_bag_outlined,
+                                  icon: RemixIcons.shopping_bag_line,
                                   label: 'Order Types',
                                   value: _orderTypes,
                                 ),
                                 _InfoItem(
-                                  icon: Icons.receipt_long_outlined,
+                                  icon: RemixIcons.bill_line,
                                   label: 'GSTIN',
                                   value: _gstin,
                                 ),
                                 _InfoItem(
-                                  icon: Icons.cloud_done_outlined,
+                                  icon: RemixIcons.cloud_line,
                                   label: 'Photo Vault Retention',
                                   value:
                                       '$_retentionDays Days (${_autoCleanup ? "Auto Cleanup" : "Manual"})',
@@ -253,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          Icons.auto_awesome,
+                          RemixIcons.magic_line,
                           size: 16,
                           color: AppColors.gold,
                         ),

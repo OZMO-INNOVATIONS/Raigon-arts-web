@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:raigon_art/app/app_router.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
@@ -306,7 +307,7 @@ class _AuthScreenState extends State<AuthScreen> {
     splashRadius: 18,
 
     icon: Icon(
-      hidden ? Icons.visibility : Icons.visibility_off,
+      hidden ? RemixIcons.eye_line : RemixIcons.eye_off_line,
       size: 20,
       color: AppColors.fieldIcon,
     ),
@@ -318,7 +319,7 @@ class _AuthScreenState extends State<AuthScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AuthHeader(
-          icon: Icons.shield_outlined,
+          icon: RemixIcons.shield_line,
           title: 'Welcome Back',
           subtitle: 'Please sign in to access your workshop dashboard.',
         ),
@@ -326,14 +327,14 @@ class _AuthScreenState extends State<AuthScreen> {
         const AuthFieldLabel('Mobile Number / Email'),
         AuthTextField(
           controller: _usernameCtrl,
-          prefixIcon: Icons.person,
+          prefixIcon: RemixIcons.user_3_line,
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 14),
         const AuthFieldLabel('Password'),
         AuthTextField(
           controller: _passwordCtrl,
-          prefixIcon: Icons.lock,
+          prefixIcon: RemixIcons.lock_line,
           obscureText: _hidePassword,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _signIn(),
@@ -353,7 +354,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 14),
         AuthButton(
           label: 'Sign In to Workshop',
-          icon: Icons.login,
+          icon: RemixIcons.login_box_line,
           iconAfter: true,
           gradient: AppColors.darkGradient,
           loading: context.watch<AuthProvider>().isLoading,
@@ -371,7 +372,7 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         const AuthHeader(
           green: true,
-          icon: Icons.chat_bubble_outline,
+          icon: RemixIcons.chat_3_line,
           title: 'Forgot Password?',
           subtitle: 'OTP will be sent to your database registered phone.',
         ),
@@ -414,7 +415,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthTextField(
           controller: _phoneCtrl,
-          prefixIcon: Icons.smartphone,
+          prefixIcon: RemixIcons.smartphone_line,
           iconColor: AppColors.green,
           readOnly: true,
         ),
@@ -423,7 +424,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthButton(
           label: 'Send OTP to Saved Number',
-          icon: Icons.chat_bubble_outline,
+          icon: RemixIcons.chat_3_line,
           gradient: AppColors.greenGradient,
           shadowColor: AppColors.green,
           loading: context.watch<AuthProvider>().isLoading,
@@ -436,7 +437,7 @@ class _AuthScreenState extends State<AuthScreen> {
         Center(
           child: AuthTextLink(
             label: 'Back to Sign In',
-            icon: Icons.arrow_back,
+            icon: RemixIcons.arrow_left_line,
             onTap: _backToSignIn,
           ),
         ),
@@ -453,7 +454,7 @@ class _AuthScreenState extends State<AuthScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AuthHeader(
-          icon: Icons.shield_outlined,
+          icon: RemixIcons.shield_line,
           title: 'Enter WhatsApp OTP',
           subtitleSpan: TextSpan(
             children: [
@@ -475,7 +476,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthTextField(
           controller: _otpCtrl,
-          prefixIcon: Icons.vpn_key,
+          prefixIcon: RemixIcons.key_line,
           autofocus: true,
           maxLength: 4,
           letterSpacing: 8,
@@ -498,7 +499,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Row(
             children: [
               const Icon(
-                Icons.access_time,
+                RemixIcons.time_line,
                 size: 18,
                 color: AppColors.textPrimary,
               ),
@@ -530,7 +531,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.refresh,
+                      RemixIcons.refresh_line,
                       size: 16,
                       color: canResend
                           ? AppColors.textPrimary
@@ -560,7 +561,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthButton(
           label: 'Verify OTP & Continue',
-          icon: Icons.check_circle,
+          icon: RemixIcons.checkbox_circle_line,
           gradient: AppColors.darkGradient,
           loading: context.watch<AuthProvider>().isLoading,
           loadingLabel: 'Verifying...',
@@ -572,7 +573,7 @@ class _AuthScreenState extends State<AuthScreen> {
         Center(
           child: AuthTextLink(
             label: 'Back to Sign In',
-            icon: Icons.arrow_back,
+            icon: RemixIcons.arrow_left_line,
             onTap: _backToSignIn,
           ),
         ),
@@ -587,7 +588,7 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         const AuthHeader(
           green: true,
-          icon: Icons.lock,
+          icon: RemixIcons.lock_line,
           title: 'Create New Password',
           subtitle: 'Set a strong new password for your workshop account.',
         ),
@@ -595,7 +596,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const AuthFieldLabel('New Password *'),
         AuthTextField(
           controller: _newPassCtrl,
-          prefixIcon: Icons.lock,
+          prefixIcon: RemixIcons.lock_line,
           hint: 'Enter new password (min 6 chars)',
           obscureText: _hideNewPass,
           autofocus: true,
@@ -612,7 +613,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthTextField(
           controller: _confirmPassCtrl,
-          prefixIcon: Icons.lock,
+          prefixIcon: RemixIcons.lock_line,
           hint: 'Re-enter new password',
           obscureText: _hideConfirmPass,
           textInputAction: TextInputAction.done,
@@ -628,7 +629,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         AuthButton(
           label: 'Save New Password & Sign In',
-          icon: Icons.save,
+          icon: RemixIcons.save_line,
           gradient: AppColors.greenSolidGradient,
           shadowColor: AppColors.green,
           loading: context.watch<AuthProvider>().isLoading,
@@ -641,7 +642,7 @@ class _AuthScreenState extends State<AuthScreen> {
         Center(
           child: AuthTextLink(
             label: 'Back to Sign In',
-            icon: Icons.arrow_back,
+            icon: RemixIcons.arrow_left_line,
             onTap: _backToSignIn,
           ),
         ),

@@ -6,6 +6,7 @@ import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/models/frame_spec.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AppViewerItem {
@@ -336,7 +337,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
                             bottom: 0,
                             child: Center(
                               child: _ArrowButton(
-                                icon: Icons.arrow_back_ios_new_rounded,
+                                icon: RemixIcons.arrow_left_s_line,
                                 tooltip: 'Previous photo (Left arrow)',
                                 onPressed: _prevPhoto,
                               ),
@@ -351,7 +352,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
                             bottom: 0,
                             child: Center(
                               child: _ArrowButton(
-                                icon: Icons.arrow_forward_ios_rounded,
+                                icon: RemixIcons.arrow_right_s_line,
                                 tooltip: 'Next photo (Right arrow)',
                                 onPressed: _nextPhoto,
                               ),
@@ -387,7 +388,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
                 color: AppColors.gold.withValues(alpha: 0.4),
               ),
             ),
-            child: const Icon(Icons.photo_library, color: AppColors.gold, size: 20),
+            child: const Icon(RemixIcons.gallery_line, color: AppColors.gold, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -452,25 +453,25 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
 
           // Zoom Controls in Top Bar
           _IconButtonBadge(
-            icon: Icons.zoom_in,
+            icon: RemixIcons.zoom_in_line,
             tooltip: 'Zoom in',
             onPressed: _zoomIn,
           ),
           const SizedBox(width: 6),
           _IconButtonBadge(
-            icon: Icons.zoom_out,
+            icon: RemixIcons.zoom_out_line,
             tooltip: 'Zoom out',
             onPressed: _zoomOut,
           ),
           const SizedBox(width: 6),
           _IconButtonBadge(
-            icon: Icons.restart_alt,
+            icon: RemixIcons.refresh_line,
             tooltip: 'Reset view (1:1)',
             onPressed: _resetZoom,
           ),
           const SizedBox(width: 6),
           _IconButtonBadge(
-            icon: Icons.rotate_right,
+            icon: RemixIcons.clockwise_line,
             tooltip: 'Rotate 90°',
             onPressed: _rotateClockwise,
           ),
@@ -478,7 +479,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
           if (item.resolvedUrl != null && item.resolvedUrl!.isNotEmpty) ...[
             const SizedBox(width: 8),
             _IconButtonBadge(
-              icon: Icons.open_in_new,
+              icon: RemixIcons.external_link_line,
               tooltip: 'Open full-resolution file in new tab',
               highlight: true,
               onPressed: () => _openInNewTab(item.resolvedUrl),
@@ -487,7 +488,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
 
           const SizedBox(width: 12),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white70, size: 24),
+            icon: const Icon(RemixIcons.close_line, color: Colors.white70, size: 24),
             tooltip: 'Close (Esc)',
             onPressed: () => Navigator.of(context).pop(),
           ),
@@ -557,7 +558,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.broken_image_rounded, size: 56, color: Color(0xFFE5484D)),
+            const Icon(RemixIcons.image_line, size: 56, color: Color(0xFFE5484D)),
             const SizedBox(height: 14),
             const Text(
               'Unable to Display Image',
@@ -632,7 +633,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Container(
                               color: const Color(0xFF2A2A3A),
-                              child: const Icon(Icons.image_not_supported, size: 20, color: Colors.white38),
+                              child: const Icon(RemixIcons.image_line, size: 20, color: Colors.white38),
                             ),
                           ),
                           if (!isSelected)
@@ -659,7 +660,7 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.aspect_ratio, size: 14, color: AppColors.gold),
+                    const Icon(RemixIcons.aspect_ratio_line, size: 14, color: AppColors.gold),
                     const SizedBox(width: 6),
                     Text(
                       'Scale: ${(_currentScale * 100).toInt()}%',

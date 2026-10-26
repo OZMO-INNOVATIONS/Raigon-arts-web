@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_pagination_footer.dart';
@@ -259,7 +259,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     final addButton = AppPrimaryButton(
       label: 'Add New Customer',
-      icon: Icons.person_add,
+      icon: RemixIcons.user_add_line,
       onPressed: () => ShellScope.of(context).openAddCustomer(),
     );
 
@@ -269,11 +269,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         if (c.maxWidth < 640) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              titleBlock,
-              const SizedBox(height: 14),
-              addButton,
-            ],
+            children: [titleBlock, const SizedBox(height: 14), addButton],
           );
         }
         return Row(
@@ -369,7 +365,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 color: p.textMuted,
                 overflow: TextOverflow.ellipsis,
               ),
-              prefixIcon: Icon(Icons.search, size: 22, color: p.textMuted),
+              prefixIcon: Icon(
+                RemixIcons.search_line,
+                size: 22,
+                color: p.textMuted,
+              ),
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -759,7 +759,7 @@ class _OrderRowState extends State<_OrderRow> {
                   ),
                 ),
               ),
-              Icon(Icons.keyboard_arrow_down, size: 20, color: color),
+              Icon(RemixIcons.arrow_down_s_line, size: 20, color: color),
             ],
           ),
         ),
@@ -775,26 +775,30 @@ class _OrderRowState extends State<_OrderRow> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _iconBtn(
-          icon: Icons.visibility,
+          icon: RemixIcons.eye_line,
           color: p.textPrimary,
           onTap: widget.onView,
         ),
         const SizedBox(width: 6),
         _iconBtn(
-          icon: FontAwesomeIcons.whatsapp,
+          icon: RemixIcons.whatsapp_fill,
           color: green,
           fill: green.withValues(alpha: p.isDark ? 0.22 : 0.18),
           size: 18,
           onTap: () {},
         ),
         const SizedBox(width: 6),
-        _iconBtn(icon: Icons.edit, color: p.textPrimary, onTap: widget.onEdit),
+        _iconBtn(
+          icon: RemixIcons.edit_line,
+          color: p.textPrimary,
+          onTap: widget.onEdit,
+        ),
       ],
     );
   }
 
   Widget _iconBtn({
-    required dynamic icon,
+    required IconData icon,
     required Color color,
     required VoidCallback onTap,
     Color? fill,
@@ -811,9 +815,7 @@ class _OrderRowState extends State<_OrderRow> {
           color: fill,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: icon is FaIconData
-            ? FaIcon(icon, size: size, color: color)
-            : Icon(icon as IconData, size: size, color: color),
+        child: Icon(icon, size: size, color: color),
       ),
     );
   }

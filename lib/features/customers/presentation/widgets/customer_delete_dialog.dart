@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/core/widgets/customer_dialog_kit.dart';
 import 'package:raigon_art/core/widgets/form_kit.dart';
@@ -61,7 +62,7 @@ class DeleteCustomerDialog extends StatelessWidget {
                         color: p.chipFill,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.close, size: 20, color: p.textPrimary),
+                      child: Icon(RemixIcons.close_line, size: 20, color: p.textPrimary),
                     ),
                   ),
                 ],

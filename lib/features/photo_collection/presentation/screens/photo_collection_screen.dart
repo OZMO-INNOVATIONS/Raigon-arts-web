@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:remixicon/remixicon.dart';
 
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -724,7 +725,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
         if (n > 0) ...[
           _actionButton(
             p,
-            icon: Icons.download,
+            icon: RemixIcons.download_line,
             label: 'Download Selected ($n)',
             onTap: () {
               _download(_selectedItems);
@@ -735,7 +736,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
           _actionButton(
             p,
-            icon: Icons.delete,
+            icon: RemixIcons.delete_bin_line,
             label: 'Delete Selected ($n)',
             danger: true,
             onTap: _deleteSelected,
@@ -763,7 +764,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
-              Icons.folder_open_rounded,
+              RemixIcons.folder_open_line,
               color: Colors.white,
               size: 22,
             ),
@@ -802,7 +803,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
           _actionButton(
             p,
-            icon: Icons.folder_open,
+            icon: RemixIcons.folder_open_line,
             label: _hasFolder ? 'Change Folder' : 'Select Photo Collection',
             onTap: _selectFolder,
           ),
@@ -811,7 +812,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
             const SizedBox(width: 10),
             _smallIconButton(
               p,
-              icon: Icons.refresh,
+              icon: RemixIcons.refresh_line,
               tooltip: 'Refresh folder',
               onTap: _refreshFolder,
             ),
@@ -837,7 +838,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
                 border: Border.all(color: p.border),
               ),
               child: Icon(
-                Icons.folder_open_outlined,
+                RemixIcons.folder_open_line,
                 size: 36,
                 color: p.textMuted,
               ),
@@ -866,7 +867,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
             _actionButton(
               p,
-              icon: Icons.folder_open,
+              icon: RemixIcons.folder_open_line,
               label: 'Select Photo Collection',
               onTap: _selectFolder,
             ),
@@ -985,9 +986,9 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          btn(Icons.grid_view, true),
+          btn(RemixIcons.grid_line, true),
           const SizedBox(width: 4),
-          btn(Icons.format_list_bulleted, false),
+          btn(RemixIcons.list_check, false),
         ],
       ),
     );
@@ -1014,7 +1015,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
                 isDense: true,
                 hintText: 'Search by photo name...',
                 hintStyle: TextStyle(fontSize: 14.5, color: p.textMuted),
-                prefixIcon: Icon(Icons.search, size: 22, color: p.textMuted),
+                prefixIcon: Icon(RemixIcons.search_line, size: 22, color: p.textMuted),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1084,7 +1085,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.folder_off_outlined, size: 46, color: p.textMuted),
+            Icon(RemixIcons.folder_warning_line, size: 46, color: p.textMuted),
 
             const SizedBox(height: 14),
 
@@ -1109,7 +1110,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
             _actionButton(
               p,
-              icon: Icons.folder_open,
+              icon: RemixIcons.folder_open_line,
               label: 'Select Folder',
               onTap: _selectFolder,
             ),
@@ -1126,7 +1127,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.photo_library_outlined, size: 48, color: p.textMuted),
+            Icon(RemixIcons.gallery_line, size: 48, color: p.textMuted),
             const SizedBox(height: 14),
             Text(
               'No photos found',
@@ -1231,7 +1232,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
                 Row(
                   children: [
                     Icon(
-                      Icons.insert_drive_file_outlined,
+                      RemixIcons.file_line,
                       size: 14,
                       color: p.textMuted,
                     ),
@@ -1258,7 +1259,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
     return Container(
       color: p.surface,
       alignment: Alignment.center,
-      child: Icon(Icons.broken_image_outlined, size: 42, color: p.textMuted),
+      child: Icon(RemixIcons.image_line, size: 42, color: p.textMuted),
     );
   }
 
@@ -1375,7 +1376,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
                       height: 46,
                       color: p.surface,
                       child: Icon(
-                        Icons.broken_image_outlined,
+                        RemixIcons.image_line,
                         size: 20,
                         color: p.textMuted,
                       ),
@@ -1405,7 +1406,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
               onPressed: () {
                 _preview(photo);
               },
-              icon: Icon(Icons.fullscreen, size: 24, color: p.textPrimary),
+              icon: Icon(RemixIcons.fullscreen_line, size: 24, color: p.textPrimary),
             ),
           ),
         ],
@@ -1450,7 +1451,7 @@ class _Check extends StatelessWidget {
         border: Border.all(color: border, width: 1.5),
       ),
       child: checked
-          ? const Icon(Icons.check, size: 15, color: Colors.white)
+          ? const Icon(RemixIcons.check_line, size: 15, color: Colors.white)
           : null,
     );
   }

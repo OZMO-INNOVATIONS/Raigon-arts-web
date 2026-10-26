@@ -7,7 +7,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
@@ -511,6 +511,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoUrls: remainingUrls,
       photoSizeLabels: widget.existing?.photoSizeLabels ?? const [],
       frames: frames,
+      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
     );
     Navigator.of(context).pop(customer);
   }
@@ -572,7 +574,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               gradient: AppColors.iconDarkGradient,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.person_add, color: Colors.white, size: 26),
+            child: const Icon(RemixIcons.user_add_line, color: Colors.white, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -608,7 +610,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 color: p.chipFill,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.close, size: 21, color: p.textPrimary),
+              child: Icon(RemixIcons.close_line, size: 21, color: p.textPrimary),
             ),
           ),
         ],
@@ -638,7 +640,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SectionHeader(
-                icon: Icons.person,
+                icon: RemixIcons.user_3_line,
                 label: 'CUSTOMER INFORMATION',
               ),
               gap,
@@ -712,7 +714,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               const SizedBox(height: 26),
               const SectionHeader(
-                icon: Icons.photo_library,
+                icon: RemixIcons.gallery_line,
                 label: 'PHOTO DETAILS & FRAMING OPTIONS',
               ),
               gap,
@@ -721,14 +723,14 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   _modeCard(
                     c,
                     FrameMode.same,
-                    Icons.filter_none,
+                    RemixIcons.file_copy_line,
                     'Same Frame for All Photos',
                     'Upload multiple photos that share identical frame dimensions, material, and moulding style.',
                   ),
                   _modeCard(
                     c,
                     FrameMode.individual,
-                    Icons.layers,
+                    RemixIcons.stack_line,
                     'Individual Frame for Each Photo',
                     'Configure separate frame size, type, material, color, and specs for every photo uploaded.',
                   ),
@@ -741,7 +743,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 _individualContent(c),
               const SizedBox(height: 26),
               const SectionHeader(
-                icon: Icons.receipt_long,
+                icon: RemixIcons.bill_line,
                 label: 'ORDER & PAYMENT DETAILS',
               ),
               gap,
@@ -939,7 +941,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.cloud_upload, size: 58, color: p.textPrimary),
+                  Icon(RemixIcons.upload_cloud_2_line, size: 58, color: p.textPrimary),
                   const SizedBox(height: 10),
                   Text(
                     'Drag & Drop Customer Photos Here',
@@ -976,7 +978,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.folder_open,
+                            RemixIcons.folder_open_line,
                             size: 19,
                             color: p.textPrimary,
                           ),
@@ -1002,7 +1004,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(Icons.photo_library, size: 16, color: AppColors.gold),
+              const Icon(RemixIcons.gallery_line, size: 16, color: AppColors.gold),
               const SizedBox(width: 8),
               Text(
                 '${_existingPhotos.length + _photos.length} photos attached'
@@ -1076,7 +1078,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                                   color: Colors.black26,
                                   alignment: Alignment.center,
                                   child: const Icon(
-                                    Icons.broken_image,
+                                    RemixIcons.image_line,
                                     size: 26,
                                     color: Colors.white54,
                                   ),
@@ -1100,7 +1102,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.close,
+                              RemixIcons.close_line,
                               size: 14,
                               color: Colors.white,
                             ),
@@ -1166,7 +1168,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.close,
+                              RemixIcons.close_line,
                               size: 14,
                               color: Colors.white,
                             ),
@@ -1181,7 +1183,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         ],
         const SizedBox(height: 26),
         const SectionHeader(
-          icon: Icons.straighten,
+          icon: RemixIcons.ruler_line,
           label: 'FRAME SPECIFICATIONS',
         ),
         const SizedBox(height: 18),
@@ -1215,7 +1217,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle, size: 22, color: p.textPrimary),
+                  Icon(RemixIcons.add_circle_line, size: 22, color: p.textPrimary),
                   const SizedBox(width: 10),
                   Text(
                     'Add Another Photo & Frame',
@@ -1275,9 +1277,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       ImageUrlHelper.resolve(e.existingUrl!),
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) =>
-                          Icon(Icons.image_outlined, color: p.textMuted, size: 28),
+                          Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
                     )
-                  : Icon(Icons.image_outlined, color: p.textMuted, size: 28),
+                  : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
         ),
       ),
     );
@@ -1287,7 +1289,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       children: [
         Row(
           children: [
-            const Icon(Icons.image, size: 17, color: AppColors.gold),
+            const Icon(RemixIcons.image_fill, size: 17, color: AppColors.gold),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -1351,7 +1353,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.refresh, size: 17, color: p.textPrimary),
+                Icon(RemixIcons.refresh_line, size: 17, color: p.textPrimary),
                 const SizedBox(width: 6),
                 Text(
                   photo == null ? 'Browse' : 'Replace',
@@ -1381,8 +1383,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                FaIcon(
-                  FontAwesomeIcons.trash,
+                Icon(
+                  RemixIcons.delete_bin_line,
                   size: 14,
                   color: Color(0xFFE5484D),
                 ),
@@ -1485,7 +1487,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           const SizedBox(width: 14),
           AppPrimaryButton(
             label: 'Save Customer & Order',
-            icon: Icons.check,
+            icon: RemixIcons.check_line,
             onPressed: _save,
           ),
         ],

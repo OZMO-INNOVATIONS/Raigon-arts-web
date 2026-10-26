@@ -50,7 +50,11 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll();
+      _customers = await _repository.getAll(
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        limit: 1000,
+      );
       _initialized = true;
 
       debugPrint('[CustomerProvider] Loaded ${_customers.length} customers.');
@@ -71,7 +75,11 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll();
+      _customers = await _repository.getAll(
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        limit: 1000,
+      );
       _initialized = true;
       _notifyOrderChange();
     } catch (error) {
@@ -240,6 +248,8 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         photoBytes: cur.photoBytes,
         photoNames: cur.photoNames,
         photoSizeLabels: cur.photoSizeLabels,
+        createdAt: cur.createdAt,
+        updatedAt: cur.updatedAt,
       );
       notifyListeners();
       _notifyOrderChange();
@@ -319,6 +329,14 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     }).length;
   }
 
+  static int _extractIdNum(String id) {
+    final match = RegExp(r'(\d+)').allMatches(id);
+    if (match.isNotEmpty) {
+      return int.tryParse(match.last.group(1) ?? '0') ?? 0;
+    }
+    return 0;
+  }
+
   List<Customer> get filteredOrders {
     final query = _orderQuery.trim().toLowerCase();
 
@@ -333,7 +351,19 @@ class CustomerAndOrderProvider extends ChangeNotifier {
           customer.name.toLowerCase().contains(query);
     }).toList();
 
-    result.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+    result.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        final cmp = b.createdAt!.compareTo(a.createdAt!);
+        if (cmp != 0) return cmp;
+      } else if (b.createdAt != null) {
+        return 1;
+      } else if (a.createdAt != null) {
+        return -1;
+      }
+      final orderCmp = b.orderDate.compareTo(a.orderDate);
+      if (orderCmp != 0) return orderCmp;
+      return _extractIdNum(b.id).compareTo(_extractIdNum(a.id));
+    });
 
     return result;
   }

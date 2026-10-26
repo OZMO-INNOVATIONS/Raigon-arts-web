@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
@@ -287,7 +287,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               gradient: AppColors.iconDarkGradient,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.badge, color: Colors.white, size: 22),
+            child: const Icon(RemixIcons.id_card_line, color: Colors.white, size: 22),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -364,7 +364,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 shape: BoxShape.circle,
                 border: Border.all(color: p.isDark ? p.border : p.border),
               ),
-              child: Icon(Icons.close, size: 21, color: p.textPrimary),
+              child: Icon(RemixIcons.close_line, size: 21, color: p.textPrimary),
             ),
           ),
         ],
@@ -488,8 +488,8 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                   runSpacing: 8,
                   children: [
                     _idChip(p),
-                    _infoChip(p, Icons.phone, _c.phone),
-                    _infoChip(p, Icons.calendar_today, _c.orderDateLabel),
+                    _infoChip(p, RemixIcons.phone_line, _c.phone),
+                    _infoChip(p, RemixIcons.calendar_line, _c.orderDateLabel),
                   ],
                 ),
               ],
@@ -520,7 +520,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.badge, size: 15, color: fg),
+          Icon(RemixIcons.id_card_line, size: 15, color: fg),
           const SizedBox(width: 7),
           Text(
             'ID: ${_c.id}',
@@ -617,7 +617,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _cardTitle(p, Icons.contact_page, 'CUSTOMER CONTACT INFO'),
+          _cardTitle(p, RemixIcons.contacts_line, 'CUSTOMER CONTACT INFO'),
           const SizedBox(height: 14),
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0)
@@ -722,7 +722,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _cardTitle(p, Icons.request_quote, 'ORDER & PAYMENT SUMMARY'),
+          _cardTitle(p, RemixIcons.file_list_3_line, 'ORDER & PAYMENT SUMMARY'),
           const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,7 +823,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _cardTitle(p, Icons.straighten, title),
+                    _cardTitle(p, RemixIcons.ruler_line, title),
                     const SizedBox(height: 16),
                     LayoutBuilder(
                       builder: (context, cons) {
@@ -902,7 +902,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                           const Padding(
                             padding: EdgeInsets.only(top: 1),
                             child: Icon(
-                              Icons.sticky_note_2,
+                              RemixIcons.file_text_line,
                               size: 20,
                               color: Color(0xFFD27D2D),
                             ),
@@ -988,7 +988,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                                 photoUrl!,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (_, _, _) => Icon(
-                                                  Icons.broken_image,
+                                                  RemixIcons.image_line,
                                                   color: p.textMuted,
                                                   size: 24,
                                                 ),
@@ -1003,7 +1003,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                             color: Colors.black.withValues(alpha: 0.6),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
-                                          child: const Icon(Icons.zoom_in, size: 12, color: AppColors.gold),
+                                          child: const Icon(RemixIcons.zoom_in_line, size: 12, color: AppColors.gold),
                                         ),
                                       ),
                                     ],
@@ -1016,7 +1016,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                     children: [
                                       Row(
                                         children: [
-                                          const Icon(Icons.image, size: 15, color: AppColors.gold),
+                                          const Icon(RemixIcons.image_fill, size: 15, color: AppColors.gold),
                                           const SizedBox(width: 6),
                                           Flexible(
                                             child: Text(
@@ -1058,7 +1058,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                     side: const BorderSide(color: AppColors.gold),
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   ),
-                                  icon: const Icon(Icons.zoom_in, size: 16),
+                                  icon: const Icon(RemixIcons.zoom_in_line, size: 16),
                                   label: const Text('View Full Image', style: TextStyle(fontSize: 12.5)),
                                 ),
                               ],
@@ -1084,7 +1084,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       children: [
         _cardTitle(
           p,
-          Icons.photo_library,
+          RemixIcons.gallery_line,
           'DIGITAL PHOTO VAULT (${photos.length})',
         ),
         const SizedBox(height: 18),
@@ -1133,7 +1133,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
         children: [
           AppPrimaryButton(
             label: 'Edit Customer & Order',
-            icon: Icons.edit_square,
+            icon: RemixIcons.edit_line,
             onPressed: () {
               Navigator.of(context).pop(_ViewAction.edit);
             },
@@ -1175,9 +1175,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  FaIcon(
-                    FontAwesomeIcons.whatsapp,
-                    size: 15,
+                  Icon(
+                    RemixIcons.whatsapp_fill,
+                    size: 16,
                     color: Colors.white,
                   ),
                   SizedBox(width: 8),
@@ -1315,7 +1315,7 @@ class _VaultCardState extends State<_VaultCard> {
                           color: p.chipFill,
                           alignment: Alignment.center,
                           child: Icon(
-                            Icons.broken_image_outlined,
+                            RemixIcons.image_line,
                             size: 28,
                             color: p.textMuted,
                           ),
@@ -1331,7 +1331,7 @@ class _VaultCardState extends State<_VaultCard> {
                           color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Icon(Icons.zoom_in, size: 14, color: AppColors.gold),
+                        child: const Icon(RemixIcons.zoom_in_line, size: 14, color: AppColors.gold),
                       ),
                     ),
                   ],
@@ -1371,7 +1371,7 @@ class _VaultCardState extends State<_VaultCard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.image,
+                              RemixIcons.image_fill,
                               size: 14,
                               color: dark ? AppColors.gold : p.textPrimary,
                             ),
@@ -1432,7 +1432,7 @@ class _VaultCardState extends State<_VaultCard> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.zoom_in, size: 18, color: Colors.white),
+                    Icon(RemixIcons.zoom_in_line, size: 18, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
                       'View',

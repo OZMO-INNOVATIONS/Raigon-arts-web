@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 
 enum NavDestination {
   dashboard,
@@ -24,14 +25,14 @@ extension NavDestinationX on NavDestination {
   };
 
   IconData get icon => switch (this) {
-    NavDestination.dashboard => Icons.pie_chart,
-    NavDestination.customers => Icons.groups,
-    NavDestination.orders => Icons.move_to_inbox,
-    NavDestination.photoCollection => Icons.photo_library,
-    NavDestination.frameSizes => Icons.straighten,
-    NavDestination.messagingAutomation => Icons.forum_outlined,
-    NavDestination.reports => Icons.bar_chart,
-    NavDestination.profile => Icons.storefront_outlined,
+    NavDestination.dashboard => RemixIcons.dashboard_line,
+    NavDestination.customers => RemixIcons.team_line,
+    NavDestination.orders => RemixIcons.inbox_line,
+    NavDestination.photoCollection => RemixIcons.gallery_line,
+    NavDestination.frameSizes => RemixIcons.ruler_line,
+    NavDestination.messagingAutomation => RemixIcons.message_3_line,
+    NavDestination.reports => RemixIcons.bar_chart_line,
+    NavDestination.profile => RemixIcons.store_2_line,
   };
 
   /// Screens Staff members are allowed to access.

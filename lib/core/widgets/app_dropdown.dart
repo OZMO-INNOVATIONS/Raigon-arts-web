@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 
@@ -107,8 +108,8 @@ class _AppDropdownState<T> extends State<AppDropdown<T>> {
                 ),
               ),
               Icon(
-                _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                size: 22,
+                _open ? RemixIcons.arrow_up_s_line : RemixIcons.arrow_down_s_line,
+                size: 20,
                 color: p.textPrimary,
               ),
             ],

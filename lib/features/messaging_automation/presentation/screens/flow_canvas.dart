@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/messaging_automation/presentation/screens/automation_ui.dart';
 import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 const double _nodeW = 220;
 const double _nodeH = 92;
@@ -27,20 +28,20 @@ class FlowCanvas extends StatelessWidget {
           children: [
             AutoButton(
               label: 'Condition',
-              icon: Icons.add,
+              icon: RemixIcons.add_line,
               filled: false,
               onPressed: () => p.addNode(NodeType.condition),
             ),
             AutoButton(
               label: 'Send message',
-              icon: Icons.add,
+              icon: RemixIcons.add_line,
               filled: false,
               onPressed: () => p.addNode(NodeType.message),
             ),
             AutoButton(label: 'Reset', filled: false, onPressed: p.resetFlow),
             AutoButton(
               label: 'Save flow',
-              icon: Icons.save_outlined,
+              icon: RemixIcons.save_line,
               onPressed: () {
                 p.saveFlow();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -112,7 +113,7 @@ class FlowCanvas extends StatelessWidget {
           width: 20,
           height: 20,
           decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-          child: const Icon(Icons.close, size: 12, color: AutoInk.purple),
+          child: const Icon(RemixIcons.close_line, size: 12, color: AutoInk.purple),
         ),
       ),
     );
@@ -120,9 +121,9 @@ class FlowCanvas extends StatelessWidget {
 
   Widget _node(BuildContext context, MessagingAutomationProvider p, FlowNode n) {
     final (color, icon) = switch (n.type) {
-      NodeType.trigger => (AutoInk.blue, Icons.bolt),
-      NodeType.condition => (const Color(0xFFE59A12), Icons.call_split),
-      NodeType.message => (AutoInk.purple, Icons.chat_bubble_outline),
+      NodeType.trigger => (AutoInk.blue, RemixIcons.flashlight_line),
+      NodeType.condition => (const Color(0xFFE59A12), RemixIcons.git_branch_line),
+      NodeType.message => (AutoInk.purple, RemixIcons.chat_3_line),
     };
     final pending = p.pendingFrom == n.id;
 

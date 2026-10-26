@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/features/messaging_automation/presentation/screens/automation_ui.dart';
 import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 /// Live phone mockup. Instagram = dark DM look, WhatsApp = green chat look.
 class PhonePreview extends StatelessWidget {
@@ -60,9 +61,9 @@ class PhonePreview extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.signal_cellular_alt, color: Colors.white, size: 14),
+                    const Icon(RemixIcons.signal_tower_line, color: Colors.white, size: 14),
                     const SizedBox(width: 4),
-                    const Icon(Icons.battery_full, color: Colors.white, size: 14),
+                    const Icon(RemixIcons.battery_line, color: Colors.white, size: 14),
                   ],
                 ),
               ),
@@ -71,7 +72,7 @@ class PhonePreview extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 16),
+                    const Icon(RemixIcons.arrow_left_s_line, color: Colors.white, size: 16),
                     const SizedBox(width: 10),
                     _avatar(account, 16),
                     const SizedBox(width: 8),
@@ -83,9 +84,9 @@ class PhonePreview extends StatelessWidget {
                             color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                       ),
                     ),
-                    const Icon(Icons.call_outlined, color: Colors.white, size: 18),
+                    const Icon(RemixIcons.phone_line, color: Colors.white, size: 18),
                     const SizedBox(width: 12),
-                    const Icon(Icons.videocam_outlined, color: Colors.white, size: 20),
+                    const Icon(RemixIcons.video_chat_line, color: Colors.white, size: 20),
                   ],
                 ),
               ),
@@ -121,7 +122,7 @@ class PhonePreview extends StatelessWidget {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.link, color: Colors.white, size: 14),
+                                      const Icon(RemixIcons.link, color: Colors.white, size: 14),
                                       const SizedBox(width: 6),
                                       Flexible(
                                         child: Text(linkLabel!,
@@ -152,16 +153,16 @@ class PhonePreview extends StatelessWidget {
                     CircleAvatar(
                       radius: 14,
                       backgroundColor: wa ? AutoInk.whatsapp : AutoInk.blue,
-                      child: Icon(wa ? Icons.add : Icons.camera_alt, color: Colors.white, size: 14),
+                      child: Icon(wa ? RemixIcons.add_line : RemixIcons.camera_line, color: Colors.white, size: 14),
                     ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text('Message...',
                           style: TextStyle(color: Colors.white54, fontSize: 12)),
                     ),
-                    const Icon(Icons.image_outlined, color: Colors.white70, size: 18),
+                    const Icon(RemixIcons.image_line, color: Colors.white70, size: 18),
                     const SizedBox(width: 8),
-                    const Icon(Icons.add_circle_outline, color: Colors.white70, size: 18),
+                    const Icon(RemixIcons.add_circle_line, color: Colors.white70, size: 18),
                   ],
                 ),
               ),

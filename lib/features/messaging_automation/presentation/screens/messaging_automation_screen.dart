@@ -4,6 +4,7 @@ import 'package:raigon_art/features/messaging_automation/presentation/screens/au
 import 'package:raigon_art/features/messaging_automation/presentation/screens/flow_canvas.dart';
 import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
 import 'package:raigon_art/features/messaging_automation/presentation/screens/phone_preview.dart';
+import 'package:remixicon/remixicon.dart';
 
 class MessagingAutomationScreen extends StatelessWidget {
   const MessagingAutomationScreen({super.key});
@@ -114,7 +115,7 @@ class _ChannelSelectView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _HeroBadge(
-            child: Icon(Icons.forum_rounded, size: 40, color: AutoInk.purple),
+            child: Icon(RemixIcons.message_3_line, size: 40, color: AutoInk.purple),
           ),
           const SizedBox(height: 28),
           Text(
@@ -193,7 +194,7 @@ class _ChannelCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: AutoInk.muted(context)),
+          Icon(RemixIcons.arrow_right_s_line, color: AutoInk.muted(context)),
         ],
       ),
     ),
@@ -245,7 +246,7 @@ class _ConnectViewState extends State<_ConnectView> {
           const SizedBox(height: 40),
           TextButton.icon(
             onPressed: p.backToChannels,
-            icon: const Icon(Icons.chevron_left, size: 18),
+            icon: const Icon(RemixIcons.arrow_left_s_line, size: 18),
             label: const Text('Choose Another Channel'),
           ),
         ],
@@ -279,7 +280,7 @@ class _ConnectViewState extends State<_ConnectView> {
           AutoPanel(
             child: Row(
               children: [
-                const Icon(Icons.verified_user_outlined, color: AutoInk.blue),
+                const Icon(RemixIcons.shield_check_line, color: AutoInk.blue),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -293,7 +294,7 @@ class _ConnectViewState extends State<_ConnectView> {
           const SizedBox(height: 6),
           TextButton.icon(
             onPressed: () => setState(() => _more = !_more),
-            icon: Icon(_more ? Icons.expand_less : Icons.expand_more, size: 18),
+            icon: Icon(_more ? RemixIcons.arrow_up_s_line : RemixIcons.arrow_down_s_line, size: 18),
             label: const Text('See More Options'),
           ),
           if (_more)
@@ -389,11 +390,11 @@ class _FirstMoveView extends StatelessWidget {
             runSpacing: 16,
             children: [
               _Perk(
-                Icons.local_fire_department_outlined,
+                RemixIcons.fire_line,
                 'Most popular\nautomations',
               ),
-              _Perk(Icons.schedule, 'Publish in 3 minutes'),
-              _Perk(Icons.edit_outlined, 'Preview first, go live\nwhen ready'),
+              _Perk(RemixIcons.time_line, 'Publish in 3 minutes'),
+              _Perk(RemixIcons.edit_line, 'Preview first, go live\nwhen ready'),
             ],
           ),
         ],
@@ -467,7 +468,7 @@ class _MiniIllustration extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (pill) const Icon(Icons.link, size: 16),
+          if (pill) const Icon(RemixIcons.link, size: 16),
           if (pill) const SizedBox(width: 6),
           Text(t, style: const TextStyle(color: Colors.black87, fontSize: 13)),
         ],
@@ -745,7 +746,7 @@ class _BuilderLeftState extends State<_BuilderLeft> {
           children: [
             IconButton(
               onPressed: p.closeBuilder,
-              icon: const Icon(Icons.arrow_back),
+              icon: const Icon(RemixIcons.arrow_left_line),
             ),
             const SizedBox(width: 4),
             ChannelIcon(p.channel, size: 28),
@@ -852,7 +853,7 @@ class _BuilderLeftState extends State<_BuilderLeft> {
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.link, color: AutoInk.blue),
+                  leading: const Icon(RemixIcons.link, color: AutoInk.blue),
                   title: Text(p.draftLinkLabel!),
                   subtitle: Text(
                     p.draftLinkUrl ?? '',
@@ -860,14 +861,14 @@ class _BuilderLeftState extends State<_BuilderLeft> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(RemixIcons.close_line),
                     onPressed: () => p.setLink(null, null),
                   ),
                 ),
               const SizedBox(height: 4),
               AutoButton(
                 label: p.draftLinkLabel == null ? 'Add A Link' : 'Edit Link',
-                icon: Icons.add,
+                icon: RemixIcons.add_line,
                 filled: false,
                 expand: true,
                 onPressed: () => _linkDialog(p),
@@ -955,7 +956,7 @@ class _DashboardView extends StatelessWidget {
                   const SizedBox(width: 12),
                   AutoButton(
                     label: 'New automation',
-                    icon: Icons.add,
+                    icon: RemixIcons.add_line,
                     onPressed: () =>
                         p.startBuilder(AutomationTrigger.dmKeyword),
                   ),
@@ -1002,7 +1003,7 @@ class _ConnectionChip extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Icon(
-            Icons.circle,
+            RemixIcons.circle_fill,
             size: 9,
             color: p.connected ? AutoInk.whatsapp : Colors.orange,
           ),
@@ -1018,10 +1019,10 @@ class _TabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = {
-      DashboardTab.automations: ('Automations', Icons.bolt),
-      DashboardTab.inbox: ('Inbox', Icons.inbox_outlined),
-      DashboardTab.flow: ('Flow builder', Icons.account_tree_outlined),
-      DashboardTab.activity: ('Activity', Icons.history),
+      DashboardTab.automations: ('Automations', RemixIcons.flashlight_line),
+      DashboardTab.inbox: ('Inbox', RemixIcons.inbox_line),
+      DashboardTab.flow: ('Flow builder', RemixIcons.git_branch_line),
+      DashboardTab.activity: ('Activity', RemixIcons.history_line),
     };
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1132,20 +1133,20 @@ class _AutomationsTab extends StatelessWidget {
       children: [
         Row(
           children: [
-            _stat(context, 'Active', '${p.activeCount}', Icons.bolt),
+            _stat(context, 'Active', '${p.activeCount}', RemixIcons.flashlight_line),
             const SizedBox(width: 12),
             _stat(
               context,
               'Total runs',
               '${p.totalRuns}',
-              Icons.play_circle_outline,
+              RemixIcons.play_circle_line,
             ),
             const SizedBox(width: 12),
             _stat(
               context,
               'Success rate',
               '${p.successRate.toStringAsFixed(0)}%',
-              Icons.check_circle_outline,
+              RemixIcons.checkbox_circle_line,
             ),
           ],
         ),
@@ -1157,7 +1158,7 @@ class _AutomationsTab extends StatelessWidget {
               width: double.infinity,
               child: Column(
                 children: [
-                  const Icon(Icons.bolt, size: 40, color: AutoInk.purple),
+                  const Icon(RemixIcons.flashlight_line, size: 40, color: AutoInk.purple),
                   const SizedBox(height: 12),
                   Text(
                     'No automations yet',
@@ -1343,7 +1344,7 @@ class _InboxTab extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.inbox_outlined,
+                          RemixIcons.inbox_line,
                           size: 40,
                           color: AutoInk.muted(context),
                         ),
@@ -1404,7 +1405,7 @@ class _InboxTab extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.sync_alt_rounded,
+                RemixIcons.repeat_line,
                 size: 56,
                 color: AutoInk.purple,
               ),
@@ -1475,7 +1476,7 @@ class _InboxTab extends StatelessWidget {
                 const Spacer(),
                 IconButton(
                   onPressed: () => p.selectThread(null),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(RemixIcons.close_line),
                 ),
               ],
             ),
@@ -1520,12 +1521,12 @@ class _InboxTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       sideItem(
-                        Icons.inbox_outlined,
+                        RemixIcons.inbox_line,
                         'All chats',
                         trail: '0',
                         sel: true,
                       ),
-                      sideItem(Icons.schedule, 'Reminders'),
+                      sideItem(RemixIcons.time_line, 'Reminders'),
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.only(left: 12, bottom: 8),
@@ -1537,7 +1538,7 @@ class _InboxTab extends StatelessWidget {
                           ),
                         ),
                       ),
-                      sideItem(Icons.favorite, 'Favorites'),
+                      sideItem(RemixIcons.heart_line, 'Favorites'),
                     ],
                   ),
                 ),
@@ -1579,7 +1580,7 @@ class _ActivityTab extends StatelessWidget {
             if (p.flows.isNotEmpty)
               AutoButton(
                 label: 'Send test',
-                icon: Icons.play_arrow_rounded,
+                icon: RemixIcons.play_line,
                 filled: false,
                 onPressed: () => p.testFlow(p.flows.first),
               ),
@@ -1608,7 +1609,7 @@ class _ActivityTab extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      l.success ? Icons.check_circle : Icons.error,
+                      l.success ? RemixIcons.checkbox_circle_line : RemixIcons.error_warning_line,
                       color: l.success ? AutoInk.whatsapp : Colors.red,
                       size: 20,
                     ),

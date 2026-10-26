@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -195,7 +196,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                                 color: p.textMuted,
                               ),
                               prefixIcon: Icon(
-                                Icons.search,
+                                RemixIcons.search_line,
                                 size: 22,
                                 color: p.textMuted,
                               ),
@@ -276,7 +277,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
         ),
         const SizedBox(width: 16),
         _GradientButton(
-          icon: Icons.add,
+          icon: RemixIcons.add_line,
           label: 'Add Frame Size',
           onTap: _add,
           fontSize: 15.5,
@@ -326,7 +327,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.cloud_off_rounded, size: 44, color: AppColors.error),
+                        const Icon(RemixIcons.cloud_off_line, size: 44, color: AppColors.error),
                         const SizedBox(height: 12),
                         Text(
                           'Failed to load frame sizes catalog',
@@ -357,7 +358,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                               }
                             });
                           },
-                          icon: const Icon(Icons.refresh, size: 16),
+                          icon: const Icon(RemixIcons.refresh_line, size: 16),
                           label: const Text('Retry'),
                         ),
                       ],
@@ -496,14 +497,14 @@ class _SizeRowState extends State<_SizeRow> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _iconBtn(
-                    Icons.edit_square,
+                    RemixIcons.edit_line,
                     p.textPrimary,
                     widget.onEdit,
                     'Edit',
                   ),
                   const SizedBox(width: 4),
                   _iconBtn(
-                    Icons.delete,
+                    RemixIcons.delete_bin_line,
                     p.textPrimary,
                     widget.onDelete,
                     'Delete',
@@ -729,7 +730,7 @@ class _DialogShell extends StatelessWidget {
                         color: p.avatarBg,
                         border: Border.all(color: p.border),
                       ),
-                      child: Icon(Icons.close, size: 18, color: p.textPrimary),
+                      child: Icon(RemixIcons.close_line, size: 18, color: p.textPrimary),
                     ),
                   ),
                 ],
@@ -856,7 +857,7 @@ class _FrameSizeDialogState extends State<_FrameSizeDialog> {
           gradient: AppColors.darkGradient,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.square_foot, size: 22, color: Colors.white),
+        child: const Icon(RemixIcons.ruler_line, size: 22, color: Colors.white),
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(28, 22, 28, 22),
@@ -935,7 +936,7 @@ class _FrameSizeDialogState extends State<_FrameSizeDialog> {
           _cancelButton(context, p),
           const SizedBox(width: 14),
           _GradientButton(
-            icon: Icons.check,
+            icon: RemixIcons.check_line,
             label: 'Save Frame Size',
             onTap: _save,
           ),
@@ -1065,8 +1066,8 @@ class _FrameSizeDialogState extends State<_FrameSizeDialog> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          arrow(Icons.keyboard_arrow_up, up),
-          arrow(Icons.keyboard_arrow_down, down),
+          arrow(RemixIcons.arrow_up_s_line, up),
+          arrow(RemixIcons.arrow_down_s_line, down),
         ],
       ),
     );

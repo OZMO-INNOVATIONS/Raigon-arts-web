@@ -385,34 +385,7 @@ class InboxPage extends StatelessWidget {
       width: double.infinity,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 24, 28, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Inbox',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.9,
-                          color: p.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage Instagram DMs and WhatsApp conversations',
-                        style: TextStyle(color: p.textMuted, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Padding(padding: const EdgeInsets.fromLTRB(28, 24, 28, 14)),
           const Expanded(child: _InboxWorkspace()),
         ],
       ),
@@ -420,7 +393,7 @@ class InboxPage extends StatelessWidget {
   }
 }
 
-/// One row of the left conversation list (either channel).
+/// One row of the left conversation list (either channel).x
 class _Convo {
   const _Convo({
     required this.channel,

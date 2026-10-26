@@ -255,13 +255,12 @@ class ChannelTabs extends StatelessWidget {
 
   final Channel active;
   final ValueChanged<Channel> onChanged;
-
-  /// Unread count shown on the active tab (hidden when 0).
   final int badge;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -271,32 +270,45 @@ class ChannelTabs extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: _tab(p, Channel.instagram)),
+          Expanded(child: _tab(context, p, Channel.instagram)),
           const SizedBox(width: 4),
-          Expanded(child: _tab(p, Channel.whatsapp)),
+          Expanded(child: _tab(context, p, Channel.whatsapp)),
         ],
       ),
     );
   }
 
-  Widget _tab(AppPalette p, Channel c) {
-    final selected = c == active;
-    final label = c.isIg ? 'Instagram' : 'WhatsApp';
+  Widget _tab(BuildContext context, AppPalette p, Channel channel) {
+    final selected = channel == active;
+    final isInstagram = channel.isIg;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final brandColor = isInstagram ? ChannelColors.ig : ChannelColors.waDeep;
+
+    final brandGradient = channel.brandGradient;
+    final label = isInstagram ? 'Instagram' : 'WhatsApp';
+
+    final lightSelectedColor = isInstagram
+        ? const Color(0xFFFCE7F3)
+        : const Color(0xFFDCFCE7);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => onChanged(c),
+        onTap: () => onChanged(channel),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? p.accentSoft : Colors.transparent,
+            color: selected
+                ? (isDark ? null : lightSelectedColor)
+                : Colors.transparent,
+            gradient: selected && isDark ? brandGradient : null,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? p.accent.withValues(alpha: .25)
+                  ? brandColor.withValues(alpha: 0.35)
                   : Colors.transparent,
             ),
           ),
@@ -304,9 +316,7 @@ class ChannelTabs extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              selected
-                  ? ChannelBadge(c, size: 22)
-                  : Icon(c.icon, size: 19, color: p.textMuted),
+              ChannelBadge(channel, size: 22),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -316,7 +326,9 @@ class ChannelTabs extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    color: selected ? p.textPrimary : p.textMuted,
+                    color: selected
+                        ? (isDark ? Colors.white : brandColor)
+                        : brandColor,
                   ),
                 ),
               ),
@@ -328,7 +340,8 @@ class ChannelTabs extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    gradient: c.brandGradient,
+                    gradient: isDark ? null : brandGradient,
+                    color: isDark ? Colors.white.withValues(alpha: 0.22) : null,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(

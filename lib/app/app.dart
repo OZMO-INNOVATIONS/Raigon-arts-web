@@ -9,8 +9,7 @@ import 'package:raigon_art/features/authentication/providers/auth_provider.dart'
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/provider/customers_screen_provider.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
-import 'package:raigon_art/features/messaging_automation/automation_rule/providers/automation_rule_provider.dart';
-import 'package:raigon_art/features/messaging_automation/connection/providers/connection_provider.dart';
+import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
 class RaigonartApp extends StatelessWidget {
   const RaigonartApp({super.key});
@@ -33,11 +32,7 @@ class RaigonartApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PaginationProvider()),
         ChangeNotifierProvider(create: (_) => CustomerAndOrderProvider()),
         ChangeNotifierProvider(create: (_) => FrameSizeProvider()),
-        ChangeNotifierProvider(create: (_) => ConnectionProvider()),
-        ChangeNotifierProxyProvider<ConnectionProvider, AutomationRuleProvider>(
-          create: (_) => AutomationRuleProvider(),
-          update: (_, conn, rules) => rules!..syncChannel(conn.channel),
-        ),
+        ChangeNotifierProvider(create: (_) => MessagingAutomationProvider()),
         ChangeNotifierProvider(create: (_) => CustomersScreenProvider()),
         // ChangeNotifierProvider(create: (_) => AddCustomerProvider()),
       ],

@@ -58,6 +58,13 @@ class _ConnectDialogState extends State<_ConnectDialog> {
     final p = AppPalette.of(context);
     final c = widget.channel;
     return AlertDialog(
+      backgroundColor: p.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(26),
+        side: BorderSide(color: p.border),
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(26, 26, 26, 14),
       content: SizedBox(
         width: 380,
         child: Column(
@@ -80,7 +87,7 @@ class _ConnectDialogState extends State<_ConnectDialog> {
               'We’ll take you to Meta to set permissions, then link your account.',
               style: TextStyle(color: p.textMuted, fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             TextField(
               controller: widget.ctrl,
               autofocus: true,
@@ -92,7 +99,7 @@ class _ConnectDialogState extends State<_ConnectDialog> {
                 errorText: err,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: GradientButton(
@@ -105,6 +112,7 @@ class _ConnectDialogState extends State<_ConnectDialog> {
             SizedBox(
               width: double.infinity,
               child: TextButton(
+                style: TextButton.styleFrom(foregroundColor: p.textMuted),
                 onPressed: busy ? null : () => Navigator.pop(context, false),
                 child: const Text('Cancel'),
               ),

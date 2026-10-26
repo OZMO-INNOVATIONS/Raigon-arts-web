@@ -21,6 +21,7 @@ class PageShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 860;
+    final gutter = narrow ? 18.0 : 28.0;
 
     final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,18 +36,16 @@ class PageShell extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(subtitle, style: TextStyle(color: p.textMuted, fontSize: 14)),
+        Text(
+          subtitle,
+          style: TextStyle(color: p.textMuted, fontSize: 14, height: 1.35),
+        ),
       ],
     );
 
-    // Keep the header fixed above the scrollable content.
+    // Header stays fixed above the scrollable content.
     final header = Padding(
-      padding: EdgeInsets.fromLTRB(
-        narrow ? 18 : 26,
-        narrow ? 18 : 26,
-        narrow ? 18 : 26,
-        0,
-      ),
+      padding: EdgeInsets.fromLTRB(gutter, narrow ? 18 : 26, gutter, 0),
       child: narrow
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,7 +58,7 @@ class PageShell extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(child: heading),
-                if (action != null) action!,
+                ?action,
               ],
             ),
     );
@@ -67,18 +66,14 @@ class PageShell extends StatelessWidget {
     final content = Expanded(
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(narrow ? 18 : 26),
+        padding: EdgeInsets.fromLTRB(gutter, narrow ? 22 : 26, gutter, 36),
         child: SizedBox(width: double.infinity, child: child),
       ),
     );
 
     Widget layout = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        header,
-        SizedBox(height: narrow ? 22 : 28),
-        content,
-      ],
+      children: [header, content],
     );
 
     if (onRefresh != null) {
@@ -89,6 +84,7 @@ class PageShell extends StatelessWidget {
       );
     }
 
-    return layout;
+    // On very wide screens keep the content in a readable column.
+    return SizedBox(width: double.infinity, child: layout);
   }
 }

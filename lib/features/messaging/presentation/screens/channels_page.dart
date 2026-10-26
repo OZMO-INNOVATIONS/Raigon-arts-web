@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/channel_badge.dart';
 import '../widgets/channel_style.dart';
+import '../widgets/gradient_button.dart';
 import '../widgets/page_shell.dart';
 import '../widgets/section_card.dart';
 
@@ -84,6 +85,7 @@ class ChannelsPage extends StatelessWidget {
     final p = AppPalette.of(context);
     final total = Channel.values.length;
     final connected = Channel.values.where((c) => s.accounts[c] != null).length;
+    final all = connected == total;
 
     return PageShell(
       title: 'Channels',
@@ -96,20 +98,10 @@ class ChannelsPage extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: connected == total ? p.mintSoft : p.chipFill,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    connected == total
-                        ? Icons.verified_rounded
-                        : Icons.link_rounded,
-                    size: 20,
-                    color: connected == total ? p.mint : p.textMuted,
-                  ),
+                IconTile(
+                  all ? Icons.verified_rounded : Icons.link_rounded,
+                  color: all ? p.mint : p.accent,
+                  background: all ? p.mintSoft : p.accentSoft,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -124,12 +116,12 @@ class ChannelsPage extends StatelessWidget {
                           color: p.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 9),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: total == 0 ? 0 : connected / total,
-                          minHeight: 5,
+                          minHeight: 6,
                           color: p.mint,
                           backgroundColor: p.border,
                         ),
@@ -140,17 +132,28 @@ class ChannelsPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          for (final c in Channel.values)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: _ChannelCard(
-                channel: c,
-                account: s.accounts[c],
-                onConnect: () => _connectChannel(context, c),
-                onDisconnect: () => s.disconnect(c),
-              ),
-            ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth >= 700 ? (c.maxWidth - 16) / 2 : c.maxWidth;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  for (final ch in Channel.values)
+                    SizedBox(
+                      width: w,
+                      child: _ChannelCard(
+                        channel: ch,
+                        account: s.accounts[ch],
+                        onConnect: () => _connectChannel(context, ch),
+                        onDisconnect: () => s.disconnect(ch),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -183,131 +186,133 @@ class _ChannelCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: p.border),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isConnected ? p.mint.withValues(alpha: .5) : p.border,
+        ),
         boxShadow: p.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Soft channel-tinted header: identity + connection state.
           Container(
-            height: 4,
-            decoration: BoxDecoration(gradient: c.brandGradient),
-          ),
-          Padding(
             padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  c.brandColor.withValues(alpha: .12),
+                  c.brandColor.withValues(alpha: .02),
+                ],
+              ),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    ChannelBadge(c, size: 52),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                ChannelBadge(c, size: 52),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c.label,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16.5,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
                         children: [
-                          Text(
-                            c.label,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16.5,
-                              color: p.textPrimary,
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isConnected
+                                  ? p.mint
+                                  : p.textMuted.withValues(alpha: .4),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isConnected
-                                      ? p.mint
-                                      : p.textMuted.withValues(alpha: .4),
-                                ),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              isConnected
+                                  ? 'Connected · $account'
+                                  : 'Not connected',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isConnected ? p.mint : p.textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
-                              const SizedBox(width: 7),
-                              Flexible(
-                                child: Text(
-                                  isConnected
-                                      ? 'Connected · $account'
-                                      : 'Not connected',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: isConnected ? p.mint : p.textMuted,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    if (isConnected)
-                      OutlinedButton(
-                        onPressed: onDisconnect,
-                        child: const Text('Disconnect'),
-                      )
-                    else
-                      TintedButton(
-                        label: 'Connect',
-                        gradient: c.brandGradient,
-                        color: c.brandColor,
-                        onPressed: onConnect,
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
                   c.blurb,
                   style: TextStyle(
                     color: p.textMuted,
                     fontSize: 13,
-                    height: 1.4,
+                    height: 1.45,
                   ),
                 ),
                 const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final t in perks)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                for (final t in perks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: p.accentSoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 13,
+                            color: p.accent,
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: c.brandColor.withValues(alpha: .09),
-                          borderRadius: BorderRadius.circular(20),
+                        const SizedBox(width: 10),
+                        Text(
+                          t,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: p.textPrimary,
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_rounded,
-                              size: 13,
-                              color: c.brandColor,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              t,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: c.brandColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: isConnected
+                      ? SoftOutlineButton(
+                          onPressed: onDisconnect,
+                          label: 'Disconnect',
+                        )
+                      : GradientButton(label: 'Connect', onPressed: onConnect),
                 ),
               ],
             ),

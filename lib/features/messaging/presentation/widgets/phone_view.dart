@@ -4,6 +4,8 @@ import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/models/chat.dart';
 
+import 'channel_style.dart';
+
 class PhoneView extends StatefulWidget {
   const PhoneView({
     super.key,
@@ -65,10 +67,11 @@ class _PhoneViewState extends State<PhoneView> {
   Widget _bubble(ChatMsg m) {
     final mine = !m.fromBot;
     final empty = m.text.trim().isEmpty;
+    final igMine = ig && mine;
     final bubbleColor = ig
-        ? (mine ? p.accent : const Color(0xFF262626))
+        ? (mine ? null : const Color(0xFF262626))
         : (mine ? const Color(0xFFD9FDD3) : Colors.white);
-    final textColor = ig ? (mine ? p.onAccent : Colors.white) : _fg;
+    final textColor = ig ? Colors.white : _fg;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Align(
@@ -83,12 +86,14 @@ class _PhoneViewState extends State<PhoneView> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: bubbleColor,
+                gradient: igMine ? ChannelColors.igBubble : null,
                 borderRadius: BorderRadius.circular(ig ? 18 : 10),
               ),
               child: Text(
                 empty ? 'Write a message' : m.text,
                 style: TextStyle(
                   fontSize: 12.5,
+                  height: 1.3,
                   color: textColor.withValues(alpha: empty ? .5 : 1),
                 ),
               ),
@@ -159,11 +164,12 @@ class _PhoneViewState extends State<PhoneView> {
       height: widget.height,
       padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B2030),
+        color: const Color(0xFF14141F),
         borderRadius: BorderRadius.circular(44),
+        border: Border.all(color: Colors.white.withValues(alpha: .08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: .18),
+            color: Colors.black.withValues(alpha: .22),
             blurRadius: 40,
             offset: const Offset(0, 18),
           ),
@@ -328,13 +334,18 @@ class _PhoneViewState extends State<PhoneView> {
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: enabled ? _submit : null,
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: ig ? p.accent : p.wa,
-                        child: Icon(
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: ig ? ChannelColors.igBubble : null,
+                          color: ig ? null : p.wa,
+                        ),
+                        child: const Icon(
                           Icons.send_rounded,
                           size: 18,
-                          color: ig ? p.onAccent : Colors.white,
+                          color: Colors.white,
                         ),
                       ),
                     ),

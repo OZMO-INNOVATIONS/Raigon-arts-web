@@ -41,11 +41,12 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
     return FutureBuilder<void>(
       future: _initialization,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: p.accent));
         }
 
         final s = _messagingAutomationProvider;
@@ -103,7 +104,7 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: p.chipFill,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: p.border),
       ),
       child: Row(
@@ -161,7 +162,7 @@ class _TabItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
           decoration: BoxDecoration(
             color: selected ? p.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: selected ? p.border : Colors.transparent),
             boxShadow: selected ? p.softShadow : null,
           ),
@@ -216,7 +217,7 @@ class _TabItem extends StatelessWidget {
   }
 }
 
-/// Connection status chips (replaces the old sidebar "Channels" card).
+/// Connection status chips (tap to open the Channels tab).
 class _ChannelStatus extends StatelessWidget {
   const _ChannelStatus({required this.s});
   final MessagingAutomationProvider s;

@@ -27,7 +27,11 @@ void openBuilder(
   );
 }
 
-void showTest(BuildContext context, MessagingAutomationProvider s, Automation a) {
+void showTest(
+  BuildContext context,
+  MessagingAutomationProvider s,
+  Automation a,
+) {
   final p = AppPalette.of(context);
   showDialog(
     context: context,
@@ -40,7 +44,7 @@ void showTest(BuildContext context, MessagingAutomationProvider s, Automation a)
           Center(child: PhoneSim(auto: a, s: s)),
           IconButton.filled(
             style: IconButton.styleFrom(
-              backgroundColor: p.chipFill,
+              backgroundColor: p.surface,
               foregroundColor: p.textPrimary,
             ),
             onPressed: () => Navigator.pop(ctx),
@@ -117,7 +121,7 @@ class AutomationsPage extends StatelessWidget {
   }
 }
 
-/// One clean card with three divided stats instead of three separate boxes.
+/// One card with three divided stats.
 class _StatsStrip extends StatelessWidget {
   const _StatsStrip({
     required this.total,
@@ -130,25 +134,24 @@ class _StatsStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
 
-    Widget stat(IconData icon, String label, String value, Color c, Color soft) {
+    Widget stat(
+      IconData icon,
+      String label,
+      String value,
+      Color c,
+      Color soft,
+    ) {
       return Expanded(
         child: Column(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: soft,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, size: 19, color: c),
-            ),
+            IconTile(icon, size: 38, color: c, background: soft),
             const SizedBox(height: 10),
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
                 color: p.textPrimary,
               ),
             ),
@@ -170,13 +173,23 @@ class _StatsStrip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
       child: Row(
         children: [
-          stat(Icons.layers_rounded, 'Automations', '$total',
-              p.tileNeutralIcon, p.tileNeutral),
+          stat(
+            Icons.layers_rounded,
+            'Automations',
+            '$total',
+            p.tileNeutralIcon,
+            p.tileNeutral,
+          ),
           divider(),
           stat(Icons.bolt_rounded, 'Live now', '$live', p.mint, p.mintSoft),
           divider(),
-          stat(Icons.reply_all_rounded, 'Replies sent', '$replies', p.sky,
-              p.skySoft),
+          stat(
+            Icons.reply_all_rounded,
+            'Replies sent',
+            '$replies',
+            p.sky,
+            p.skySoft,
+          ),
         ],
       ),
     );
@@ -220,42 +233,6 @@ class _Banner extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill(this.text, this.color, this.soft, {this.icon, this.iconSize = 12});
-  final String text;
-  final Color color, soft;
-  final IconData? icon;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-      decoration: BoxDecoration(
-        color: soft,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: iconSize, color: color),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.s});
   final MessagingAutomationProvider s;
@@ -263,6 +240,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    const gold = Color(0xFFCDBB88);
 
     Widget step(int n, String t) => Container(
       padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
@@ -278,7 +256,7 @@ class _EmptyState extends StatelessWidget {
             height: 20,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: Color(0xFFCDBB88),
+              color: gold,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -306,65 +284,92 @@ class _EmptyState extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(26),
-          decoration: BoxDecoration(
-            gradient: p.brandDeep,
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: p.glow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Reply to every DM, automatically',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 25,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Set a trigger, write the reply, test it in a phone preview, then go live.',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: .78),
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  step(1, 'Channel'),
-                  step(2, 'Trigger'),
-                  step(3, 'Reply'),
-                  step(4, 'Go live'),
-                ],
-              ),
-              const SizedBox(height: 22),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFCDBB88),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: p.brandDeep,
+              boxShadow: p.glow,
+            ),
+            child: Stack(
+              children: [
+                // One quiet decorative circle, nothing else.
+                Positioned(
+                  right: -50,
+                  top: -50,
+                  child: Container(
+                    width: 190,
+                    height: 190,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: gold.withValues(alpha: .10),
+                    ),
                   ),
                 ),
-                onPressed: () => openBuilder(context, s),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Create automation'),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Reply to every DM, automatically',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.7,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Set a trigger, write the reply, test it in a phone preview, then go live.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .78),
+                          fontSize: 14,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          step(1, 'Channel'),
+                          step(2, 'Trigger'),
+                          step(3, 'Reply'),
+                          step(4, 'Go live'),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: gold,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 16,
+                          ),
+                        ),
+                        onPressed: () => openBuilder(context, s),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text(
+                          'Create automation',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 30),
         Text(
           'Or start from a popular idea',
           style: TextStyle(
@@ -469,12 +474,7 @@ class _StartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Pill(
-              tag,
-              tagColor,
-              tagColor.withValues(alpha: .12),
-              icon: icon,
-            ),
+            Pill(tag, color: tagColor, soft: tagColor.withValues(alpha: .12), icon: icon),
             const SizedBox(height: 12),
             Text(
               title,
@@ -503,12 +503,7 @@ class _StartCard extends StatelessWidget {
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
-              child: TintedButton(
-                label: cta,
-                gradient: gradient,
-                color: tagColor,
-                onPressed: onTap,
-              ),
+              child: GradientButton(label: cta, onPressed: onTap),
             ),
           ],
         ),
@@ -533,7 +528,7 @@ class _AutoCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
         child: Row(
           children: [
-            ChannelBadge(a.channel, size: 44),
+            ChannelBadge(a.channel, size: 46),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -555,10 +550,19 @@ class _AutoCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       isLive
-                          ? _Pill('Live', p.mint, p.mintSoft,
-                              icon: Icons.circle, iconSize: 8)
-                          : _Pill('Paused', p.textMuted, p.chipFill,
-                              icon: Icons.pause_rounded, iconSize: 12),
+                          ? Pill(
+                              'Live',
+                              color: p.mint,
+                              soft: p.mintSoft,
+                              icon: Icons.circle,
+                              iconSize: 8,
+                            )
+                          : Pill(
+                              'Paused',
+                              color: p.textMuted,
+                              soft: p.chipFill,
+                              icon: Icons.pause_rounded,
+                            ),
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -568,25 +572,25 @@ class _AutoCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: p.textMuted, fontSize: 13),
                   ),
-                  const SizedBox(height: 9),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _Pill(
+                      Pill(
                         '${a.runs} replies',
-                        p.textMuted,
-                        p.chipFill,
+                        color: p.textMuted,
+                        soft: p.chipFill,
                         icon: Icons.reply_rounded,
                       ),
                       if (!connected)
                         GestureDetector(
                           onTap: () => s.setTab(2),
-                          child: _Pill(
+                          child: Pill(
                             'Channel disconnected · Fix',
-                            p.amber,
-                            p.amberSoft,
+                            color: p.amber,
+                            soft: p.amberSoft,
                             icon: Icons.link_off_rounded,
                           ),
                         ),

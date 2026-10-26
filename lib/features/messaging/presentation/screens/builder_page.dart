@@ -10,6 +10,7 @@ import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 import '../widgets/channel_badge.dart';
 import '../widgets/channel_style.dart';
 import '../widgets/connect_dialog.dart';
+import '../widgets/gradient_button.dart';
 import '../widgets/phone_sim.dart';
 import '../widgets/phone_view.dart';
 import '../widgets/section_card.dart';
@@ -55,11 +56,11 @@ class _BuilderPageState extends State<BuilderPage> {
   MessagingAutomationProvider get s => widget.s;
   AppPalette get p => AppPalette.of(context);
 
-  // ── channel-driven colors: Instagram = pink/purple, WhatsApp = green.
-  // Until a channel is picked we fall back to the app's own brand.
-  Color get _cc => channel?.brandColor ?? p.accent;
-  LinearGradient get _cg => channel?.brandGradient ?? p.brand;
-  Color get _on => channel != null ? Colors.white : p.onBrand;
+  // The app theme (gold / black) drives the whole wizard. The channel's own
+  // colour only shows up on its badge and in the preview panel.
+  Color get _cc => p.accent;
+  LinearGradient get _cg => p.brand;
+  Color get _on => p.onBrand;
 
   @override
   void initState() {
@@ -195,7 +196,7 @@ class _BuilderPageState extends State<BuilderPage> {
   };
 
   Widget _label(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Text(
       t,
       style: TextStyle(
@@ -206,18 +207,6 @@ class _BuilderPageState extends State<BuilderPage> {
     ),
   );
 
-  Widget _radio(bool selected) => AnimatedContainer(
-    duration: const Duration(milliseconds: 180),
-    width: 24,
-    height: 24,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: selected ? _cg : null,
-      border: selected ? null : Border.all(color: p.border, width: 1.5),
-    ),
-    child: selected ? Icon(Icons.check_rounded, size: 16, color: _on) : null,
-  );
-
   // ── step bodies ───────────────────────────────────────────────
 
   Widget _stepChannel() => Column(
@@ -225,86 +214,53 @@ class _BuilderPageState extends State<BuilderPage> {
       for (final c in Channel.values)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          child: _OptionTile(
+            selected: channel == c,
             onTap: () => _pickChannel(c),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: channel == c
-                    ? c.brandColor.withValues(alpha: .07)
-                    : p.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: channel == c ? c.brandColor : p.border,
-                  width: channel == c ? 2 : 1,
-                ),
-                boxShadow: channel == c
-                    ? [
-                        BoxShadow(
-                          color: c.brandColor.withValues(alpha: .18),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  ChannelBadge(c, size: 50),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          c.label,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: p.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: s.accounts[c] != null
-                                    ? p.mint
-                                    : p.textMuted.withValues(alpha: .4),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                s.accounts[c] != null
-                                    ? 'Connected · ${s.accounts[c]}'
-                                    : 'Tap to connect',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: s.accounts[c] != null
-                                      ? p.mint
-                                      : p.textMuted,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+            padding: const EdgeInsets.all(16),
+            leading: ChannelBadge(c, size: 50),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c.label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: p.textPrimary,
                   ),
-                  const SizedBox(width: 10),
-                  _radio(channel == c),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: s.accounts[c] != null
+                            ? p.mint
+                            : p.textMuted.withValues(alpha: .4),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        s.accounts[c] != null
+                            ? 'Connected · ${s.accounts[c]}'
+                            : 'Tap to connect',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: s.accounts[c] != null ? p.mint : p.textMuted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -321,68 +277,45 @@ class _BuilderPageState extends State<BuilderPage> {
         for (final t in TriggerType.values.where((t) => t.allows(c)))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
+            child: _OptionTile(
+              selected: trigger == t,
               onTap: () => setState(() => trigger = t),
-              child: AnimatedContainer(
+              leading: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.all(14),
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: trigger == t
-                      ? _cc.withValues(alpha: .07)
-                      : p.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: trigger == t ? _cc : p.border,
-                    width: trigger == t ? 1.6 : 1,
+                  gradient: trigger == t ? _cg : null,
+                  color: trigger == t ? null : p.chipFill,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  _triggerIcon(t),
+                  size: 20,
+                  color: trigger == t ? _on : p.textMuted,
+                ),
+              ),
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: p.textPrimary,
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: trigger == t ? _cg : null,
-                        color: trigger == t ? null : p.chipFill,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _triggerIcon(t),
-                        size: 20,
-                        color: trigger == t ? _on : p.textMuted,
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.desc,
+                    style: TextStyle(
+                      color: p.textMuted,
+                      fontSize: 12.5,
+                      height: 1.3,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            t.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: p.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            t.desc,
-                            style: TextStyle(
-                              color: p.textMuted,
-                              fontSize: 12.5,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _radio(trigger == t),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -411,7 +344,7 @@ class _BuilderPageState extends State<BuilderPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextField(
                   controller: kw,
                   onChanged: (_) => setState(() {}),
@@ -424,7 +357,7 @@ class _BuilderPageState extends State<BuilderPage> {
                   'Use commas to separate words',
                   style: TextStyle(color: p.textMuted, fontSize: 12),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -435,27 +368,33 @@ class _BuilderPageState extends State<BuilderPage> {
                       style: TextStyle(color: p.textMuted, fontSize: 12),
                     ),
                     for (final e in ['Price', 'Link', 'Shop'])
-                      GestureDetector(
-                        onTap: () => setState(
-                          () => kw.text = kw.text.trim().isEmpty
-                              ? e
-                              : '${kw.text.trim().replaceAll(RegExp(r',\s*$'), '')}, $e',
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () => setState(
+                            () => kw.text = kw.text.trim().isEmpty
+                                ? e
+                                : '${kw.text.trim().replaceAll(RegExp(r',\s*$'), '')}, $e',
                           ),
-                          decoration: BoxDecoration(
-                            color: _cc.withValues(alpha: .10),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '+ $e',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: _cc,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.accentSoft,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _cc.withValues(alpha: .35),
+                              ),
+                            ),
+                            child: Text(
+                              '+ $e',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: _cc,
+                              ),
                             ),
                           ),
                         ),
@@ -493,14 +432,17 @@ class _BuilderPageState extends State<BuilderPage> {
                   t,
                   style: TextStyle(fontSize: 12.5, color: p.textPrimary),
                 ),
-                backgroundColor: _cc.withValues(alpha: .07),
-                side: BorderSide(color: _cc.withValues(alpha: .25)),
+                backgroundColor: p.accentSoft,
+                side: BorderSide(color: _cc.withValues(alpha: .3)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 onPressed: () => setState(() => msg.text = t),
               ),
           ],
         ),
       ],
-      const SizedBox(height: 16),
+      const SizedBox(height: 18),
       SectionCard(
         shadow: false,
         padding: const EdgeInsets.all(16),
@@ -550,24 +492,16 @@ class _BuilderPageState extends State<BuilderPage> {
   Widget _stepReview() {
     final d = _draft();
     Widget row(IconData i, String k, String v) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 11),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: _cc.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(i, size: 16, color: _cc),
-          ),
+          IconTile(i, size: 32),
           const SizedBox(width: 12),
           SizedBox(
-            width: 60,
+            width: 62,
             child: Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: 7),
               child: Text(
                 k,
                 style: TextStyle(color: p.textMuted, fontSize: 13),
@@ -576,7 +510,7 @@ class _BuilderPageState extends State<BuilderPage> {
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 5),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
                 v,
                 style: TextStyle(
@@ -625,8 +559,9 @@ class _BuilderPageState extends State<BuilderPage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: _cc.withValues(alpha: .08),
+            color: p.accentSoft,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _cc.withValues(alpha: .25)),
           ),
           child: Row(
             children: [
@@ -676,35 +611,28 @@ class _BuilderPageState extends State<BuilderPage> {
 
   Widget _footer(bool narrow) {
     final back = step > 0
-        ? OutlinedButton(
+        ? SoftOutlineButton(
             onPressed: () => _go(-1),
-            child: narrow
-                ? const Icon(Icons.arrow_back_rounded, size: 20)
-                : const Text('Back'),
+            icon: Icons.arrow_back_rounded,
+            label: narrow ? null : 'Back',
           )
         : null;
     final acts = <Widget>[
       if (step == 3) ...[
-        OutlinedButton(
+        SoftOutlineButton(
           onPressed: _valid ? () => _finish(false) : null,
-          child: const Text('Save paused'),
+          label: 'Save paused',
         ),
-        TintedButton(
+        GradientButton(
           label: 'Go live',
           icon: Icons.rocket_launch_rounded,
-          gradient: _cg,
-          color: _cc,
-          onColor: _on,
           onPressed: _valid ? () => _finish(true) : null,
         ),
       ] else
-        TintedButton(
+        GradientButton(
           label: 'Next',
           icon: Icons.arrow_forward_rounded,
           iconAfter: true,
-          gradient: _cg,
-          color: _cc,
-          onColor: _on,
           onPressed: _valid ? () => _go(1) : null,
         ),
     ];
@@ -724,22 +652,21 @@ class _BuilderPageState extends State<BuilderPage> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: _cc.withValues(alpha: .12),
+          color: p.accentSoft,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          'STEP ${step + 1} OF 4',
+          'Step ${step + 1} of 4',
           style: TextStyle(
             color: _cc,
-            fontWeight: FontWeight.w800,
-            fontSize: 11,
-            letterSpacing: .8,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
           ),
         ),
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       Text(
         _titles[step],
         style: TextStyle(
@@ -750,12 +677,15 @@ class _BuilderPageState extends State<BuilderPage> {
         ),
       ),
       const SizedBox(height: 4),
-      Text(_subs[step], style: TextStyle(color: p.textMuted, fontSize: 14)),
-      const SizedBox(height: 22),
+      Text(
+        _subs[step],
+        style: TextStyle(color: p.textMuted, fontSize: 14, height: 1.35),
+      ),
+      const SizedBox(height: 24),
     ],
   );
 
-  /// Numbered stepper in the channel color.
+  /// Numbered stepper in the app's gold.
   Widget _stepper(bool compact) {
     Widget dot(int i) {
       final done = i < step;
@@ -824,7 +754,7 @@ class _BuilderPageState extends State<BuilderPage> {
   Widget _previewTag() {
     final c = channel;
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
+      padding: const EdgeInsets.fromLTRB(6, 5, 14, 5),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(20),
@@ -837,7 +767,7 @@ class _BuilderPageState extends State<BuilderPage> {
             ChannelBadge(c, size: 22),
             const SizedBox(width: 8),
           ] else ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
           ],
           Text(
             c == null ? 'Live preview' : 'Live preview · ${c.label}',
@@ -885,8 +815,10 @@ class _BuilderPageState extends State<BuilderPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Panel tint follows the chosen channel; falls back to the app gold.
+    final tint = channel?.brandColor ?? p.accent;
     return Theme(
-      // Focus rings, selection and outlined buttons follow the channel color.
+      // Focus rings, selection and outlined buttons follow the app accent.
       data: theme.copyWith(
         colorScheme: theme.colorScheme.copyWith(primary: _cc),
       ),
@@ -901,6 +833,7 @@ class _BuilderPageState extends State<BuilderPage> {
                 child: Row(
                   children: [
                     IconButton(
+                      tooltip: 'Close',
                       onPressed: () => Navigator.pop(context),
                       icon: Icon(Icons.close_rounded, color: p.textPrimary),
                     ),
@@ -917,7 +850,7 @@ class _BuilderPageState extends State<BuilderPage> {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 540,
+                            width: 560,
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 40,
@@ -949,13 +882,13 @@ class _BuilderPageState extends State<BuilderPage> {
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    _cc.withValues(alpha: .14),
-                                    _cc.withValues(alpha: .04),
+                                    tint.withValues(alpha: .12),
+                                    tint.withValues(alpha: .03),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(28),
                                 border: Border.all(
-                                  color: _cc.withValues(alpha: .15),
+                                  color: tint.withValues(alpha: .16),
                                 ),
                               ),
                               alignment: Alignment.center,
@@ -984,7 +917,7 @@ class _BuilderPageState extends State<BuilderPage> {
                       children: [
                         _header(),
                         _body(),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 30),
                         Center(child: _previewTag()),
                         const SizedBox(height: 14),
                         Center(child: _preview(height: 520)),
@@ -1002,6 +935,69 @@ class _BuilderPageState extends State<BuilderPage> {
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Selectable card used for channel and trigger choices.
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.selected,
+    required this.onTap,
+    required this.leading,
+    required this.body,
+    this.padding = const EdgeInsets.all(14),
+  });
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget leading, body;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: padding,
+          decoration: BoxDecoration(
+            color: selected ? p.accentSoft : p.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? p.accent : p.border,
+              width: selected ? 1.6 : 1,
+            ),
+            boxShadow: selected ? p.softShadow : null,
+          ),
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 14),
+              Expanded(child: body),
+              const SizedBox(width: 10),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: selected ? p.brand : null,
+                  border: selected
+                      ? null
+                      : Border.all(color: p.border, width: 1.5),
+                ),
+                child: selected
+                    ? Icon(Icons.check_rounded, size: 16, color: p.onBrand)
+                    : null,
+              ),
+            ],
           ),
         ),
       ),

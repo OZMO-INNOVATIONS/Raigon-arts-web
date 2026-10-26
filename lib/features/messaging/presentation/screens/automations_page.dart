@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/automation.dart';
+import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
@@ -41,7 +42,9 @@ void showTest(
       child: Stack(
         alignment: Alignment.topRight,
         children: [
-          Center(child: PhoneSim(auto: a, s: s)),
+          Center(
+            child: PhoneSim(auto: a, s: s),
+          ),
           IconButton.filled(
             style: IconButton.styleFrom(
               backgroundColor: p.surface,
@@ -65,10 +68,6 @@ class AutomationsPage extends StatelessWidget {
     final p = AppPalette.of(context);
     final empty = s.automations.isEmpty;
     final firstLoad = empty && s.loadingAutomations;
-    final liveCount = s.automations
-        .where((a) => a.live && s.accounts[a.channel] != null)
-        .length;
-    final replies = s.automations.fold<int>(0, (t, a) => t + a.runs);
 
     return PageShell(
       title: empty ? 'Let’s get started' : 'Automations',
@@ -103,16 +102,33 @@ class AutomationsPage extends StatelessWidget {
                 ),
               ),
             ),
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth >= 700 ? (c.maxWidth - 16) / 2 : c.maxWidth;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  for (final ch in Channel.values)
+                    SizedBox(
+                      width: w,
+                      child: _ChannelCard(
+                        channel: ch,
+                        account: s.accounts[ch],
+                        onConnect: () => s.connectChannel(context, ch),
+                        onDisconnect: () => s.disconnect(ch),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+
           if (!firstLoad)
             if (empty)
               _EmptyState(s: s)
             else ...[
-              _StatsStrip(
-                total: s.automations.length,
-                live: liveCount,
-                replies: replies,
-              ),
-              const SizedBox(height: 22),
               for (final a in s.automations) _AutoCard(s: s, a: a),
             ],
         ],
@@ -121,80 +137,209 @@ class AutomationsPage extends StatelessWidget {
   }
 }
 
-/// One card with three divided stats.
-class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({
-    required this.total,
-    required this.live,
-    required this.replies,
+class _ChannelCard extends StatelessWidget {
+  const _ChannelCard({
+    required this.channel,
+    required this.account,
+    required this.onConnect,
+    required this.onDisconnect,
   });
-  final int total, live, replies;
+
+  final Channel channel;
+  final String? account;
+  final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-
-    Widget stat(
-      IconData icon,
-      String label,
-      String value,
-      Color c,
-      Color soft,
-    ) {
-      return Expanded(
-        child: Column(
-          children: [
-            IconTile(icon, size: 38, color: c, background: soft),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: p.textPrimary,
+    final c = channel;
+    final isConnected = account != null;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isConnected ? p.mint.withValues(alpha: .5) : p.border,
+        ),
+        boxShadow: p.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Soft channel-tinted header: identity + connection state.
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  c.brandColor.withValues(alpha: .12),
+                  c.brandColor.withValues(alpha: .02),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: p.textMuted, fontSize: 12),
+            child: Row(
+              children: [
+                ChannelBadge(c, size: 52),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c.label,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16.5,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isConnected
+                                  ? p.mint
+                                  : p.textMuted.withValues(alpha: .4),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              isConnected
+                                  ? 'Connected · $account'
+                                  : 'Not connected',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isConnected ? p.mint : p.textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
-
-    Widget divider() => Container(width: 1, height: 64, color: p.border);
-
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-      child: Row(
-        children: [
-          stat(
-            Icons.layers_rounded,
-            'Automations',
-            '$total',
-            p.tileNeutralIcon,
-            p.tileNeutral,
           ),
-          divider(),
-          stat(Icons.bolt_rounded, 'Live now', '$live', p.mint, p.mintSoft),
-          divider(),
-          stat(
-            Icons.reply_all_rounded,
-            'Replies sent',
-            '$replies',
-            p.sky,
-            p.skySoft,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c.blurb,
+                  style: TextStyle(
+                    color: p.textMuted,
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: isConnected
+                      ? SoftOutlineButton(
+                          onPressed: onDisconnect,
+                          label: 'Disconnect',
+                        )
+                      : GradientButton(label: 'Connect', onPressed: onConnect),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+// /// One card with three divided stats.
+// class _StatsStrip extends StatelessWidget {
+//   const _StatsStrip({
+//     required this.total,
+//     required this.live,
+//     required this.replies,
+//   });
+//   final int total, live, replies;
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final p = AppPalette.of(context);
+
+//     Widget stat(
+//       IconData icon,
+//       String label,
+//       String value,
+//       Color c,
+//       Color soft,
+//     ) {
+//       return Expanded(
+//         child: Column(
+//           children: [
+//             IconTile(icon, size: 38, color: c, background: soft),
+//             const SizedBox(height: 10),
+//             Text(
+//               value,
+//               style: TextStyle(
+//                 fontSize: 24,
+//                 fontWeight: FontWeight.w800,
+//                 letterSpacing: -0.5,
+//                 color: p.textPrimary,
+//               ),
+//             ),
+//             const SizedBox(height: 2),
+//             Text(
+//               label,
+//               maxLines: 1,
+//               overflow: TextOverflow.ellipsis,
+//               style: TextStyle(color: p.textMuted, fontSize: 12),
+//             ),
+//           ],
+//         ),
+//       );
+//     }
+
+//     Widget divider() => Container(width: 1, height: 64, color: p.border);
+
+//     return SectionCard(
+//       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+//       child: Row(
+//         children: [
+//           stat(
+//             Icons.layers_rounded,
+//             'Automations',
+//             '$total',
+//             p.tileNeutralIcon,
+//             p.tileNeutral,
+//           ),
+//           divider(),
+//           stat(Icons.bolt_rounded, 'Live now', '$live', p.mint, p.mintSoft),
+//           divider(),
+//           stat(
+//             Icons.reply_all_rounded,
+//             'Replies sent',
+//             '$replies',
+//             p.sky,
+//             p.skySoft,
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 class _Banner extends StatelessWidget {
   const _Banner({required this.text, required this.onRetry});
@@ -288,10 +433,7 @@ class _EmptyState extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           child: Container(
             width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: p.brandDeep,
-              boxShadow: p.glow,
-            ),
+            decoration: BoxDecoration(gradient: p.brandDeep, boxShadow: p.glow),
             child: Stack(
               children: [
                 // One quiet decorative circle, nothing else.
@@ -392,8 +534,7 @@ class _EmptyState extends StatelessWidget {
                   tagColor: ChannelColors.ig,
                   gradient: ChannelColors.igBubble,
                   icon: Icons.camera_alt_rounded,
-                  title:
-                      'Send a DM with your link every time someone comments on your post',
+                  title: 'Send a DM with your link every time someone comments on your post',
                   cta: 'Send a link from comments',
                   user: 'link pls!',
                   bot: 'Here it is',
@@ -406,8 +547,7 @@ class _EmptyState extends StatelessWidget {
                   tagColor: ChannelColors.waDeep,
                   gradient: ChannelColors.waGradient,
                   icon: Icons.chat_rounded,
-                  title:
-                      'Send customized replies when people DM you specific keywords',
+                  title: 'Send customized replies when people DM you specific keywords',
                   cta: 'Respond to your DMs',
                   user: 'INFO',
                   bot: 'Here you go',
@@ -474,7 +614,12 @@ class _StartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Pill(tag, color: tagColor, soft: tagColor.withValues(alpha: .12), icon: icon),
+            Pill(
+              tag,
+              color: tagColor,
+              soft: tagColor.withValues(alpha: .12),
+              icon: icon,
+            ),
             const SizedBox(height: 12),
             Text(
               title,

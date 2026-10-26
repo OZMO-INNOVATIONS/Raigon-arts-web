@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
-import 'package:raigon_art/features/messaging/models/channel.dart';
-import 'package:raigon_art/features/messaging/presentation/screens/channels_page.dart';
 import 'package:raigon_art/features/messaging/presentation/screens/inbox_page.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
@@ -11,7 +9,7 @@ import 'automations_page.dart';
 const _nav = [
   ('Automations', Icons.bolt_rounded),
   ('Inbox', Icons.inbox_rounded),
-  ('Channels', Icons.hub_rounded),
+  // ('Channels', Icons.hub_rounded),
 ];
 
 class MessagingAutomationScreen extends StatefulWidget {
@@ -59,7 +57,7 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
               final pages = [
                 AutomationsPage(s: s),
                 InboxPage(s: s),
-                ChannelsPage(s: s),
+                // ChannelsPage(s: s),
               ];
               return LayoutBuilder(
                 builder: (context, c) {
@@ -128,13 +126,7 @@ class _TopBar extends StatelessWidget {
         width: double.infinity,
         child: narrow
             ? tabs
-            : Row(
-                children: [
-                  SizedBox(width: 440, child: tabs),
-                  const Spacer(),
-                  _ChannelStatus(s: s),
-                ],
-              ),
+            : Row(children: [SizedBox(width: 440, child: tabs)]),
       ),
     );
   }
@@ -217,66 +209,66 @@ class _TabItem extends StatelessWidget {
   }
 }
 
-/// Connection status chips (tap to open the Channels tab).
-class _ChannelStatus extends StatelessWidget {
-  const _ChannelStatus({required this.s});
-  final MessagingAutomationProvider s;
+// /// Connection status chips (tap to open the Channels tab).
+// class _ChannelStatus extends StatelessWidget {
+//   const _ChannelStatus({required this.s});
+//   final MessagingAutomationProvider s;
 
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final c in Channel.values)
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Tooltip(
-              message: s.accounts[c] != null
-                  ? '${c.label} connected'
-                  : 'Connect ${c.label}',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => s.setTab(2),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: p.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: p.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: s.accounts[c] != null
-                              ? p.mint
-                              : p.textMuted.withValues(alpha: .4),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        c.label,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: p.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     final p = AppPalette.of(context);
+//     return Row(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         for (final c in Channel.values)
+//           Padding(
+//             padding: const EdgeInsets.only(left: 8),
+//             child: Tooltip(
+//               message: s.accounts[c] != null
+//                   ? '${c.label} connected'
+//                   : 'Connect ${c.label}',
+//               child: InkWell(
+//                 borderRadius: BorderRadius.circular(20),
+//                 onTap: () => s.setTab(2),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(
+//                     horizontal: 12,
+//                     vertical: 8,
+//                   ),
+//                   decoration: BoxDecoration(
+//                     color: p.surface,
+//                     borderRadius: BorderRadius.circular(20),
+//                     border: Border.all(color: p.border),
+//                   ),
+//                   child: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Container(
+//                         width: 8,
+//                         height: 8,
+//                         decoration: BoxDecoration(
+//                           shape: BoxShape.circle,
+//                           color: s.accounts[c] != null
+//                               ? p.mint
+//                               : p.textMuted.withValues(alpha: .4),
+//                         ),
+//                       ),
+//                       const SizedBox(width: 7),
+//                       Text(
+//                         c.label,
+//                         style: TextStyle(
+//                           fontSize: 12.5,
+//                           fontWeight: FontWeight.w600,
+//                           color: p.textMuted,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ),
+//       ],
+//     );
+//   }
+// }

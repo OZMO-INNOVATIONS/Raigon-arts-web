@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/automation.dart';
 import '../models/channel.dart';
@@ -467,5 +468,69 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
     conversation.msgs.add(message);
     notifyListeners();
+  }
+
+  Future<void> connectChannel(BuildContext context, Channel channel) async {
+    try {
+      if (channel.isIg) {
+        // First check whether Instagram is already connected.
+        final username = await refreshInstagramConnection();
+
+        if (!context.mounted) return;
+
+        if (username != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Connected to @$username')));
+          return;
+        }
+
+        // Start Instagram Login through the new Supabase Edge Function.
+        final oauthUri = Uri.parse(
+          'https://nhqewkbztfmlophtzqmk.supabase.co/'
+          'functions/v1/instagram-oauth?action=start',
+        );
+
+        final launched = await launchUrl(
+          oauthUri,
+          mode: LaunchMode.externalApplication,
+        );
+
+        if (!context.mounted) return;
+
+        if (!launched) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open Instagram login.')),
+          );
+        }
+
+        return;
+      }
+
+      // Keep the existing WhatsApp flow unchanged.
+      final account = await refreshWhatsAppConnection();
+
+      if (!context.mounted) return;
+
+      if (account != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('WhatsApp connected: $account')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'WhatsApp account details were not returned. '
+              'Check your whatsapp_inbox Edge Function.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not connect channel: $e')));
+    }
   }
 }

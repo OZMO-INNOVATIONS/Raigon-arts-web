@@ -379,8 +379,6 @@ class InboxPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-
     return SizedBox(
       width: double.infinity,
       child: Column(

@@ -11,7 +11,7 @@ class ApiClient {
 
   final http.Client _http;
   bool _isRefreshing = false;
-  static const Duration defaultTimeout = Duration(seconds: 25);
+  static const Duration defaultTimeout = Duration(seconds: 50);
   static void Function()? onSessionExpired;
 
   Uri _buildUri(String path, [Map<String, dynamic>? queryParameters]) {
@@ -112,34 +112,49 @@ class ApiClient {
     );
   }
 
-  Future<T> _executeWithNetworkHandling<T>(Future<T> Function() action) async {
-    try {
-      return await action();
-    } on ApiException {
-      rethrow;
-    } on http.ClientException catch (e) {
-      debugPrint('[ApiClient] ClientException: ${e.message}');
-      throw ApiException(
-        message: 'Cannot reach server. Please ensure the backend is running at ${ApiConstants.baseUrl}.',
-        statusCode: 0,
-      );
-    } on TimeoutException {
-      debugPrint('[ApiClient] TimeoutException');
-      throw const ApiException(
-        message: 'The request timed out. Please check your internet connection.',
-        statusCode: 408,
-      );
-    } catch (e) {
-      debugPrint('[ApiClient] Unexpected error: $e');
-      if (e is ApiException) rethrow;
-      final str = e.toString();
-      final cleanMsg = str.contains('SocketException') || str.contains('Failed host lookup')
-          ? 'Unable to connect to server. Please check your internet connection.'
-          : 'Network request error: $e';
-      throw ApiException(
-        message: cleanMsg,
-        statusCode: 0,
-      );
+  Future<T> _executeWithNetworkHandling<T>(
+    Future<T> Function() action, {
+    int maxRetries = 2,
+  }) async {
+    int attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        return await action();
+      } on ApiException {
+        rethrow;
+      } on TimeoutException catch (e) {
+        debugPrint('[ApiClient] Timeout on attempt $attempt/$maxRetries: $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+          continue;
+        }
+        throw const ApiException(
+          message: 'The server took too long to respond. Cloud instance may be spinning up—please retry.',
+          statusCode: 408,
+        );
+      } on http.ClientException catch (e) {
+        debugPrint('[ApiClient] ClientException on attempt $attempt/$maxRetries: ${e.message}');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+          continue;
+        }
+        throw ApiException(
+          message: 'Cannot reach server. Please ensure the backend is running at ${ApiConstants.baseUrl}.',
+          statusCode: 0,
+        );
+      } catch (e) {
+        debugPrint('[ApiClient] Unexpected error: $e');
+        if (e is ApiException) rethrow;
+        final str = e.toString();
+        final cleanMsg = str.contains('SocketException') || str.contains('Failed host lookup')
+            ? 'Unable to connect to server. Please check your internet connection.'
+            : 'Network request error: $e';
+        throw ApiException(
+          message: cleanMsg,
+          statusCode: 0,
+        );
+      }
     }
   }
 

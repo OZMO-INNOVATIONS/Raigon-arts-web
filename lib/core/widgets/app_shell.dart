@@ -6,6 +6,7 @@ import 'package:raigon_art/features/authentication/providers/auth_provider.dart'
 import 'package:raigon_art/app/app_router.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_sidebar.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/app_top_bar.dart';
@@ -72,6 +73,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _logout() async {
+    final confirmed = await showLogoutConfirmationDialog(context);
+    if (!confirmed || !mounted) return;
+
     try {
       await context.read<AuthProvider>().signOut();
 

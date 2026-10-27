@@ -12,10 +12,12 @@ import 'package:raigon_art/features/customers/presentation/widgets/add_customer_
 import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customers_table.dart';
+import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -67,7 +69,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     140, // Payment
     170, // Status
     140, // Delivery
-    130, // Actions
+    160, // Actions
   ];
 
   static final double _minTableWidth =
@@ -91,6 +93,39 @@ class _OrdersScreenState extends State<OrdersScreen> {
   ];
 
   Status _statusOf(Customer c) => _statusOverride[c.id] ?? c.status;
+
+  Future<void> _delete(Customer customer) async {
+    final ok = await showDeleteOrderConfirmationDialog(context, customer);
+    if (!ok || !mounted) return;
+    try {
+      await context.read<CustomerAndOrderProvider>().remove(customer.id);
+      if (mounted) {
+        AppSnackBar.success(context, 'Order ${customer.id} deleted successfully.');
+      }
+    } catch (error) {
+      if (mounted) {
+        final msg = error is ApiException
+            ? error.userFriendlyMessage
+            : 'Could not delete order. Try again.';
+        AppSnackBar.error(context, msg);
+      }
+    }
+  }
+
+  Future<void> _sendWhatsApp(Customer customer) async {
+    try {
+      final opened = await CustomerWhatsAppService.openOrderConfirmation(customer);
+      if (!mounted) return;
+      if (opened) {
+        AppSnackBar.success(context, 'WhatsApp opened with order confirmation.');
+      } else {
+        AppSnackBar.error(context, 'Could not open WhatsApp. Please try again.');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Could not open WhatsApp. Check customer phone number.');
+    }
+  }
 
   static const _months = [
     'Jan',
@@ -496,10 +531,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                       context,
                                       rows[i],
                                     ),
+                                    onWhatsApp: () => _sendWhatsApp(rows[i]),
                                     onEdit: () => showEditCustomerDialog(
                                       context,
                                       rows[i],
                                     ),
+                                    onDelete: () => _delete(rows[i]),
                                   ),
                             ],
                           ),
@@ -562,7 +599,9 @@ class _OrderRow extends StatefulWidget {
     required this.deliveryLabel,
     required this.onStatus,
     required this.onView,
+    required this.onWhatsApp,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final AppPalette p;
@@ -578,7 +617,9 @@ class _OrderRow extends StatefulWidget {
   final String deliveryLabel;
   final ValueChanged<Status> onStatus;
   final VoidCallback onView;
+  final VoidCallback onWhatsApp;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   State<_OrderRow> createState() => _OrderRowState();
@@ -785,13 +826,19 @@ class _OrderRowState extends State<_OrderRow> {
           color: green,
           fill: green.withValues(alpha: p.isDark ? 0.22 : 0.18),
           size: 18,
-          onTap: () {},
+          onTap: widget.onWhatsApp,
         ),
         const SizedBox(width: 6),
         _iconBtn(
           icon: RemixIcons.edit_line,
           color: p.textPrimary,
           onTap: widget.onEdit,
+        ),
+        const SizedBox(width: 6),
+        _iconBtn(
+          icon: RemixIcons.delete_bin_line,
+          color: const Color(0xFFE05C58),
+          onTap: widget.onDelete,
         ),
       ],
     );

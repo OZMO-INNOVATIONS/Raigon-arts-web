@@ -38,15 +38,12 @@ class _CustomersTableState extends State<CustomersTable> {
     'CUSTOMER ID',
     'CUSTOMER NAME',
     'PHONE NO',
-    'SELECTED PHOTOS',
-    'FRAME SIZE',
-    'FRAME TYPE',
-    'QTY',
+    'CITY',
     'ORDER STATUS',
     'ORDER DATE',
     'ACTIONS',
   ];
-  static const _w = <double>[120, 230, 150, 220, 150, 160, 70, 170, 150];
+  static const _w = <double>[140, 260, 170, 170, 180, 160];
 
   static const double _actionsMin = 200;
   static const double _hPad = 28;
@@ -203,99 +200,65 @@ class _CustomersTableState extends State<CustomersTable> {
         padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 16),
         child: _cells(
           [
-            Text(c.id, style: bold),
+            InkWell(
+              onTap: () => widget.onView?.call(c),
+              child: Text(c.id, style: bold),
+            ),
 
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: p.avatarBg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.gold,
+            InkWell(
+              onTap: () => widget.onView?.call(c),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: p.avatarBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gold,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
 
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        c.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: p.textPrimary,
-                        ),
+                  Expanded(
+                    child: Text(
+                      c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: p.textPrimary,
                       ),
-
-                      if (c.city.trim().isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          c.city,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, color: p.textMuted),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             Text(c.phone, style: cell),
 
-            PhotoStrip(
-              customer: c,
-              count: c.photoCount,
-              urls: c.photoUrls.isNotEmpty
-                  ? c.photoUrls
-                  : [
-                      for (final f in c.frames)
-                        if (f.photoUrl != null && f.photoUrl!.isNotEmpty)
-                          f.photoUrl!,
-                    ],
-              bytes: c.photoBytes,
-              seed: index,
-              onTap: () => widget.onView?.call(c),
-            ),
             Text(
-              c.frameSize.isNotEmpty
-                  ? c.frameSize
-                  : (c.effectiveFrames.isNotEmpty ? c.effectiveFrames.first.size : '-'),
+              c.city.trim().isNotEmpty ? c.city : '—',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cell,
             ),
-            Text(
-              c.frameType.isNotEmpty
-                  ? c.frameType
-                  : (c.effectiveFrames.isNotEmpty ? c.effectiveFrames.first.frameType : '-'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cell,
-            ),
-            Text('${c.qty}', style: bold),
+
             Align(
               alignment: Alignment.centerLeft,
               child: StatusPill(status: c.status),
             ),
+
             Text(c.orderDateLabel, style: cell),
           ],
           Row(

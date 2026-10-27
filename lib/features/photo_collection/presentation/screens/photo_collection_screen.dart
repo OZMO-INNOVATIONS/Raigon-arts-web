@@ -8,10 +8,10 @@ import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:remixicon/remixicon.dart';
-
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 
@@ -342,7 +342,9 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
         _hasFolder = false;
         _error = msg;
       });
-      if (msg.isNotEmpty && !msg.toLowerCase().contains('abort') && !msg.toLowerCase().contains('cancel')) {
+      if (msg.isNotEmpty &&
+          !msg.toLowerCase().contains('abort') &&
+          !msg.toLowerCase().contains('cancel')) {
         AppSnackBar.error(context, msg);
       }
     }
@@ -460,7 +462,9 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
         _loading = false;
         _error = msg;
       });
-      if (msg.isNotEmpty && !msg.toLowerCase().contains('abort') && !msg.toLowerCase().contains('cancel')) {
+      if (msg.isNotEmpty &&
+          !msg.toLowerCase().contains('abort') &&
+          !msg.toLowerCase().contains('cancel')) {
         AppSnackBar.error(context, msg);
       }
     }
@@ -541,6 +545,19 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
     final items = _selectedItems;
 
     if (items.isEmpty) return;
+
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Delete Photos',
+      message:
+          'Delete ${items.length} selected photo${items.length == 1 ? '' : 's'}?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      icon: RemixIcons.delete_bin_line,
+    );
+
+    if (!confirmed || !mounted) return;
+
     try {
       final fileNames = items.map((photo) => photo.fileName).toList();
 
@@ -1015,7 +1032,11 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
                 isDense: true,
                 hintText: 'Search by photo name...',
                 hintStyle: TextStyle(fontSize: 14.5, color: p.textMuted),
-                prefixIcon: Icon(RemixIcons.search_line, size: 22, color: p.textMuted),
+                prefixIcon: Icon(
+                  RemixIcons.search_line,
+                  size: 22,
+                  color: p.textMuted,
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1231,11 +1252,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
                 Row(
                   children: [
-                    Icon(
-                      RemixIcons.file_line,
-                      size: 14,
-                      color: p.textMuted,
-                    ),
+                    Icon(RemixIcons.file_line, size: 14, color: p.textMuted),
                     const SizedBox(width: 7),
                     Text(
                       photo.sizeLabel,
@@ -1406,7 +1423,11 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
               onPressed: () {
                 _preview(photo);
               },
-              icon: Icon(RemixIcons.fullscreen_line, size: 24, color: p.textPrimary),
+              icon: Icon(
+                RemixIcons.fullscreen_line,
+                size: 24,
+                color: p.textPrimary,
+              ),
             ),
           ),
         ],

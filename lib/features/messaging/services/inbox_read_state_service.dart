@@ -1,9 +1,8 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InboxReadStateService {
   InboxReadStateService({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
 
@@ -44,15 +43,12 @@ class InboxReadStateService {
       throw Exception('Please sign in to save inbox read states.');
     }
 
-    await _client.from('inbox_read_states').upsert(
-      {
-        'user_id': user.id,
-        'channel': channel,
-        'conversation_key': conversationKey,
-        'last_read_at': lastReadAt.toUtc().toIso8601String(),
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      },
-      onConflict: 'user_id,channel,conversation_key',
-    );
+    await _client.from('inbox_read_states').upsert({
+      'user_id': user.id,
+      'channel': channel,
+      'conversation_key': conversationKey,
+      'last_read_at': lastReadAt.toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id,channel,conversation_key');
   }
 }

@@ -72,12 +72,8 @@ class InstagramInboxService {
       throw Exception('Please sign in to access the Instagram Inbox.');
     }
 
-    final uri = Uri.parse(endpoint).replace(
-      queryParameters: const {
-        'instagram_user_id': '17841415634351143',
-        'limit': '200',
-      },
-    );
+    final uri = Uri.parse(endpoint)
+        .replace(queryParameters: const {'limit': '200'});
 
     final response = await http
         .get(

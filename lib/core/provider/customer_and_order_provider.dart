@@ -27,6 +27,43 @@ class CustomerAndOrderProvider extends ChangeNotifier {
   bool _initialized = false;
   Object? _error;
 
+  static int _extractIdNum(String id) {
+    final matches = RegExp(r'(\d+)').allMatches(id);
+    if (matches.isNotEmpty) {
+      return int.tryParse(matches.last.group(1) ?? '0') ?? 0;
+    }
+    return 0;
+  }
+
+  /// Sorts customers with latest records on top:
+  /// 1) Newest `createdAt` timestamp
+  /// 2) Newest `orderDate`
+  /// 3) Highest numeric order ID (e.g. RA-1005 > RA-1004)
+  static int compareLatestFirst(Customer a, Customer b) {
+    if (a.createdAt != null && b.createdAt != null) {
+      final cmp = b.createdAt!.compareTo(a.createdAt!);
+      if (cmp != 0) return cmp;
+    } else if (a.createdAt != null) {
+      return -1;
+    } else if (b.createdAt != null) {
+      return 1;
+    }
+
+    final orderCmp = b.orderDate.compareTo(a.orderDate);
+    if (orderCmp != 0) return orderCmp;
+
+    final numA = _extractIdNum(a.id);
+    final numB = _extractIdNum(b.id);
+    if (numA != numB) {
+      return numB.compareTo(numA);
+    }
+    return b.id.compareTo(a.id);
+  }
+
+  void _sortCustomers() {
+    _customers.sort(compareLatestFirst);
+  }
+
   List<Customer> get customers => List.unmodifiable(_customers);
   bool get isLoading => _isLoading;
   bool get initialized => _initialized;
@@ -55,6 +92,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         sortOrder: 'desc',
         limit: 1000,
       );
+      _sortCustomers();
       _initialized = true;
 
       debugPrint('[CustomerProvider] Loaded ${_customers.length} customers.');
@@ -80,6 +118,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         sortOrder: 'desc',
         limit: 1000,
       );
+      _sortCustomers();
       _initialized = true;
       _notifyOrderChange();
     } catch (error) {
@@ -156,6 +195,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = [
         for (final c in _customers) c.id == customer.id ? safeCreated : c,
       ];
+      _sortCustomers();
       notifyListeners();
       _notifyOrderChange();
     } catch (error) {
@@ -178,6 +218,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       for (final existing in _customers)
         existing.id == customer.id ? customer : existing,
     ];
+    _sortCustomers();
 
     _error = null;
     notifyListeners();
@@ -188,6 +229,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = [
         for (final c in _customers) c.id == customer.id ? safeUpdated : c,
       ];
+      _sortCustomers();
       notifyListeners();
       _notifyOrderChange();
     } catch (error) {
@@ -329,14 +371,6 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     }).length;
   }
 
-  static int _extractIdNum(String id) {
-    final match = RegExp(r'(\d+)').allMatches(id);
-    if (match.isNotEmpty) {
-      return int.tryParse(match.last.group(1) ?? '0') ?? 0;
-    }
-    return 0;
-  }
-
   List<Customer> get filteredOrders {
     final query = _orderQuery.trim().toLowerCase();
 
@@ -351,19 +385,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
           customer.name.toLowerCase().contains(query);
     }).toList();
 
-    result.sort((a, b) {
-      if (a.createdAt != null && b.createdAt != null) {
-        final cmp = b.createdAt!.compareTo(a.createdAt!);
-        if (cmp != 0) return cmp;
-      } else if (b.createdAt != null) {
-        return 1;
-      } else if (a.createdAt != null) {
-        return -1;
-      }
-      final orderCmp = b.orderDate.compareTo(a.orderDate);
-      if (orderCmp != 0) return orderCmp;
-      return _extractIdNum(b.id).compareTo(_extractIdNum(a.id));
-    });
+    result.sort(compareLatestFirst);
 
     return result;
   }

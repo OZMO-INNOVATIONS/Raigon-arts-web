@@ -159,6 +159,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: _toolbar(p, wide),
                       ),
 
+                      if (customerProvider.isLoading && customerProvider.initialized)
+                        const LinearProgressIndicator(
+                          color: AppColors.gold,
+                          backgroundColor: Colors.transparent,
+                          minHeight: 3,
+                        ),
+
                       if (customerProvider.isLoading && !customerProvider.initialized)
                         const Expanded(
                           child: Center(

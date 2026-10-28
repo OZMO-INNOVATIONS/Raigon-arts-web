@@ -517,7 +517,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     final p = AppPalette.of(context);
     final sortedCustomers = [...customers]
-      ..sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      ..sort(CustomerAndOrderProvider.compareLatestFirst);
 
     const pageSize = 8;
     final recent = sortedCustomers.take(pageSize).toList();

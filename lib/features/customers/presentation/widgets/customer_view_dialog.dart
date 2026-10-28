@@ -412,11 +412,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                   );
                 },
               ),
-              for (var i = 0; i < frames.length; i++) ...[
-                const SizedBox(height: 40),
-                _specCard(c, frames, i),
-              ],
-              const SizedBox(height: 40),
+              const SizedBox(height: 28),
+              _framesSection(c, frames, photos),
+              const SizedBox(height: 36),
               _vault(c, photos),
               SizedBox(height: p.isDark ? 4 : 4),
             ],
@@ -781,299 +779,368 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
-  Widget _specCard(FormColors c, List<FrameSpec> frames, int index) {
+  Widget _framesSection(
+    FormColors c,
+    List<FrameSpec> frames,
+    List<_VaultPhoto> photos,
+  ) {
+    return LayoutBuilder(
+      builder: (context, cons) {
+        final isMulti = frames.length > 1;
+        final isWide = cons.maxWidth >= 640 && isMulti;
+        const gap = 20.0;
+        final cardWidth = isWide ? (cons.maxWidth - gap) / 2 : cons.maxWidth;
+
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (var i = 0; i < frames.length; i++)
+              SizedBox(
+                width: cardWidth,
+                child: _individualFrameCard(c, frames, i, photos),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _individualFrameCard(
+    FormColors c,
+    List<FrameSpec> frames,
+    int index,
+    List<_VaultPhoto> photos,
+  ) {
     final p = c.p;
     final f = frames[index];
     final single = frames.length == 1;
     final qty = single ? _c.qty : f.qty;
-    final title = single
-        ? 'FRAME WORKSHOP SPECIFICATIONS'
-        : 'PHOTO #${index + 1} FRAME SPECIFICATIONS';
-    final notes = f.notes.trim();
 
-    final specs = <(String, String)>[
-      ('FRAME SIZE', f.sizeLabel),
-      ('FRAME TYPE', f.frameType),
-      ('MATERIAL', f.material),
-      ('COLOR FINISH', f.finish),
-      ('ORIENTATION', _shortOrientation(f.orientation)),
-      ('QUANTITY', '$qty ${qty == 1 ? 'Frame' : 'Frames'}'),
-    ];
+    // Resolve associated artwork photo for this frame
+    _VaultPhoto? photo;
+    int photoIndex = index;
 
-    final tileBg = p.isDark ? const Color(0xFF2B2D4B) : p.surface;
-    final tileBorder = p.isDark ? const Color(0xFF45477A) : p.border;
+    if (f.photoBytes != null) {
+      photo = _VaultPhoto(
+        name: f.photoName ?? 'Artwork #${index + 1}',
+        sizeLabel:
+            '${(f.photoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB',
+        image: MemoryImage(f.photoBytes!),
+      );
+    } else if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
+      final resolvedUrl = ImageUrlHelper.resolve(f.photoUrl!);
+      final matchedIndex = photos.indexWhere((item) => item.url == resolvedUrl);
+      if (matchedIndex != -1) {
+        photo = photos[matchedIndex];
+        photoIndex = matchedIndex;
+      } else {
+        photo = _VaultPhoto(
+          name: f.photoName ??
+              (index < photos.length ? photos[index].name : 'Artwork #${index + 1}'),
+          sizeLabel: index < photos.length ? photos[index].sizeLabel : 'Artwork',
+          image: NetworkImage(resolvedUrl),
+          url: resolvedUrl,
+        );
+      }
+    } else if (index < photos.length) {
+      photo = photos[index];
+      photoIndex = index;
+    }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: p.isDark ? const Color(0xFF383A66) : const Color(0xFFFCFAF4),
-          border: Border.all(
-            color: p.isDark ? const Color(0xFF4B4D7E) : p.border,
-          ),
-          borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+          width: 1.2,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(width: 4, color: AppColors.gold),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _cardTitle(p, RemixIcons.ruler_line, title),
-                    const SizedBox(height: 16),
-                    LayoutBuilder(
-                      builder: (context, cons) {
-                        const gap = 16.0;
-                        final cols = cons.maxWidth >= 600
-                            ? 4
-                            : (cons.maxWidth >= 380 ? 2 : 1);
-                        final w = (cons.maxWidth - gap * (cols - 1)) / cols;
-                        return Wrap(
-                          spacing: gap,
-                          runSpacing: 14,
-                          children: [
-                            for (final s in specs)
-                              SizedBox(
-                                width: w,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 15,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: tileBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: tileBorder),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        s.$1,
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 1.0,
-                                          color: p.textMuted,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 7),
-                                      Text(
-                                        _orDash(s.$2),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: p.textPrimary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDEFE0),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: p.isDark
-                              ? Colors.transparent
-                              : const Color(0xFFF7DFC4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (photo != null) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                InkWell(
+                  onTap: () => _showPhotoViewerDialog(
+                    context,
+                    photo!,
+                    customer: _c,
+                    initialIndex: photoIndex,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.gold, width: 1.5),
+                        ),
+                        child: Image(
+                          image: photo.image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(
+                            RemixIcons.image_line,
+                            color: p.textMuted,
+                            size: 24,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 1),
-                            child: Icon(
-                              RemixIcons.file_text_line,
-                              size: 20,
-                              color: Color(0xFFD27D2D),
-                            ),
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          child: const Icon(
+                            RemixIcons.zoom_in_line,
+                            size: 11,
+                            color: AppColors.gold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        photo.name,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: p.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.isDark
+                                  ? const Color(0xFF3D4068)
+                                  : const Color(0xFFF0ECE1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: p.isDark
+                                    ? const Color(0xFF555888)
+                                    : const Color(0xFFE2DDD1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
-                                  'Special Instructions & Notes:',
-                                  style: TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFC9722A),
-                                  ),
+                                Icon(
+                                  RemixIcons.image_line,
+                                  size: 13,
+                                  color: p.textPrimary,
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(width: 4),
                                 Text(
-                                  notes.isEmpty
-                                      ? 'No special instructions provided.'
-                                      : notes,
-                                  style: const TextStyle(
-                                    fontSize: 15.5,
-                                    color: Color(0xFFC9722A),
+                                  'Photo #${photoIndex + 1}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.textPrimary,
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            photo.sizeLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: p.textMuted,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    if (f.photoUrl != null && f.photoUrl!.isNotEmpty || f.photoBytes != null) ...[
-                      const SizedBox(height: 16),
-                      Builder(
-                        builder: (ctx) {
-                          final photoUrl = (f.photoUrl != null && f.photoUrl!.isNotEmpty)
-                              ? ImageUrlHelper.resolve(f.photoUrl!)
-                              : null;
-                          final photoName = f.photoName ?? 'Artwork #${index + 1}';
-                          final photo = _VaultPhoto(
-                            name: photoName,
-                            sizeLabel: 'Frame Artwork Spec',
-                            image: f.photoBytes != null
-                                ? MemoryImage(f.photoBytes!)
-                                : NetworkImage(photoUrl!) as ImageProvider,
-                            url: photoUrl,
-                          );
-
-                          return Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: p.isDark ? const Color(0xFF2A2C46) : const Color(0xFFF7F5EE),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.gold.withValues(alpha: 0.5),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                InkWell(
-                                  onTap: () => _showPhotoViewerDialog(
-                                    ctx,
-                                    photo,
-                                    customer: widget.customer,
-                                    initialIndex: index,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Stack(
-                                    children: [
-                                      Container(
-                                        width: 58,
-                                        height: 58,
-                                        clipBehavior: Clip.antiAlias,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppColors.gold, width: 1.5),
-                                        ),
-                                        child: f.photoBytes != null
-                                            ? Image.memory(f.photoBytes!, fit: BoxFit.cover)
-                                            : Image.network(
-                                                photoUrl!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, _, _) => Icon(
-                                                  RemixIcons.image_line,
-                                                  color: p.textMuted,
-                                                  size: 24,
-                                                ),
-                                              ),
-                                      ),
-                                      Positioned(
-                                        right: 2,
-                                        bottom: 2,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.6),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: const Icon(RemixIcons.zoom_in_line, size: 12, color: AppColors.gold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(RemixIcons.image_fill, size: 15, color: AppColors.gold),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              photoName,
-                                              style: TextStyle(
-                                                fontSize: 14.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: p.textPrimary,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        photoUrl != null ? 'Asset URL: $photoUrl' : 'Attached In-Memory Image',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: p.textMuted,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                OutlinedButton.icon(
-                                  onPressed: () => _showPhotoViewerDialog(
-                                    ctx,
-                                    photo,
-                                    customer: _c,
-                                    initialIndex: index,
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.gold,
-                                    side: const BorderSide(color: AppColors.gold),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                  icon: const Icon(RemixIcons.zoom_in_line, size: 16),
-                                  label: const Text('View Full Image', style: TextStyle(fontSize: 12.5)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
                     ],
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 10),
+                InkWell(
+                  onTap: () => _showPhotoViewerDialog(
+                    context,
+                    photo!,
+                    customer: _c,
+                    initialIndex: photoIndex,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.darkGradient,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(RemixIcons.search_line, size: 14, color: Colors.white),
+                        SizedBox(width: 6),
+                        Text(
+                          'View',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              height: 1,
+              color: p.isDark
+                  ? const Color(0xFF45477A)
+                  : p.border.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 16),
+          ],
+          _specRow(
+            icon: RemixIcons.ruler_line,
+            label: 'Frame Size:',
+            value: f.sizeLabel,
+            p: p,
+          ),
+          const SizedBox(height: 14),
+          _specRow(
+            icon: RemixIcons.shopping_bag_3_line,
+            label: 'Frame Type & Material:',
+            value: '${f.frameType} • ${f.material}',
+            p: p,
+          ),
+          const SizedBox(height: 14),
+          _specRow(
+            icon: RemixIcons.palette_line,
+            label: 'Color & Finish:',
+            value: f.finish,
+            p: p,
+          ),
+          const SizedBox(height: 14),
+          _specRow(
+            icon: RemixIcons.compass_3_line,
+            label: 'Orientation & Qty:',
+            value: '${_shortOrientation(f.orientation)} • $qty Frame(s)',
+            p: p,
+          ),
+          if (f.notes.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDEFE0),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: p.isDark ? Colors.transparent : const Color(0xFFF7DFC4),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(
+                      RemixIcons.file_text_line,
+                      size: 15,
+                      color: Color(0xFFD27D2D),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      f.notes.trim(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFC9722A),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _specRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required AppPalette p,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: p.textPrimary),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            color: p.textPrimary,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: p.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -143,52 +143,102 @@ Thank you for choosing Raigon Arts! ❤️
       digits = digits.substring(1);
     }
 
-    // Normalize Indian mobile numbers to country code +91.
+    // Normalize 10-digit Indian mobile numbers to country code 91.
     if (digits.length == 10) {
       digits = '91$digits';
-    } else if (digits.length == 12 && digits.startsWith('91')) {
-      // Already has the Indian country code.
     }
 
     return digits;
   }
 
+  static String buildPaymentReminderMessage(Customer customer) {
+    final balance = customer.total - customer.advance;
+
+    return '''
+📦 *RAIGON ARTS WORKSHOP* - Payment Due Reminder
+----------------------------------------
+Dear *${customer.name}*,
+
+Friendly reminder regarding your framing order with Raigon Arts:
+
+🧾 *Order ID:* ${customer.id}
+📅 *Order Date:* ${_formatDate(customer.orderDate)}
+🚚 *Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+
+🖼️ *Frame Details:*
+${_frameDetails(customer)}
+
+🔢 *Total Quantity:* ${customer.qty} Frame(s)
+
+💰 *TOTAL AMOUNT:* ${_money(customer.total)}
+💵 *Advance Paid:* ${_money(customer.advance)}
+💳 *BALANCE DUE:* ${_money(balance)}
+📌 *Payment Status:* ${_paymentStatus(customer)}
+----------------------------------------
+📍 *Workshop Address:* $kWorkshopAddress
+📞 *Contact / GPay / UPI:* +91 $kWorkshopPhone
+
+Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
+'''
+        .trim();
+  }
+
   static Future<bool> openOrderConfirmation(Customer customer) async {
     final phone = _whatsAppNumber(customer.phone);
-
-    if (phone.length != 12 || !phone.startsWith('91')) {
-      throw ArgumentError('Customer must have a valid Indian mobile number.');
-    }
+    if (phone.isEmpty) return false;
 
     final message = buildMessage(customer);
+    return openDirectChat(phone, message);
+  }
 
-    final uri = Uri.https('wa.me', '/$phone', {'text': message});
+  static Future<bool> openPaymentReminder(Customer customer) async {
+    final phone = _whatsAppNumber(customer.phone);
+    if (phone.isEmpty) return false;
 
-    try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-      if (!opened) {
-        debugPrint('Could not open WhatsApp: $uri');
-      }
-
-      return opened;
-    } catch (error, stackTrace) {
-      debugPrint('WhatsApp launch failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
+    final message = buildPaymentReminderMessage(customer);
+    return openDirectChat(phone, message);
   }
 
   static Future<bool> openDirectChat(String phone, [String? text]) async {
     final cleanPhone = _whatsAppNumber(phone);
     if (cleanPhone.isEmpty) return false;
+
     final queryParams = text != null && text.isNotEmpty ? {'text': text} : <String, String>{};
     final uri = Uri.https('wa.me', '/$cleanPhone', queryParams);
+
     try {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!launched) {
+        final fallbackUri = Uri.parse(
+          'https://api.whatsapp.com/send?phone=$cleanPhone'
+          '${text != null && text.isNotEmpty ? '&text=${Uri.encodeComponent(text)}' : ''}',
+        );
+        return await launchUrl(
+          fallbackUri,
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+      }
+      return launched;
     } catch (e) {
-      debugPrint('[CustomerWhatsAppService] openDirectChat failed: $e');
-      return false;
+      debugPrint('[CustomerWhatsAppService] openDirectChat failed, trying fallback: $e');
+      try {
+        final fallbackUri = Uri.parse(
+          'https://api.whatsapp.com/send?phone=$cleanPhone'
+          '${text != null && text.isNotEmpty ? '&text=${Uri.encodeComponent(text)}' : ''}',
+        );
+        return await launchUrl(
+          fallbackUri,
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+      } catch (_) {
+        return false;
+      }
     }
   }
 

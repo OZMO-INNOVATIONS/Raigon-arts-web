@@ -14,6 +14,7 @@ import 'package:raigon_art/core/widgets/notification_model.dart';
 import 'package:raigon_art/core/widgets/notification_panel.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
 import 'package:raigon_art/features/customers/presentation/screens/customers_screen.dart';
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
@@ -177,6 +178,14 @@ class _AppShellState extends State<AppShell> {
                   },
                   onViewDetails: () => _goTo(NavDestination.orders),
                   onViewAll: () => _goTo(NavDestination.orders),
+                  onSelectNotification: (item) {
+                    setState(() => _showNotifications = false);
+                    if (item.customer != null) {
+                      showViewCustomerDialog(context, item.customer!);
+                    } else {
+                      _goTo(NavDestination.orders);
+                    }
+                  },
                 ),
               ),
             ],

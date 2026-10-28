@@ -59,27 +59,65 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
 
     AppSnackBar.success(context, 'Customer & frame order saved successfully.');
 
-    // Open the same WhatsApp order confirmation template.
+    // Automatically open WhatsApp order confirmation receipt.
     try {
-      final opened = await CustomerWhatsAppService.openOrderConfirmation(
-        result,
-      );
+      final opened = await CustomerWhatsAppService.openOrderConfirmation(result);
 
       if (!opened && context.mounted) {
-        AppSnackBar.error(
-          context,
-          'Customer saved, but WhatsApp could not be opened.',
+        showDialog(
+          context: context,
+          builder: (ctx) {
+            final p = AppPalette.of(ctx);
+            return AlertDialog(
+              backgroundColor: p.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: p.border),
+              ),
+              title: Row(
+                children: [
+                  const Icon(RemixIcons.whatsapp_fill, color: AppColors.green, size: 24),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Open WhatsApp Receipt',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                'Customer ${result.name} is saved. Tap below to send the order confirmation receipt on WhatsApp.',
+                style: TextStyle(fontSize: 14, color: p.textPrimary),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('Close', style: TextStyle(color: p.textMuted)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    CustomerWhatsAppService.openOrderConfirmation(result);
+                  },
+                  icon: const Icon(RemixIcons.whatsapp_fill, size: 16),
+                  label: const Text('Open WhatsApp', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            );
+          },
         );
       }
     } catch (error) {
       debugPrint('WhatsApp confirmation failed: $error');
-
-      if (context.mounted) {
-        AppSnackBar.error(
-          context,
-          'Customer saved, but WhatsApp could not be opened.',
-        );
-      }
     }
   } catch (error) {
     debugPrint('Customer save failed: $error');

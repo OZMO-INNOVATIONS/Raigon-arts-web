@@ -13,6 +13,7 @@ import 'package:raigon_art/core/widgets/app_dropdown.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/core/models/status.dart';
+import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 import 'package:raigon_art/features/reports/services/reports_service.dart';
 
 enum ReportPeriod { month1, month2, allTime }
@@ -546,6 +547,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final customerProvider = context.watch<CustomerAndOrderProvider>();
+
+    if (customerProvider.isLoading && !customerProvider.initialized) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.gold),
+            const SizedBox(height: 16),
+            Text(
+              'Generating reports...',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final report = ReportData(
       customers: customerProvider.customers,
       period: _period,
@@ -1452,7 +1474,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
               : _GradientButton(
                   icon: RemixIcons.whatsapp_fill,
                   label: 'Remind',
-                  onTap: () {},
+                  onTap: () async {
+                    final opened =
+                        await CustomerWhatsAppService.openPaymentReminder(c);
+                    if (!opened && mounted) {
+                      AppSnackBar.error(
+                        context,
+                        'Could not open WhatsApp for ${c.name}.',
+                      );
+                    }
+                  },
                   fontSize: 14.5,
                   vPad: 10,
                   radius: 8,

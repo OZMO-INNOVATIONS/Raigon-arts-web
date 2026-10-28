@@ -5,8 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 
-const String _kFallbackSupabaseUrl =
-    'https://nhqewkbztfmlophtzqmk.supabase.co';
+const String _kFallbackSupabaseUrl = 'https://nhqewkbztfmlophtzqmk.supabase.co';
 const String _kFallbackSupabaseKey =
     'sb_publishable_K1zyH5jkmCBZ-wHVCXd32g_7JTzuYvl';
 
@@ -25,20 +24,17 @@ Future<void> main() async {
   final supabaseUrl = envUrl.isNotEmpty
       ? envUrl
       : (dotenv.env['SUPABASE_URL']?.trim().isNotEmpty == true
-          ? dotenv.env['SUPABASE_URL']!.trim()
-          : _kFallbackSupabaseUrl);
+            ? dotenv.env['SUPABASE_URL']!.trim()
+            : _kFallbackSupabaseUrl);
 
   final supabaseKey = envKey.isNotEmpty
       ? envKey
       : (dotenv.env['SUPABASE_PUBLISHABLE_KEY']?.trim().isNotEmpty == true
-          ? dotenv.env['SUPABASE_PUBLISHABLE_KEY']!.trim()
-          : _kFallbackSupabaseKey);
+            ? dotenv.env['SUPABASE_PUBLISHABLE_KEY']!.trim()
+            : _kFallbackSupabaseKey);
 
   try {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      publishableKey: supabaseKey,
-    );
+    await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseKey);
   } catch (e) {
     debugPrint('[main] Supabase initialization error: $e');
   }
@@ -51,4 +47,3 @@ Future<void> main() async {
 
   runApp(const RaigonartApp());
 }
-

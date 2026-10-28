@@ -190,7 +190,29 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final customerProvider = context.watch<CustomerAndOrderProvider>();
-    final all = customerProvider.customers;
+
+    if (customerProvider.isLoading && !customerProvider.initialized) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.gold),
+            const SizedBox(height: 16),
+            Text(
+              'Loading orders...',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final all = List<Customer>.of(customerProvider.customers)
+      ..sort(CustomerAndOrderProvider.compareLatestFirst);
     final q = _query.trim().toLowerCase();
     final rows = all.where((c) {
       if (_filter != null && _statusOf(c) != _filter) {
@@ -228,6 +250,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (customerProvider.isLoading)
+                    const LinearProgressIndicator(
+                      color: AppColors.gold,
+                      backgroundColor: Colors.transparent,
+                      minHeight: 3,
+                    ),
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: _searchField(p),

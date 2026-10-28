@@ -13,12 +13,14 @@ class NotificationPanel extends StatefulWidget {
     required this.onClose,
     required this.onViewDetails,
     required this.onViewAll,
+    this.onSelectNotification,
     this.notifications = const [],
   });
 
   final VoidCallback onClose;
   final VoidCallback onViewDetails;
   final VoidCallback onViewAll;
+  final void Function(NotificationItem item)? onSelectNotification;
   final List<NotificationItem> notifications;
 
   @override
@@ -264,152 +266,241 @@ class _NotificationPanelState extends State<NotificationPanel> {
   Widget _itemCard(AppPalette p, NotificationItem n) {
     final isDue = n.type == NotificationType.due;
     final accent = isDue ? AppPalette.orange : AppColors.green;
+    final cardBorder = isDue
+        ? AppPalette.orange.withValues(alpha: p.isDark ? 0.35 : 0.45)
+        : AppColors.green.withValues(alpha: p.isDark ? 0.35 : 0.45);
+    final cardBg = isDue
+        ? (p.isDark ? const Color(0xFF332626) : const Color(0xFFFFF9F5))
+        : (p.isDark ? const Color(0xFF223328) : const Color(0xFFF6FCF7));
+
+    void handleView() {
+      if (widget.onSelectNotification != null) {
+        widget.onSelectNotification!(n);
+      } else {
+        widget.onViewDetails();
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDue ? p.notifDueBg : p.notifCompletedBg,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              isDue ? RemixIcons.error_warning_fill : RemixIcons.checkbox_circle_fill,
-              size: 22,
-              color: accent,
-            ),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: p.isDark ? 0.25 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: handleView,
+          borderRadius: BorderRadius.circular(16),
+          hoverColor: accent.withValues(alpha: 0.06),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        n.title,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: p.textPrimary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      n.tag,
-                      style: TextStyle(fontSize: 12, color: p.textMuted),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  n.message,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    height: 1.35,
-                    color: p.textPrimary,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: accent.withValues(alpha: 0.4)),
+                  ),
+                  child: Icon(
+                    isDue
+                        ? RemixIcons.error_warning_fill
+                        : RemixIcons.checkbox_circle_fill,
+                    size: 24,
+                    color: accent,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  n.meta,
-                  style: TextStyle(fontSize: 12.5, color: p.textMuted),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    InkWell(
-                      onTap: widget.onViewDetails,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: AppColors.darkGradient,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              RemixIcons.eye_line,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'View Details',
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              n.title,
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        if (n.phone.isNotEmpty) {
-                          CustomerWhatsAppService.openDirectChat(
-                            n.phone,
-                            'Hello! Regarding your Raigon Arts framing order: ${n.message}',
-                          );
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: p.softButtonFill,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              RemixIcons.whatsapp_fill,
-                              size: 15,
-                              color: AppColors.green,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'WhatsApp',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
                                 color: p.textPrimary,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Text(
+                              n.tag,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: accent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        n.message,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: p.textPrimary.withValues(alpha: 0.9),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            RemixIcons.time_line,
+                            size: 13,
+                            color: p.textMuted,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              n.meta,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: p.textMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          InkWell(
+                            onTap: handleView,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: AppColors.darkGradient,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    RemixIcons.eye_line,
+                                    size: 15,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'View Full Profile',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (n.phone.isNotEmpty)
+                            InkWell(
+                              onTap: () async {
+                                if (n.customer != null) {
+                                  if (isDue) {
+                                    await CustomerWhatsAppService.openPaymentReminder(n.customer!);
+                                  } else {
+                                    await CustomerWhatsAppService.openOrderConfirmation(n.customer!);
+                                  }
+                                } else {
+                                  CustomerWhatsAppService.openDirectChat(
+                                    n.phone,
+                                    'Hello! Regarding your Raigon Arts framing order: ${n.message}',
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.green.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.green.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      RemixIcons.whatsapp_fill,
+                                      size: 15,
+                                      color: AppColors.green,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isDue ? 'Remind' : 'WhatsApp',
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

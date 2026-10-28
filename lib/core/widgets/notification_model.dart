@@ -11,6 +11,8 @@ class NotificationItem {
     required this.meta,
     required this.tag,
     this.phone = '',
+    this.customer,
+    this.date,
   });
 
   final NotificationType type;
@@ -19,6 +21,8 @@ class NotificationItem {
   final String meta;
   final String tag;
   final String phone;
+  final Customer? customer;
+  final DateTime? date;
 }
 
 List<NotificationItem> buildNotificationsFromCustomers(
@@ -26,12 +30,16 @@ List<NotificationItem> buildNotificationsFromCustomers(
 ) {
   final list = <NotificationItem>[];
   for (final c in customers) {
+    final frameText = c.frameSize.isNotEmpty ? c.frameSize : 'Framing job';
+    final eventDate = c.updatedAt ?? c.createdAt ?? c.orderDate;
+
     if (c.status == Status.completed) {
-      final frameText = c.frameSize.isNotEmpty ? c.frameSize : 'Framing job';
       list.add(
         NotificationItem(
           type: NotificationType.completed,
-          title: 'Work Completed: ${c.id} 🖼️',
+          customer: c,
+          date: eventDate,
+          title: 'Ready for Delivery • ${c.id}',
           message:
               'Framing job for ${c.name} ($frameText) is completed & ready!',
           meta: 'Status: Completed • Phone: ${c.phone}',
@@ -44,15 +52,25 @@ List<NotificationItem> buildNotificationsFromCustomers(
       list.add(
         NotificationItem(
           type: NotificationType.due,
-          title: 'Payment Due: ${c.id} ⚠️',
+          customer: c,
+          date: eventDate,
+          title: 'Payment Due • ${c.id}',
           message:
               '${c.name} has a pending balance of ₹${c.balance} for the order.',
-          meta: 'Status: ${c.status.label} • Phone: ${c.phone}',
-          tag: 'Due',
+          meta: 'Balance: ₹${c.balance} • Phone: ${c.phone}',
+          tag: '₹${c.balance} Due',
           phone: c.phone,
         ),
       );
     }
   }
+
+  list.sort((a, b) {
+    if (a.date != null && b.date != null) {
+      return b.date!.compareTo(a.date!);
+    }
+    return 0;
+  });
+
   return list;
 }

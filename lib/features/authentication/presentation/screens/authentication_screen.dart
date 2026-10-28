@@ -23,8 +23,8 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _usernameCtrl = TextEditingController(text: AuthModel.adminEmail);
-  final _passwordCtrl = TextEditingController(text: 'securePassword123');
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(text: AuthModel.registeredPhone);
   final _otpCtrl = TextEditingController();
   final _newPassCtrl = TextEditingController();
@@ -323,19 +323,24 @@ class _AuthScreenState extends State<AuthScreen> {
           title: 'Welcome Back',
           subtitle: 'Please sign in to access your workshop dashboard.',
         ),
-        const SizedBox(height: 40),
-        const AuthFieldLabel('Mobile Number / Email'),
+        const SizedBox(height: 36),
+        const AuthFieldLabel('Email / Mobile Number'),
         AuthTextField(
           controller: _usernameCtrl,
-          prefixIcon: RemixIcons.user_3_line,
+          prefixIcon: RemixIcons.mail_line,
+          hint: 'Enter your email or mobile number',
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.username, AutofillHints.email],
           textInputAction: TextInputAction.next,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         const AuthFieldLabel('Password'),
         AuthTextField(
           controller: _passwordCtrl,
           prefixIcon: RemixIcons.lock_line,
+          hint: 'Enter your password',
           obscureText: _hidePassword,
+          autofillHints: const [AutofillHints.password],
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _signIn(),
           suffix: _eyeButton(
@@ -343,7 +348,7 @@ class _AuthScreenState extends State<AuthScreen> {
             () => setState(() => _hidePassword = !_hidePassword),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerRight,
           child: AuthTextLink(

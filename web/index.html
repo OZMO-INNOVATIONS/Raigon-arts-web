@@ -755,6 +755,22 @@
         }
       };
 
+    // ============================================================
+    // LOCAL OFFLINE DOWNLOAD HELPER
+    // ============================================================
+
+    window.downloadPhotoFile = function (url, fileName) {
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.error('[PHOTO_COLLECTION_JS] download error:', err);
+      }
+    };
 
     // ============================================================
     // DEBUG
@@ -791,14 +807,7 @@
 
   </script>
 </head>
-
 <body>
-
-  <script
-    src="flutter_bootstrap.js"
-    async>
-  </script>
-
+  <script src="flutter_bootstrap.js" async></script>
 </body>
-
 </html>

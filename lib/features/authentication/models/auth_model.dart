@@ -16,7 +16,9 @@ class AuthModel {
 
   static const String registeredPhone = '8137922114';
   static const String adminEmail = 'admin@gmail.com';
+  static const String adminDefaultPassword = 'admin123';
   static const String staffEmail = 'staff@gmail.com';
+  static const String staffDefaultPassword = 'staff123';
 
   final AuthStep step;
   final bool isLoading;

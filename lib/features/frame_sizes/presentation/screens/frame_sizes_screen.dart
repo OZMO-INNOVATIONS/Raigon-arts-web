@@ -45,7 +45,12 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       if (custProvider.customers.isNotEmpty) {
         context.read<FrameSizeProvider>().syncCountsWithCustomers(custProvider.customers);
       }
-      context.read<FrameSizeProvider>().refresh().catchError((_) {});
+      final frameProvider = context.read<FrameSizeProvider>();
+      if (!frameProvider.initialized && !frameProvider.isLoading) {
+        frameProvider.init();
+      } else {
+        frameProvider.refresh().catchError((_) {});
+      }
     });
   }
 
@@ -238,10 +243,71 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                       ],
                     ),
                   ),
+                  if (provider.isLoading && provider.initialized)
+                    const LinearProgressIndicator(
+                      color: AppColors.gold,
+                      backgroundColor: Colors.transparent,
+                      minHeight: 3,
+                    ),
 
-                  Expanded(
-                    child: SingleChildScrollView(child: _table(p, list, provider)),
-                  ),
+                  if (provider.isLoading && !provider.initialized)
+                    const Expanded(
+                      child: Center(
+                        child: CircularProgressIndicator(color: AppColors.gold),
+                      ),
+                    )
+                  else if (provider.error != null && provider.sizes.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(RemixIcons.cloud_off_line, size: 48, color: AppColors.error),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Failed to load frame sizes catalog',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                provider.error is ApiException
+                                    ? (provider.error as ApiException).userFriendlyMessage
+                                    : 'Please check your connection to the server.',
+                                style: TextStyle(fontSize: 14, color: p.textMuted),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  context.read<FrameSizeProvider>().refresh().then((_) {
+                                    if (context.mounted) {
+                                      AppSnackBar.success(context, 'Frame sizes loaded.');
+                                    }
+                                  }).catchError((e) {
+                                    if (context.mounted) {
+                                      final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
+                                      AppSnackBar.error(context, msg);
+                                    }
+                                  });
+                                },
+                                icon: const Icon(RemixIcons.refresh_line, size: 16),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: SingleChildScrollView(child: _table(p, list, provider)),
+                    ),
                 ],
               ),
             ),
@@ -321,50 +387,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                     ],
                   ),
                 ),
-                if (provider.error != null && list.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 48),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(RemixIcons.cloud_off_line, size: 44, color: AppColors.error),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Failed to load frame sizes catalog',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: p.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          provider.error is ApiException
-                              ? (provider.error as ApiException).userFriendlyMessage
-                              : 'Please check your connection to the server.',
-                          style: TextStyle(fontSize: 13, color: p.textMuted),
-                        ),
-                        const SizedBox(height: 14),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            context.read<FrameSizeProvider>().refresh().then((_) {
-                              if (context.mounted) {
-                                AppSnackBar.success(context, 'Frame sizes loaded.');
-                              }
-                            }).catchError((e) {
-                              if (context.mounted) {
-                                final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
-                                AppSnackBar.error(context, msg);
-                              }
-                            });
-                          },
-                          icon: const Icon(RemixIcons.refresh_line, size: 16),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (list.isEmpty)
+                if (list.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 48),
                     child: Text(

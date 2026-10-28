@@ -10,7 +10,10 @@ import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_dropdown.dart';
+import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
+import 'package:raigon_art/core/widgets/shell_scope.dart';
+import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
@@ -546,6 +549,79 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+
+    if (!AuthService.isAdmin) {
+      return Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.4),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.3 : 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: AppColors.darkGradient,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.gold, width: 1.5),
+                ),
+                child: const Icon(
+                  RemixIcons.lock_2_line,
+                  size: 28,
+                  color: AppColors.gold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Reports & Financials Restricted',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: p.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Access to profit summaries, revenue metrics, billing reports, and financial performance is restricted to Administrator accounts. Please contact an administrator or sign in with admin credentials.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: p.textMuted,
+                ),
+              ),
+              const SizedBox(height: 24),
+              AppPrimaryButton(
+                label: 'Go to Customers',
+                icon: RemixIcons.team_line,
+                onPressed: () {
+                  ShellScope.of(context).goTo(NavDestination.customers);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final customerProvider = context.watch<CustomerAndOrderProvider>();
 
     if (customerProvider.isLoading && !customerProvider.initialized) {

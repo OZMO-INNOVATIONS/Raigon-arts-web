@@ -41,6 +41,7 @@ extension NavDestinationX on NavDestination {
     NavDestination.orders ||
     NavDestination.photoCollection ||
     NavDestination.frameSizes ||
+    NavDestination.messagingAutomation ||
     NavDestination.profile => true,
     _ => false,
   };

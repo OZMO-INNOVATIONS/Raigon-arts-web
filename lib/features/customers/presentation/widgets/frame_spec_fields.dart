@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:raigon_art/features/customers/models/frame_spec.dart';
+import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/widgets/form_kit.dart';
+import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
@@ -97,6 +98,7 @@ class FrameSpecFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const gap = SizedBox(height: 18);
+    final c = FormColors.of(context);
 
     final provider = context.watch<FrameSizeProvider>();
     final savedSizes = provider.sizes;
@@ -124,12 +126,45 @@ class FrameSpecFields extends StatelessWidget {
           children: [
             LabeledField(
               label: 'Frame Size',
-              child: sizeNames.isEmpty
-                  ? const InputDecorator(
-                      decoration: InputDecoration(border: OutlineInputBorder()),
-                      child: Text('No frame sizes available'),
+              child: provider.isLoading && sizeNames.isEmpty
+                  ? InputDecorator(
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: c.p.border),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Loading frame sizes...',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: c.p.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
                     )
-                  : FormDropdown<String>(
+                  : sizeNames.isEmpty
+                      ? const InputDecorator(
+                          decoration: InputDecoration(border: OutlineInputBorder()),
+                          child: Text('No frame sizes available'),
+                        )
+                      : FormDropdown<String>(
                       key: ValueKey(selectedSize),
                       value: selectedSize,
                       hint: 'Select Frame Size',

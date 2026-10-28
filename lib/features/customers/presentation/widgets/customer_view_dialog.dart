@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:provider/provider.dart';
@@ -373,7 +375,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
   }
 
   Widget _body(FormColors c) {
-    final p = c.p;
     final frames = _c.effectiveFrames;
     final photos = _photosOf(_c);
     return ScrollbarTheme(
@@ -387,7 +388,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
         thumbVisibility: true,
         child: SingleChildScrollView(
           controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(30, 26, 30, 28),
+          padding: const EdgeInsets.fromLTRB(30, 26, 30, 36),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -402,21 +403,21 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       children: [contact, const SizedBox(height: 21), summary],
                     );
                   }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: contact),
-                      const SizedBox(width: 21),
-                      Expanded(child: summary),
-                    ],
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: contact),
+                        const SizedBox(width: 21),
+                        Expanded(child: summary),
+                      ],
+                    ),
                   );
                 },
               ),
               const SizedBox(height: 28),
               _framesSection(c, frames, photos),
-              const SizedBox(height: 36),
-              _vault(c, photos),
-              SizedBox(height: p.isDark ? 4 : 4),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -784,25 +785,195 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     List<FrameSpec> frames,
     List<_VaultPhoto> photos,
   ) {
-    return LayoutBuilder(
-      builder: (context, cons) {
-        final isMulti = frames.length > 1;
-        final isWide = cons.maxWidth >= 640 && isMulti;
-        const gap = 20.0;
-        final cardWidth = isWide ? (cons.maxWidth - gap) / 2 : cons.maxWidth;
+    final p = c.p;
+    final int cardCount = math.max(frames.length, photos.length);
+    if (cardCount == 0) {
+      return const SizedBox.shrink();
+    }
 
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (var i = 0; i < frames.length; i++)
-              SizedBox(
-                width: cardWidth,
-                child: _individualFrameCard(c, frames, i, photos),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _individualFrameHeaderBanner(p, cardCount),
+        const SizedBox(height: 22),
+        _cardTitle(
+          p,
+          RemixIcons.stack_line,
+          'INDIVIDUAL FRAME PHOTO VAULT ($cardCount)',
+        ),
+        const SizedBox(height: 18),
+        LayoutBuilder(
+          builder: (context, cons) {
+            final isMulti = cardCount > 1;
+            final isWide = cons.maxWidth >= 640 && isMulti;
+            const gap = 20.0;
+
+            if (!isWide) {
+              return Column(
+                children: [
+                  for (var i = 0; i < cardCount; i++) ...[
+                    if (i > 0) const SizedBox(height: gap),
+                    _individualFrameCard(c, frames, i, photos),
+                  ],
+                ],
+              );
+            }
+
+            final rows = <Widget>[];
+            for (var i = 0; i < cardCount; i += 2) {
+              if (i > 0) rows.add(const SizedBox(height: gap));
+              final hasSecond = i + 1 < cardCount;
+              if (hasSecond) {
+                rows.add(
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _individualFrameCard(c, frames, i, photos),
+                        ),
+                        const SizedBox(width: gap),
+                        Expanded(
+                          child: _individualFrameCard(c, frames, i + 1, photos),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              } else {
+                final cardWidth = (cons.maxWidth - gap) / 2;
+                rows.add(
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: cardWidth,
+                        child: _individualFrameCard(c, frames, i, photos),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: rows,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _individualFrameHeaderBanner(AppPalette p, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.4 : 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      RemixIcons.stack_line,
+                      size: 20,
+                      color: AppColors.gold,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        'INDIVIDUAL FRAME SPECIFICATIONS CONFIGURED',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-          ],
-        );
-      },
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF1E1D1B),
+                      Color(0xFF332D24),
+                      Color(0xFF6B5838),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.55),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      RemixIcons.equalizer_line,
+                      size: 15,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      '$count Custom Frame${count == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Each photo below has its own distinct frame size, material, color, and mounting specifications configured.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: p.textMuted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -813,7 +984,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     List<_VaultPhoto> photos,
   ) {
     final p = c.p;
-    final f = frames[index];
+    final f = index < frames.length ? frames[index] : frames.first;
     final single = frames.length == 1;
     final qty = single ? _c.qty : f.qty;
 
@@ -823,7 +994,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
     if (f.photoBytes != null) {
       photo = _VaultPhoto(
-        name: f.photoName ?? 'Artwork #${index + 1}',
+        name: f.photoName ?? (index < photos.length ? photos[index].name : 'Artwork #${index + 1}'),
         sizeLabel:
             '${(f.photoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB',
         image: MemoryImage(f.photoBytes!),
@@ -850,7 +1021,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
     return Container(
       decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF4),
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
@@ -868,199 +1039,220 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (photo != null) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                InkWell(
-                  onTap: () => _showPhotoViewerDialog(
-                    context,
-                    photo!,
-                    customer: _c,
-                    initialIndex: photoIndex,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.gold, width: 1.5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: photo == null
+                    ? null
+                    : () => _showPhotoViewerDialog(
+                          context,
+                          photo!,
+                          customer: _c,
+                          initialIndex: photoIndex,
                         ),
-                        child: Image(
-                          image: photo.image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
-                            RemixIcons.image_line,
-                            color: p.textMuted,
-                            size: 24,
-                          ),
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.gold.withValues(alpha: 0.6),
+                          width: 1.5,
                         ),
                       ),
-                      Positioned(
-                        right: 2,
-                        bottom: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            RemixIcons.zoom_in_line,
-                            size: 11,
-                            color: AppColors.gold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        photo.name,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: p.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.isDark
-                                  ? const Color(0xFF3D4068)
-                                  : const Color(0xFFF0ECE1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: p.isDark
-                                    ? const Color(0xFF555888)
-                                    : const Color(0xFFE2DDD1),
+                      child: photo != null
+                          ? Image(
+                              image: photo.image,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: p.chipFill,
+                                child: Icon(
+                                  RemixIcons.image_line,
+                                  color: p.textMuted,
+                                  size: 24,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: p.chipFill,
+                              child: Icon(
+                                RemixIcons.image_line,
+                                color: p.textMuted,
+                                size: 24,
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  RemixIcons.image_line,
-                                  size: 13,
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(
+                          RemixIcons.zoom_in_line,
+                          size: 11,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      photo?.name ?? 'Artwork #${index + 1}',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: p.isDark
+                                ? const Color(0xFF3D4068)
+                                : const Color(0xFFF0ECE1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: p.isDark
+                                  ? const Color(0xFF555888)
+                                  : const Color(0xFFE2DDD1),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                RemixIcons.image_line,
+                                size: 13,
+                                color: p.textPrimary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Photo #${photoIndex + 1}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
                                   color: p.textPrimary,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Photo #${photoIndex + 1}',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: p.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            photo.sizeLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: p.textMuted,
-                            ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          photo?.sizeLabel ?? '0.0 MB',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: p.textMuted,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: photo == null
+                    ? null
+                    : () => _showPhotoViewerDialog(
+                          context,
+                          photo!,
+                          customer: _c,
+                          initialIndex: photoIndex,
+                        ),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF1E1D1B),
+                        Color(0xFF383126),
+                        Color(0xFF7A6237),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(RemixIcons.search_line, size: 13, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'View',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                InkWell(
-                  onTap: () => _showPhotoViewerDialog(
-                    context,
-                    photo!,
-                    customer: _c,
-                    initialIndex: photoIndex,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.darkGradient,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(RemixIcons.search_line, size: 14, color: Colors.white),
-                        SizedBox(width: 6),
-                        Text(
-                          'View',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Divider(
-              height: 1,
-              color: p.isDark
-                  ? const Color(0xFF45477A)
-                  : p.border.withValues(alpha: 0.7),
-            ),
-            const SizedBox(height: 16),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _dashedDivider(p),
           _specRow(
             icon: RemixIcons.ruler_line,
             label: 'Frame Size:',
             value: f.sizeLabel,
             p: p,
           ),
-          const SizedBox(height: 14),
+          _dashedDivider(p),
           _specRow(
             icon: RemixIcons.shopping_bag_3_line,
             label: 'Frame Type & Material:',
             value: '${f.frameType} • ${f.material}',
             p: p,
           ),
-          const SizedBox(height: 14),
+          _dashedDivider(p),
           _specRow(
             icon: RemixIcons.palette_line,
             label: 'Color & Finish:',
             value: f.finish,
             p: p,
           ),
-          const SizedBox(height: 14),
+          _dashedDivider(p),
           _specRow(
             icon: RemixIcons.compass_3_line,
             label: 'Orientation & Qty:',
@@ -1070,32 +1262,33 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
           if (f.notes.trim().isNotEmpty) ...[
             const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
-                color: const Color(0xFFFDEFE0),
-                borderRadius: BorderRadius.circular(8),
+                color: p.isDark
+                    ? const Color(0xFF383A66)
+                    : const Color(0xFFFCF6ED),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: p.isDark ? Colors.transparent : const Color(0xFFF7DFC4),
+                  color: p.isDark
+                      ? Colors.transparent
+                      : const Color(0xFFF2DFC6),
                 ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Icon(
-                      RemixIcons.file_text_line,
-                      size: 15,
-                      color: Color(0xFFD27D2D),
-                    ),
+                  Icon(
+                    RemixIcons.file_text_fill,
+                    size: 15,
+                    color: p.textPrimary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      f.notes.trim(),
-                      style: const TextStyle(
+                      'Notes: ${f.notes.trim()}',
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFFC9722A),
+                        color: p.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1109,6 +1302,16 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
+  Widget _dashedDivider(AppPalette p) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: SizedBox(
+        height: 1,
+        child: CustomPaint(painter: DashedLinePainter(p.rowDivider)),
+      ),
+    );
+  }
+
   Widget _specRow({
     required IconData icon,
     required String label,
@@ -1116,9 +1319,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     required AppPalette p,
   }) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: p.textPrimary),
+        Padding(
+          padding: const EdgeInsets.only(top: 1.5),
+          child: Icon(icon, size: 16, color: p.textPrimary),
+        ),
         const SizedBox(width: 10),
         Text(
           label,
@@ -1128,61 +1334,18 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             color: p.textPrimary,
           ),
         ),
-        const Spacer(),
-        Flexible(
+        const SizedBox(width: 12),
+        Expanded(
           child: Text(
             value,
             textAlign: TextAlign.right,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w700,
               color: p.textPrimary,
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _vault(FormColors c, List<_VaultPhoto> photos) {
-    final p = c.p;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _cardTitle(
-          p,
-          RemixIcons.gallery_line,
-          'DIGITAL PHOTO VAULT (${photos.length})',
-        ),
-        const SizedBox(height: 18),
-        if (photos.isEmpty)
-          Text(
-            'No photos uploaded for this order.',
-            style: TextStyle(fontSize: 14.5, color: p.textMuted),
-          )
-        else
-          LayoutBuilder(
-            builder: (context, cons) {
-              const gap = 21.0;
-              final cols = (photos.length == 1 || cons.maxWidth < 560) ? 1 : 2;
-              final w = (cons.maxWidth - gap * (cols - 1)) / cols;
-              return Wrap(
-                spacing: gap,
-                runSpacing: 20,
-                children: [
-                  for (var i = 0; i < photos.length; i++)
-                    SizedBox(
-                      width: w,
-                      child: _VaultCard(
-                        photo: photos[i],
-                        index: i,
-                        customer: _c,
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
       ],
     );
   }
@@ -1286,235 +1449,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _VaultCard extends StatefulWidget {
-  const _VaultCard({
-    required this.photo,
-    required this.index,
-    this.customer,
-  });
-  final _VaultPhoto photo;
-  final int index;
-  final Customer? customer;
-
-  @override
-  State<_VaultCard> createState() => _VaultCardState();
-}
-
-class _VaultCardState extends State<_VaultCard> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    final photo = widget.photo;
-    final dark = p.isDark;
-
-    final nameColor = dark ? const Color(0xFF111118) : p.textPrimary;
-    final sizeColor = dark ? const Color(0xFF6E6E80) : p.textMuted;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-        decoration: BoxDecoration(
-          color: dark ? null : const Color(0xFFFEFDFB),
-          gradient: dark
-              ? const LinearGradient(
-                  colors: [Color(0xFF74748A), Color(0xFFD3D3DE)],
-                )
-              : null,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _hover
-                ? AppColors.gold
-                : (dark ? const Color(0xFF8D8776) : p.border),
-            width: _hover ? 1.6 : 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.2 : 0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () => _showPhotoViewerDialog(
-                context,
-                photo,
-                customer: widget.customer,
-                initialIndex: widget.index,
-              ),
-              child: Container(
-                width: 76,
-                height: 76,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.7),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Image(
-                        image: photo.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: p.chipFill,
-                          alignment: Alignment.center,
-                          child: Icon(
-                            RemixIcons.image_line,
-                            size: 28,
-                            color: p.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 4,
-                      bottom: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(RemixIcons.zoom_in_line, size: 14, color: AppColors.gold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    photo.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: nameColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: dark
-                              ? AppColors.gold.withValues(alpha: 0.3)
-                              : const Color(0xFFF4F1EA),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              RemixIcons.image_fill,
-                              size: 14,
-                              color: dark ? AppColors.gold : p.textPrimary,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Photo #${widget.index + 1}',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: dark ? AppColors.gold : p.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          photo.sizeLabel,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                            color: sizeColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _showPhotoViewerDialog(
-                context,
-                photo,
-                customer: widget.customer,
-                initialIndex: widget.index,
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  gradient: AppColors.darkGradient,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(RemixIcons.zoom_in_line, size: 18, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      'View',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

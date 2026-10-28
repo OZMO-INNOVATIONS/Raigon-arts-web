@@ -2,11 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math' as math;
-import 'dart:typed_data';
-
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -26,6 +22,9 @@ external JSPromise<JSString?> _refreshPhotoDirectory();
 
 @JS('restorePhotoDirectory')
 external JSPromise<JSString?> _restorePhotoDirectory();
+
+@JS('downloadPhotoFile')
+external void _downloadPhotoFile(JSString url, JSString fileName);
 
 void _photoLog(String message) {
   debugPrint('[PHOTO_COLLECTION] $message');
@@ -499,26 +498,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
 
     try {
       for (final photo in items) {
-        final response = await http.get(Uri.parse(photo.url));
-
-        if (response.statusCode != 200) {
-          throw Exception('Unable to download ${photo.fileName}');
-        }
-
-        final bytes = Uint8List.fromList(response.bodyBytes);
-
-        final extension = _fileExtension(photo.fileName);
-
-        final mimeType = _mimeType(extension);
-
-        final baseName = photo.fileName.replaceFirst(RegExp(r'\.[^.]+$'), '');
-
-        await FileSaver.instance.saveFile(
-          name: baseName,
-          bytes: bytes,
-          fileExtension: extension,
-          mimeType: mimeType,
-        );
+        _downloadPhotoFile(photo.url.toJS, photo.fileName.toJS);
       }
 
       if (!mounted) return;
@@ -1510,37 +1490,6 @@ String _formatFileSize(int bytes) {
   final gb = bytes / (1024 * 1024 * 1024);
 
   return '${gb.toStringAsFixed(2)} GB';
-}
-
-String _fileExtension(String fileName) {
-  final index = fileName.lastIndexOf('.');
-
-  if (index == -1 || index == fileName.length - 1) {
-    return 'jpg';
-  }
-
-  return fileName.substring(index + 1).toLowerCase();
-}
-
-MimeType _mimeType(String extension) {
-  switch (extension) {
-    case 'png':
-      return MimeType.png;
-
-    case 'webp':
-      return MimeType.webp;
-
-    case 'gif':
-      return MimeType.gif;
-
-    case 'bmp':
-      return MimeType.bmp;
-
-    case 'jpg':
-    case 'jpeg':
-    default:
-      return MimeType.jpeg;
-  }
 }
 
 String _cleanError(Object error) {

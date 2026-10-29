@@ -2,9 +2,8 @@ import 'dart:math' as math;
 
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart' as pdf;
+import 'package:raigon_art/features/reports/presentation/template/report_pdf_template.dart';
 import 'package:remixicon/remixicon.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
@@ -261,7 +260,6 @@ class ReportData {
     final labels = <String>[];
     final values = <double>[];
 
-
     // Checkpoint dates spanning from start through today inclusive
     final checkpoints = <DateTime>[];
     var cp = DateTime(start.year, start.month, start.day);
@@ -281,10 +279,13 @@ class ReportData {
       } else {
         final prevDate = checkpoints[i - 1];
         final from = DateTime(prevDate.year, prevDate.month, prevDate.day + 1);
-        final toExclusive = DateTime(curDate.year, curDate.month, curDate.day + 1);
+        final toExclusive = DateTime(
+          curDate.year,
+          curDate.month,
+          curDate.day + 1,
+        );
         values.add(_sumTotal(from, toExclusive).toDouble());
       }
-
     }
     return ChartSeries(labels, values);
   }
@@ -433,6 +434,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       debugPrint('[ReportsScreen] API summary fetch error: $e');
     }
   }
+
   static const _red = Color(0xFFE0605E);
 
   Future<void> _exportPdf(
@@ -441,95 +443,76 @@ class _ReportsScreenState extends State<ReportsScreen> {
     List<Customer> archived,
   ) async {
     try {
-      final sizes = d.topFrameSizes;
-      final doc = pw.Document();
-      doc.addPage(
-        pw.MultiPage(
-          margin: const pw.EdgeInsets.all(32),
-          build: (_) => [
-            pw.Text(
-              'Raigon Arts - Reports & Business Analytics',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(d.rangeLabel, style: const pw.TextStyle(fontSize: 11)),
-            pw.SizedBox(height: 16),
-            _pdfTable(
-              ['Metric', 'Value'],
-              [
-                ['Total Billed Revenue', 'Rs. ${_inr(d.billed)}'],
-                ['Advance Collected', 'Rs. ${_inr(d.advance)}'],
-                ['Outstanding Balance Due', 'Rs. ${_inr(d.outstanding)}'],
-                [
-                  'Highest Value Order',
-                  'Rs. ${_inr(d.periodCustomers.isEmpty ? 0 : d.periodCustomers.map((c) => c.total).reduce(math.max))}',
-                ],
-                ['Orders Analyzed', '${d.orders}'],
-                ['Growth', d.growthLabel],
-                ['Collection Ratio', d.ratioLabel],
-              ],
-            ),
-            if (sizes.isNotEmpty) ...[
-              pw.SizedBox(height: 18),
-              pw.Text(
-                'Top Frame Sizes Sold',
-                style: pw.TextStyle(
-                  fontSize: 13,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+      // Same chart source the screen uses (API data first, local fallback).
+      final series =
+          (_apiTrajectory != null &&
+              _apiTrajectory!.labels.isNotEmpty &&
+              _apiTrajectory!.values.isNotEmpty)
+          ? ChartSeries(_apiTrajectory!.labels, _apiTrajectory!.values)
+          : d.chart;
+
+      final highest = d.periodCustomers.isEmpty
+          ? 0
+          : d.periodCustomers.map((c) => c.total).reduce(math.max);
+
+      final bytes = await ReportPdfTemplate.build(
+        ReportPdfData(
+          rangeLabel: d.rangeLabel,
+          chartTitle: d.chartTitle,
+          chartSubtitle: d.period == ReportPeriod.allTime
+              ? 'Monthly billed revenue trajectory'
+              : 'Billed revenue trajectory (per '
+                    '${d.period == ReportPeriod.month1 ? '5' : '10'}-day period)',
+          generatedAt: DateTime.now(),
+          billed: d.billed,
+          advance: d.advance,
+          outstanding: d.outstanding,
+          highestOrder: highest,
+          orders: d.orders,
+          aov: d.aov,
+          collectionRatio: d.collectionRatio,
+          growthLabel: d.growthLabel,
+          hasGrowth: d.growthPct != null,
+          growthPositive: d.growthPositive,
+          chartLabels: series.labels,
+          chartValues: series.values,
+          frameSizes: [
+            for (final s in d.topFrameSizes)
+              PdfShare(s.label, s.count, s.fraction),
+          ],
+          materials: [
+            for (final s in d.topMaterials)
+              PdfShare(s.label, s.count, s.fraction),
+          ],
+          active: [
+            for (final c in active)
+              PdfActiveRow(
+                name: c.name,
+                city: c.city,
+                phone: c.phone,
+                frame: c.frameSize,
+                total: c.total,
+                advance: c.advance,
+                balance: math.max(0, c.balance),
               ),
-              pw.SizedBox(height: 6),
-              _pdfTable(
-                ['Frame Size', 'Quantity', 'Share'],
-                [
-                  for (final s in sizes)
-                    [s.label, '${s.count}', '${s.percent}%'],
-                ],
+          ],
+          archived: [
+            for (final c in archived)
+              PdfArchivedRow(
+                name: c.name,
+                orderId: c.id,
+                phone: c.phone,
+                frame: c.frameSize,
+                material: _materialOf(c),
+                delivery: _date(_deliveryOf(c)),
+                total: c.total,
+                advance: c.advance,
+                balance: math.max(0, c.balance),
               ),
-            ],
-            pw.SizedBox(height: 18),
-            pw.Text(
-              'Active Customers (${active.length})',
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 6),
-            _pdfTable(
-              ['Customer', 'Phone', 'Frame', 'Billed', 'Advance', 'Balance'],
-              [
-                for (final c in active)
-                  [
-                    c.name,
-                    c.phone,
-                    c.frameSize,
-                    'Rs. ${_inr(c.total)}',
-                    'Rs. ${_inr(c.advance)}',
-                    'Rs. ${_inr(math.max(0, c.balance))}',
-                  ],
-              ],
-            ),
-            pw.SizedBox(height: 18),
-            pw.Text(
-              'Archived Completed >7 Days (${archived.length})',
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 6),
-            _pdfTable(
-              ['Customer', 'Order', 'Frame', 'Delivery', 'Settled'],
-              [
-                for (final c in archived)
-                  [
-                    c.name,
-                    c.id,
-                    '${c.frameSize} - ${_materialOf(c)}',
-                    _date(_deliveryOf(c)),
-                    'Rs. ${_inr(c.advance)}',
-                  ],
-              ],
-            ),
           ],
         ),
       );
-      final bytes = await doc.save();
+
       await FileSaver.instance.saveFile(
         name: 'Raigon_Report_${_period.name}',
         bytes: bytes,
@@ -602,11 +585,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Text(
                 'Access to profit summaries, revenue metrics, billing reports, and financial performance is restricted to Administrator accounts. Please contact an administrator or sign in with admin credentials.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: p.textMuted,
-                ),
+                style: TextStyle(fontSize: 14, height: 1.5, color: p.textMuted),
               ),
               const SizedBox(height: 24),
               AppPrimaryButton(
@@ -816,7 +795,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           p,
           d.growthLabel,
           growthColor,
-          icon: d.growthPositive ? RemixIcons.arrow_up_line : RemixIcons.arrow_down_line,
+          icon: d.growthPositive
+              ? RemixIcons.arrow_up_line
+              : RemixIcons.arrow_down_line,
         ),
       ),
       _MetricCard(
@@ -829,7 +810,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             gradient: AppColors.darkGradient,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(RemixIcons.hand_coin_line, size: 22, color: Colors.white),
+          child: const Icon(
+            RemixIcons.hand_coin_line,
+            size: 22,
+            color: Colors.white,
+          ),
         ),
         badge: _badge(p, '${d.ratioLabel} Collection Ratio', _goldText),
       ),
@@ -944,7 +929,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _salesCard(AppPalette p, ReportData d) {
-    final series = (_apiTrajectory != null &&
+    final series =
+        (_apiTrajectory != null &&
             _apiTrajectory!.labels.isNotEmpty &&
             _apiTrajectory!.values.isNotEmpty)
         ? ChartSeries(_apiTrajectory!.labels, _apiTrajectory!.values)
@@ -1019,7 +1005,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: TweenAnimationBuilder<double>(
-              key: ValueKey('${_period}_${series.labels.join('_')}_${series.values.join('_')}'),
+              key: ValueKey(
+                '${_period}_${series.labels.join('_')}_${series.values.join('_')}',
+              ),
               tween: Tween(begin: 0, end: 1),
               duration: const Duration(milliseconds: 450),
               curve: Curves.easeOutCubic,
@@ -1209,7 +1197,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Row(
               children: [
-                const Icon(RemixIcons.database_2_line, size: 22, color: AppColors.gold),
+                const Icon(
+                  RemixIcons.database_2_line,
+                  size: 22,
+                  color: AppColors.gold,
+                ),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -1721,7 +1713,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(RemixIcons.file_text_line, size: 17, color: p.textPrimary),
+                  Icon(
+                    RemixIcons.file_text_line,
+                    size: 17,
+                    color: p.textPrimary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'View Record',
@@ -1990,7 +1986,10 @@ class _TrajectoryPainter extends CustomPainter {
         final pillW = tp.width + 14;
         final pillH = tp.height + 6;
         final pillCenter = Offset(
-          pts[i].dx.clamp(padX / 2 + pillW / 2, size.width - padX / 2 - pillW / 2),
+          pts[i].dx.clamp(
+            padX / 2 + pillW / 2,
+            size.width - padX / 2 - pillW / 2,
+          ),
           pts[i].dy - 20,
         );
         final rrect = RRect.fromRectAndRadius(
@@ -2083,8 +2082,7 @@ class _GradientButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon != null)
-                  Icon(icon, size: 20, color: Colors.white),
+                if (icon != null) Icon(icon, size: 20, color: Colors.white),
                 const SizedBox(width: 10),
                 Text(
                   label,
@@ -2102,26 +2100,3 @@ class _GradientButton extends StatelessWidget {
     );
   }
 }
-
-pw.Widget _pdfCell(String t, {bool bold = false}) => pw.Padding(
-  padding: const pw.EdgeInsets.all(5),
-  child: pw.Text(
-    t,
-    style: pw.TextStyle(
-      fontSize: 9,
-      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-    ),
-  ),
-);
-
-pw.Widget _pdfTable(List<String> heads, List<List<String>> rows) => pw.Table(
-  border: pw.TableBorder.all(color: pdf.PdfColors.grey400, width: 0.5),
-  children: [
-    pw.TableRow(
-      decoration: const pw.BoxDecoration(color: pdf.PdfColors.grey200),
-      children: [for (final h in heads) _pdfCell(h, bold: true)],
-    ),
-    for (final r in rows)
-      pw.TableRow(children: [for (final c in r) _pdfCell(c)]),
-  ],
-);

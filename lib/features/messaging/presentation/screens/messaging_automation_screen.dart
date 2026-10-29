@@ -9,7 +9,6 @@ import 'automations_page.dart';
 const _nav = [
   ('Automations', Icons.bolt_rounded),
   ('Messages', Icons.inbox_rounded),
-  // ('Channels', Icons.hub_rounded),
 ];
 
 class MessagingAutomationScreen extends StatefulWidget {

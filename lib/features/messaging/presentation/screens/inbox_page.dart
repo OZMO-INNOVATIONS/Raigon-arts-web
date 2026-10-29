@@ -958,14 +958,28 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         throw Exception('No audio was recorded. Please try again.');
       }
       final blob = html.Blob(chunks, mimeType);
+
       final reader = html.FileReader();
-      reader.readAsArrayBuffer(blob);
+      reader.readAsDataUrl(blob);
       await reader.onLoad.first;
+
       final result = reader.result;
-      if (result is! ByteBuffer) {
+
+      if (result is! String) {
         throw Exception('Could not read the recorded audio.');
       }
-      final bytes = Uint8List.view(result);
+
+      final commaIndex = result.indexOf(',');
+      if (commaIndex < 0) {
+        throw Exception('Invalid recorded audio data.');
+      }
+
+      final bytes = base64Decode(result.substring(commaIndex + 1));
+
+      if (bytes.isEmpty) {
+        throw Exception('The recorded audio is empty.');
+      }
+
       if (!mounted) return;
       setState(() {
         _recording = false;

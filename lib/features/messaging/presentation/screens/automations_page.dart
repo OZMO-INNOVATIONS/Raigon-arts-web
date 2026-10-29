@@ -135,10 +135,10 @@ class _AutomationsPageState extends State<AutomationsPage> {
     final shown = _filtered();
 
     return PageShell(
-      title: empty ? 'Let’s get started' : 'Automations',
-      subtitle: empty
-          ? 'Pick a popular first move. You can preview before going live.'
-          : 'Replies that run on their own, around the clock.',
+      // title: empty ? 'Let’s get started' : 'Automations',
+      // subtitle: empty
+      //     ? 'Pick a popular first move. You can preview before going live.'
+      //     : 'Replies that run on their own, around the clock.',
       onRefresh: s.loadAutomations,
       action: empty
           ? null

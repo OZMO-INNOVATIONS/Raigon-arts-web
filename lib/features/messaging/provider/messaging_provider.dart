@@ -2,6 +2,7 @@
 
 // import 'package:flutter/material.dart';
 // import 'package:raigon_art/core/utils/helper.dart';
+// import 'package:raigon_art/core/widgets/app_snackbar.dart';
 // import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:supabase_flutter/supabase_flutter.dart';
@@ -53,6 +54,16 @@
 //       } catch (error) {
 //         debugPrint('Local AppState load failed: $error');
 //       }
+//     }
+
+//     // Refresh the Instagram username from Supabase so a newly authorized
+//     // account replaces any stale locally cached username after the app reloads.
+//     try {
+//       await refreshInstagramConnection();
+//     } catch (error) {
+//       // Keep the app usable if Instagram is not connected or the inbox is
+//       // temporarily unavailable. The existing cached state is preserved.
+//       debugPrint('Instagram connection refresh during load failed: $error');
 //     }
 
 //     await loadAutomations();
@@ -546,8 +557,15 @@
 //     notifyListeners();
 //   }
 
-//   Future<void> connectChannel(BuildContext context, Channel channel) async {
-//     Helper.igLog('CONNECT_START', details: 'Channel=${channel.name}');
+//   Future<void> connectChannel(
+//     BuildContext context,
+//     Channel channel, {
+//     bool switchAccount = false,
+//   }) async {
+//     Helper.igLog(
+//       'CONNECT_START',
+//       details: 'Channel=${channel.name}; switchAccount=$switchAccount',
+//     );
 
 //     try {
 //       if (channel.isIg) {
@@ -575,14 +593,15 @@
 
 //         if (!context.mounted) return;
 
-//         if (account != null && account.isNotEmpty) {
+//         if (account != null && account.isNotEmpty && !switchAccount) {
 //           Helper.igLog(
 //             'ALREADY_CONNECTED',
 //             details: 'Instagram account=@$account',
 //           );
 
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             SnackBar(content: Text('Instagram already connected: @$account')),
+//           AppSnackBar.success(
+//             context,
+//             'Instagram already connected: @$account',
 //           );
 
 //           return;
@@ -590,7 +609,9 @@
 
 //         Helper.igLog(
 //           'OAUTH_START',
-//           details: 'No connected account found; opening Instagram OAuth',
+//           details: switchAccount
+//               ? 'Opening Instagram OAuth to switch accounts'
+//               : 'No connected account found; opening Instagram OAuth',
 //         );
 
 //         final oauthUri = Uri.parse(
@@ -618,6 +639,16 @@
 //         if (!launched) {
 //           ScaffoldMessenger.of(context).showSnackBar(
 //             const SnackBar(content: Text('Could not open Instagram login.')),
+//           );
+//         } else if (switchAccount) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text(
+//                 'Complete Instagram authorization in the opened tab, '
+//                 'then return to Raigon Art and refresh the page.',
+//               ),
+//               duration: Duration(seconds: 6),
+//             ),
 //           );
 //         }
 
@@ -663,6 +694,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/utils/helper.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1259,8 +1291,9 @@ class MessagingAutomationProvider extends ChangeNotifier {
             details: 'Instagram account=@$account',
           );
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Instagram already connected: @$account')),
+          AppSnackBar.success(
+            context,
+            'Instagram already connected: @$account',
           );
 
           return;
@@ -1296,18 +1329,12 @@ class MessagingAutomationProvider extends ChangeNotifier {
         if (!context.mounted) return;
 
         if (!launched) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open Instagram login.')),
-          );
+          AppSnackBar.error(context, 'Could not open Instagram login.');
         } else if (switchAccount) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Complete Instagram authorization in the opened tab, '
-                'then return to Raigon Art and refresh the page.',
-              ),
-              duration: Duration(seconds: 6),
-            ),
+          AppSnackBar.success(
+            context,
+            'Complete Instagram authorization in the opened tab, '
+            'then return to Raigon Art and refresh the page.',
           );
         }
 
@@ -1320,17 +1347,12 @@ class MessagingAutomationProvider extends ChangeNotifier {
       if (!context.mounted) return;
 
       if (account != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('WhatsApp connected: $account')));
+        AppSnackBar.success(context, 'WhatsApp connected: $account');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'WhatsApp account details were not returned. '
-              'Check your whatsapp_inbox Edge Function.',
-            ),
-          ),
+        AppSnackBar.error(
+          context,
+          'WhatsApp account details were not returned. '
+          'Check your whatsapp_inbox Edge Function.',
         );
       }
     } catch (error, stackTrace) {
@@ -1343,9 +1365,7 @@ class MessagingAutomationProvider extends ChangeNotifier {
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not connect channel: $error')),
-      );
+      AppSnackBar.error(context, 'Could not connect channel: $error');
     }
   }
 }

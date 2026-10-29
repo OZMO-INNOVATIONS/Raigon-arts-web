@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 import 'package:raigon_art/features/messaging/services/inbox_read_state_service.dart';
@@ -627,12 +628,12 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
 
   void _snack(String message, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Colors.red : null,
-      ),
-    );
+
+    if (error) {
+      AppSnackBar.error(context, message);
+    } else {
+      AppSnackBar.success(context, message);
+    }
   }
 
   // ───────────────────────── Instagram logic ─────────────────────────

@@ -941,9 +941,39 @@ class InboxBubble extends StatelessWidget {
             PopupMenuButton<String>(
               tooltip: 'More',
               padding: EdgeInsets.zero,
-              onSelected: (_) => Clipboard.setData(ClipboardData(text: text)),
-              itemBuilder: (_) => const <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(value: 'copy', child: Text('Copy text')),
+              color: p.surface,
+              elevation: 8,
+              shadowColor: Colors.black.withValues(alpha: 0.14),
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: p.border, width: 1),
+              ),
+              onSelected: (value) {
+                if (value == 'copy') {
+                  Clipboard.setData(ClipboardData(text: text));
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'copy',
+                  height: 42,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.copy_rounded, size: 17, color: p.textPrimary),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Copy text',
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
               child: Padding(
                 padding: const EdgeInsets.all(6),

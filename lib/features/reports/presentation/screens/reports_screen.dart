@@ -1521,7 +1521,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         [
           _nameCell(p, c.name, c.city),
           Text(c.phone, style: t(FontWeight.w500)),
-          Text(c.frameSize, style: t(FontWeight.w500, 14)),
+          Padding(
+            padding: const EdgeInsets.only(right: 30),
+            child: Text(
+              c.frameSize,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: t(FontWeight.w500, 14),
+            ),
+          ),
           Text(_money(c.total), style: t(FontWeight.w700)),
           Text(
             _money(c.advance),
@@ -1657,7 +1666,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(c.frameSize, style: t(FontWeight.w600)),
+              Text(
+                c.frameSize,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: t(FontWeight.w600),
+              ),
               const SizedBox(height: 2),
               Text(
                 _materialOf(c),

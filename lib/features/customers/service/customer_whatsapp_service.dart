@@ -203,7 +203,9 @@ Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
     final cleanPhone = _whatsAppNumber(phone);
     if (cleanPhone.isEmpty) return false;
 
-    final queryParams = text != null && text.isNotEmpty ? {'text': text} : <String, String>{};
+    final queryParams = text != null && text.isNotEmpty
+        ? {'text': text}
+        : <String, String>{};
     final uri = Uri.https('wa.me', '/$cleanPhone', queryParams);
 
     try {
@@ -225,7 +227,9 @@ Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
       }
       return launched;
     } catch (e) {
-      debugPrint('[CustomerWhatsAppService] openDirectChat failed, trying fallback: $e');
+      debugPrint(
+        '[CustomerWhatsAppService] openDirectChat failed, trying fallback: $e',
+      );
       try {
         final fallbackUri = Uri.parse(
           'https://api.whatsapp.com/send?phone=$cleanPhone'
@@ -251,7 +255,9 @@ Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
       );
       return true;
     } catch (e) {
-      debugPrint('[CustomerWhatsAppService] sendApiOrderConfirmation failed: $e');
+      debugPrint(
+        '[CustomerWhatsAppService] sendApiOrderConfirmation failed: $e',
+      );
       return false;
     }
   }
@@ -279,4 +285,3 @@ Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
     }
   }
 }
-

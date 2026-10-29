@@ -53,11 +53,7 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
           child: ListenableBuilder(
             listenable: s,
             builder: (context, _) {
-              final pages = [
-                AutomationsPage(s: s),
-                InboxPage(s: s),
-                // ChannelsPage(s: s),
-              ];
+              final pages = [AutomationsPage(s: s), InboxPage(s: s)];
               return LayoutBuilder(
                 builder: (context, c) {
                   final narrow = c.maxWidth < 860;
@@ -123,7 +119,68 @@ class _TopBar extends StatelessWidget {
         narrow ? 18 : 36,
         0,
       ),
-      child: SizedBox(width: double.infinity, child: tabs),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+
+          return Row(
+            children: [
+              // Automations and Messages tabs
+              Expanded(child: tabs),
+
+              // Show New automation only on Automations tab
+              if (s.tab == 0) ...[
+                SizedBox(width: compact ? 8 : 16),
+                Tooltip(
+                  message: 'New automation',
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: p.brand,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: p.softShadow,
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => openBuilder(context, s),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 14 : 22,
+                            vertical: 15,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.add_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              if (!compact) ...[
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'New automation',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
     );
   }
 }

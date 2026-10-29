@@ -18,7 +18,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _tagline = 'Photo Frames & Custom Framing';
   String _businessPhone = '8137922114';
   String _businessEmail = 'orders@raigonarts.com';
-  String _workshopAddress = 'Main Workshop, MG Road, Trivandrum';
   String _gstin = '32AAAAA0000A1Z5';
   int _retentionDays = 45;
   bool _autoCleanup = true;
@@ -94,20 +93,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final service = WorkshopSettingsService();
       final results = await Future.wait([
-        service.getProfile().catchError((_) => const WorkshopProfile(
-              businessName: 'Raigon Arts',
-              tagline: 'Photo Frames & Custom Framing',
-              businessPhone: '8137922114',
-              businessEmail: 'orders@raigonarts.com',
-              workshopAddress: 'Main Workshop, MG Road, Trivandrum',
-              gstin: '',
-              businessHours: [],
-            )),
-        service.getRetentionPolicy().catchError((_) => const RetentionPolicy(
-              retentionDays: 45,
-              autoCleanupEnabled: true,
-              retentionTarget: 'all',
-            )),
+        service.getProfile().catchError(
+          (_) => const WorkshopProfile(
+            businessName: 'Raigon Arts',
+            tagline: 'Photo Frames & Custom Framing',
+            businessPhone: '8137922114',
+            businessEmail: 'orders@raigonarts.com',
+            workshopAddress: 'Main Workshop, MG Road, Trivandrum',
+            gstin: '',
+            businessHours: [],
+          ),
+        ),
+        service.getRetentionPolicy().catchError(
+          (_) => const RetentionPolicy(
+            retentionDays: 45,
+            autoCleanupEnabled: true,
+            retentionTarget: 'all',
+          ),
+        ),
       ]);
 
       if (mounted) {
@@ -118,7 +121,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _tagline = profile.tagline;
           _businessPhone = profile.businessPhone;
           _businessEmail = profile.businessEmail;
-          _workshopAddress = profile.workshopAddress;
           _gstin = profile.gstin.isNotEmpty ? profile.gstin : 'Not registered';
           _retentionDays = retention.retentionDays;
           _autoCleanup = retention.autoCleanupEnabled;
@@ -179,20 +181,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               p,
                               title: 'LOCATION',
                               rows: [
-                                _InfoItem(
+                                const _InfoItem(
                                   icon: RemixIcons.map_pin_line,
                                   label: 'Workshop Address',
-                                  value: _workshopAddress,
+                                  value:
+                                      'VP 302-A, R J Building, Kollamkonam Junction, '
+                                      'Vilappilsala, Thiruvananthapuram, Kerala 695573',
                                 ),
                                 const _InfoItem(
                                   icon: RemixIcons.building_line,
                                   label: 'City & State',
-                                  value: 'Trivandrum, Kerala',
+                                  value: 'Thiruvananthapuram, Kerala',
                                 ),
                                 const _InfoItem(
                                   icon: RemixIcons.mail_send_line,
                                   label: 'PIN Code',
-                                  value: '695001',
+                                  value: '695573',
                                 ),
                               ],
                             ),

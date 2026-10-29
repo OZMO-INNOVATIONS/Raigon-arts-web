@@ -16,40 +16,12 @@ class AppTopBar extends StatelessWidget {
   final int notificationCount;
   final VoidCallback onBellTap;
 
-  static const _weekdays = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-
-  static const _months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-
   String _greeting(int hour) {
     if (hour >= 5 && hour < 12) return 'Good morning';
     if (hour >= 12 && hour < 17) return 'Good afternoon';
     if (hour >= 17 && hour < 21) return 'Good evening';
     return 'Good night';
   }
-
-  String _dateLine(DateTime d) =>
-      '${_weekdays[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]} ${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -73,28 +45,18 @@ class AppTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_greeting(now.hour)} Raigon 👋',
+                      '${_greeting(now.hour)}, Raigon 👋',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        height: 1.15,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w100,
+                        letterSpacing: -0.35,
+                        height: 1.2,
                         color: p.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _dateLine(now),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: p.textMuted,
-                      ),
-                    ),
+                    const SizedBox(height: 4),
                   ],
                 ),
               ),

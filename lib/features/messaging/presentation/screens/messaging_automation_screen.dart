@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
+import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:raigon_art/features/messaging/presentation/screens/inbox_page.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
@@ -54,11 +55,12 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
             listenable: s,
             builder: (context, _) {
               final pages = [AutomationsPage(s: s), InboxPage(s: s)];
+
               return LayoutBuilder(
                 builder: (context, c) {
                   final narrow = c.maxWidth < 860;
+
                   return Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _TopBar(s: s, narrow: narrow),
@@ -129,51 +131,15 @@ class _TopBar extends StatelessWidget {
               Expanded(child: tabs),
 
               // Show New automation only on Automations tab
+              // Show New automation only on Automations tab
               if (s.tab == 0) ...[
                 SizedBox(width: compact ? 8 : 16),
                 Tooltip(
                   message: 'New automation',
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        gradient: p.brand,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: p.softShadow,
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => openBuilder(context, s),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: compact ? 14 : 22,
-                            vertical: 15,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.add_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              if (!compact) ...[
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'New automation',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: AppPrimaryButton(
+                    label: compact ? '' : 'New automation',
+                    icon: Icons.add_rounded,
+                    onPressed: () => openBuilder(context, s),
                   ),
                 ),
               ],
@@ -187,6 +153,7 @@ class _TopBar extends StatelessWidget {
 
 class _TabItem extends StatelessWidget {
   const _TabItem({required this.s, required this.index});
+
   final MessagingAutomationProvider s;
   final int index;
 
@@ -194,7 +161,6 @@ class _TabItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final selected = s.tab == index;
-    final showBadge = index == 1 && s.convos.isNotEmpty;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -209,7 +175,7 @@ class _TabItem extends StatelessWidget {
             color: selected ? p.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: selected ? p.border : Colors.transparent),
-            boxShadow: selected ? p.softShadow : null,
+            boxShadow: selected && !p.isDark ? p.softShadow : null,
           ),
           child: Center(
             child: FittedBox(
@@ -231,27 +197,6 @@ class _TabItem extends StatelessWidget {
                       color: selected ? p.textPrimary : p.textMuted,
                     ),
                   ),
-                  if (showBadge) ...[
-                    const SizedBox(width: 7),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${s.convos.length}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: p.onAccent,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

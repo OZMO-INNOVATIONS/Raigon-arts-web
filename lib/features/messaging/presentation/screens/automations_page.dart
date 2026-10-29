@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:raigon_art/core/constants/asset_constants.dart';
@@ -18,12 +19,29 @@ import '../widgets/phone_sim.dart';
 import '../widgets/section_card.dart';
 import 'builder_page.dart';
 
+// Logger and navigation helpers
+
+void _log(String message, {Object? error, StackTrace? stackTrace}) {
+  if (!kDebugMode) return;
+  debugPrint('[AutomationsPage] $message');
+  if (error != null) {
+    debugPrint('[AutomationsPage] ERROR: $error');
+  }
+  if (stackTrace != null) {
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+// Opens builder screen for creating or editing an automation.
 void openBuilder(
   BuildContext context,
   MessagingAutomationProvider s, {
   Automation? existing,
   TriggerType? preset,
 }) {
+  _log(
+    'Opening builder (existing: ${existing?.id ?? "none"}, preset: ${preset?.name ?? "none"})',
+  );
   Navigator.of(context).push(
     MaterialPageRoute(
       fullscreenDialog: true,
@@ -32,11 +50,13 @@ void openBuilder(
   );
 }
 
+// Displays interactive phone simulator dialog to test an automation.
 void showTest(
   BuildContext context,
   MessagingAutomationProvider s,
   Automation a,
 ) {
+  _log('Showing test preview for: ${a.name} (${a.id})');
   final p = AppPalette.of(context);
   showDialog(
     context: context,
@@ -63,6 +83,7 @@ void showTest(
   );
 }
 
+// Maps trigger types to display labels.
 String _triggerLabel(TriggerType t) {
   switch (t) {
     case TriggerType.keyword:
@@ -76,9 +97,7 @@ String _triggerLabel(TriggerType t) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Page
-// ─────────────────────────────────────────────────────────────
+// Main automations page
 
 class AutomationsPage extends StatefulWidget {
   const AutomationsPage({super.key, required this.s});
@@ -90,7 +109,7 @@ class AutomationsPage extends StatefulWidget {
 
 class _AutomationsPageState extends State<AutomationsPage> {
   final TextEditingController _search = TextEditingController();
-  int _status = 0; // 0 all, 1 active, 2 paused
+  int _status = 0; // 0 = all, 1 = active, 2 = paused
   Channel? _channel; // null = all channels
   String _query = '';
 
@@ -119,6 +138,7 @@ class _AutomationsPageState extends State<AutomationsPage> {
   }
 
   void _clearFilters() {
+    _log('Clearing filters');
     setState(() {
       _status = 0;
       _channel = null;
@@ -181,9 +201,7 @@ class _AutomationsPageState extends State<AutomationsPage> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Connect Your Channels panel
-// ─────────────────────────────────────────────────────────────
+// Connect channels panel
 
 class _ConnectPanel extends StatelessWidget {
   const _ConnectPanel({required this.s});
@@ -193,102 +211,126 @@ class _ConnectPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            p.mintSoft.withValues(alpha: p.isDark ? .55 : .8),
-            p.surface,
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Connect Your Channels',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: p.textPrimary,
+          ),
         ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: p.mint.withValues(alpha: .25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Connect Your Channels',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-              color: p.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Link your Instagram and WhatsApp to start automating conversations.',
-            style: TextStyle(color: p.textMuted, fontSize: 13.5),
-          ),
-          const SizedBox(height: 18),
-          LayoutBuilder(
-            builder: (context, c) {
-              Widget card(Channel ch) => _ChannelCard(
-                channel: ch,
-                account: s.accounts[ch],
-                onConnect: () => s.connectChannel(
-                  context,
-                  ch,
-                  switchAccount: ch.isIg && s.accounts[ch] != null,
-                ),
-                onDisconnect: () => s.disconnect(ch),
-              );
-
-              final wa = card(Channel.whatsapp);
-              final ig = card(Channel.instagram);
-              const why = _WhyConnect();
-
-              if (c.maxWidth >= 980) {
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 5, child: wa),
-                      const SizedBox(width: 14),
-                      Expanded(flex: 5, child: ig),
-                      const SizedBox(width: 14),
-                      const Expanded(flex: 4, child: why),
-                    ],
-                  ),
+        const SizedBox(height: 4),
+        Text(
+          'Link your Instagram and WhatsApp to start automating conversations.',
+          style: TextStyle(color: p.textMuted, fontSize: 13.5),
+        ),
+        const SizedBox(height: 18),
+        LayoutBuilder(
+          builder: (context, c) {
+            Widget card(Channel ch) => _ChannelCard(
+              channel: ch,
+              account: s.accounts[ch],
+              onConnect: () async {
+                _log(
+                  'Connecting channel ${ch.name} (switchAccount: ${ch.isIg && s.accounts[ch] != null})',
                 );
-              }
+                try {
+                  await s.connectChannel(
+                    context,
+                    ch,
+                    switchAccount: ch.isIg && s.accounts[ch] != null,
+                  );
+                } catch (e, stack) {
+                  _log(
+                    'Failed to connect ${ch.name}',
+                    error: e,
+                    stackTrace: stack,
+                  );
+                  if (context.mounted) {
+                    AppSnackBar.error(context, 'Could not connect channel: $e');
+                  }
+                }
+              },
+              onDisconnect: () {
+                _log('Disconnecting channel ${ch.name}');
+                try {
+                  s.disconnect(ch);
+                  if (context.mounted) {
+                    AppSnackBar.success(
+                      context,
+                      '${ch.isIg ? 'Instagram' : 'WhatsApp'} disconnected.',
+                    );
+                  }
+                } catch (e, stack) {
+                  _log(
+                    'Failed to disconnect ${ch.name}',
+                    error: e,
+                    stackTrace: stack,
+                  );
+                  if (context.mounted) {
+                    AppSnackBar.error(
+                      context,
+                      'Could not disconnect channel: $e',
+                    );
+                  }
+                }
+              },
+            );
 
-              if (c.maxWidth >= 700) {
-                return Column(
+            final wa = card(Channel.whatsapp);
+            final ig = card(Channel.instagram);
+            const why = _WhyConnect();
+
+            if (c.maxWidth >= 980) {
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: wa),
-                          const SizedBox(width: 14),
-                          Expanded(child: ig),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    why,
+                    Expanded(flex: 5, child: wa),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 5, child: ig),
+                    const SizedBox(width: 14),
+                    const Expanded(flex: 4, child: why),
                   ],
-                );
-              }
+                ),
+              );
+            }
 
+            if (c.maxWidth >= 700) {
               return Column(
                 children: [
-                  wa,
-                  const SizedBox(height: 14),
-                  ig,
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: wa),
+                        const SizedBox(width: 14),
+                        Expanded(child: ig),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 14),
                   why,
                 ],
               );
-            },
-          ),
-        ],
-      ),
+            }
+
+            return Column(
+              children: [
+                wa,
+                const SizedBox(height: 14),
+                ig,
+                const SizedBox(height: 14),
+                why,
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -495,15 +537,16 @@ class _PillButton extends StatelessWidget {
 class _WhyConnect extends StatelessWidget {
   const _WhyConnect();
 
+  static const List<String> _items = [
+    'Auto-reply to messages',
+    'Trigger workflows & automations',
+    'Collect customer data',
+    'Track performance & analytics',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    const items = [
-      'Auto-reply to messages',
-      'Trigger workflows & automations',
-      'Collect customer data',
-      'Track performance & analytics',
-    ];
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -539,7 +582,7 @@ class _WhyConnect extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          for (final t in items)
+          for (final t in _items)
             Padding(
               padding: const EdgeInsets.only(bottom: 9),
               child: Row(
@@ -561,9 +604,7 @@ class _WhyConnect extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Filter bar
-// ─────────────────────────────────────────────────────────────
+// Filter bar and controls
 
 class _FilterBar extends StatelessWidget {
   const _FilterBar({
@@ -582,6 +623,11 @@ class _FilterBar extends StatelessWidget {
   final ValueChanged<Channel?> onChannel;
   final ValueChanged<String> onQuery;
 
+  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(26),
+    borderSide: BorderSide(color: c),
+  );
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
@@ -596,9 +642,23 @@ class _FilterBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _seg(p, 0, 'All', null),
-          _seg(p, 1, 'Active', p.mint),
-          _seg(p, 2, 'Paused', p.textMuted),
+          _FilterSegment(
+            selected: status == 0,
+            label: 'All',
+            onTap: () => onStatus(0),
+          ),
+          _FilterSegment(
+            selected: status == 1,
+            label: 'Active',
+            dotColor: p.mint,
+            onTap: () => onStatus(1),
+          ),
+          _FilterSegment(
+            selected: status == 2,
+            label: 'Paused',
+            dotColor: p.textMuted,
+            onTap: () => onStatus(2),
+          ),
         ],
       ),
     );
@@ -622,9 +682,12 @@ class _FilterBar extends StatelessWidget {
 
     final filter = PopupMenuButton<int>(
       tooltip: 'Filter by channel',
-      onSelected: (v) => onChannel(
-        v == 0 ? null : (v == 1 ? Channel.instagram : Channel.whatsapp),
-      ),
+      onSelected: (v) {
+        _log('Filtering channel by value: $v');
+        onChannel(
+          v == 0 ? null : (v == 1 ? Channel.instagram : Channel.whatsapp),
+        );
+      },
       itemBuilder: (_) => const <PopupMenuEntry<int>>[
         PopupMenuItem<int>(value: 0, child: Text('All channels')),
         PopupMenuItem<int>(value: 1, child: Text('Instagram')),
@@ -695,14 +758,24 @@ class _FilterBar extends StatelessWidget {
       },
     );
   }
+}
 
-  OutlineInputBorder _border(Color c) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(26),
-    borderSide: BorderSide(color: c),
-  );
+class _FilterSegment extends StatelessWidget {
+  const _FilterSegment({
+    required this.selected,
+    required this.label,
+    required this.onTap,
+    this.dotColor,
+  });
 
-  Widget _seg(AppPalette p, int value, String label, Color? dot) {
-    final selected = status == value;
+  final bool selected;
+  final String label;
+  final Color? dotColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
     final bg = p.isDark ? p.accent : AppColors.black;
     final fg = selected
         ? (p.isDark ? AppColors.black : Colors.white)
@@ -712,7 +785,7 @@ class _FilterBar extends StatelessWidget {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => onStatus(value),
+        onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
@@ -723,13 +796,15 @@ class _FilterBar extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (dot != null) ...[
+              if (dotColor != null) ...[
                 Container(
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected ? dot : dot.withValues(alpha: .8),
+                    color: selected
+                        ? dotColor
+                        : dotColor!.withValues(alpha: .8),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -784,9 +859,7 @@ class _NoMatches extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Banner + empty state (unchanged behaviour)
-// ─────────────────────────────────────────────────────────────
+// Sync error banner
 
 class _Banner extends StatelessWidget {
   const _Banner({required this.text, required this.onRetry});
@@ -815,7 +888,17 @@ class _Banner extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: onRetry,
+            onPressed: () async {
+              _log('Retrying automations load from error banner');
+              try {
+                await onRetry();
+              } catch (e, stack) {
+                _log('Retry failed', error: e, stackTrace: stack);
+                if (context.mounted) {
+                  AppSnackBar.error(context, 'Could not sync automations: $e');
+                }
+              }
+            },
             style: TextButton.styleFrom(foregroundColor: p.accent),
             child: const Text('Retry'),
           ),
@@ -825,53 +908,17 @@ class _Banner extends StatelessWidget {
   }
 }
 
+// Empty state and starters
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.s});
   final MessagingAutomationProvider s;
 
+  static const Color _gold = Color(0xFFCDBB88);
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    const gold = Color(0xFFCDBB88);
-
-    Widget step(int n, String t) => Container(
-      padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: gold,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '$n',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            t,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,7 +938,7 @@ class _EmptyState extends StatelessWidget {
                     height: 190,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: gold.withValues(alpha: .10),
+                      color: _gold.withValues(alpha: .10),
                     ),
                   ),
                 ),
@@ -920,20 +967,20 @@ class _EmptyState extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Wrap(
+                      const Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          step(1, 'Channel'),
-                          step(2, 'Trigger'),
-                          step(3, 'Reply'),
-                          step(4, 'Go live'),
+                          _StepBadge(number: 1, title: 'Channel'),
+                          _StepBadge(number: 2, title: 'Trigger'),
+                          _StepBadge(number: 3, title: 'Reply'),
+                          _StepBadge(number: 4, title: 'Go live'),
                         ],
                       ),
                       const SizedBox(height: 24),
                       FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: gold,
+                          backgroundColor: _gold,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1009,6 +1056,56 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+class _StepBadge extends StatelessWidget {
+  const _StepBadge({required this.number, required this.title});
+  final int number;
+  final String title;
+
+  static const Color _gold = Color(0xFFCDBB88);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: _gold,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$number',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StartCard extends StatelessWidget {
   const _StartCard({
     required this.width,
@@ -1022,33 +1119,13 @@ class _StartCard extends StatelessWidget {
     required this.bot,
     required this.onTap,
   });
+
   final double width;
   final String tag, title, cta, user, bot;
   final Color tagColor;
   final LinearGradient gradient;
   final String icon;
   final VoidCallback onTap;
-
-  Widget _bubble(AppPalette p, String t, {bool right = false}) => Align(
-    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        gradient: right ? gradient : null,
-        color: right ? null : p.surface,
-        border: right ? null : Border.all(color: p.border),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Text(
-        t,
-        style: TextStyle(
-          fontSize: 13,
-          color: right ? Colors.white : p.textPrimary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -1080,9 +1157,13 @@ class _StartCard extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _bubble(p, user),
+                  _ChatPreviewBubble(text: user, isSender: false),
                   const SizedBox(height: 10),
-                  _bubble(p, bot, right: true),
+                  _ChatPreviewBubble(
+                    text: bot,
+                    isSender: true,
+                    gradient: gradient,
+                  ),
                 ],
               ),
             ),
@@ -1098,9 +1179,44 @@ class _StartCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Automation card
-// ─────────────────────────────────────────────────────────────
+class _ChatPreviewBubble extends StatelessWidget {
+  const _ChatPreviewBubble({
+    required this.text,
+    required this.isSender,
+    this.gradient,
+  });
+
+  final String text;
+  final bool isSender;
+  final LinearGradient? gradient;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Align(
+      alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          gradient: isSender ? gradient : null,
+          color: isSender ? null : p.surface,
+          border: isSender ? null : Border.all(color: p.border),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            color: isSender ? Colors.white : p.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Automation item card
 
 class _AutoCard extends StatelessWidget {
   const _AutoCard({required this.s, required this.a});
@@ -1108,19 +1224,20 @@ class _AutoCard extends StatelessWidget {
   final MessagingAutomationProvider s;
   final Automation a;
 
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    final connected = s.accounts[a.channel] != null;
-    final isLive = a.live && connected;
+  Widget _buildVerticalDivider(Color borderColor) => Container(
+    width: 1,
+    height: 40,
+    margin: const EdgeInsets.symmetric(horizontal: 14),
+    color: borderColor,
+  );
 
-    // Fixed-size tile with the SVG badge centered.
-    final tile = SizedBox(
-      width: 60,
-      height: 60,
-      child: Center(child: ChannelBadge(a.channel, size: 60)),
-    );
-    final info = Column(
+  Widget _buildInfo(
+    BuildContext context,
+    AppPalette p,
+    bool connected,
+    bool isLive,
+  ) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Wrap(
@@ -1184,70 +1301,67 @@ class _AutoCard extends StatelessWidget {
         ),
       ],
     );
+  }
 
-    Widget stat(IconData icon, String value, String label) {
-      return _Stat(icon: icon, value: value, label: label);
-    }
-
-    Widget vline() => Container(
-      width: 1,
-      height: 40,
-      margin: const EdgeInsets.symmetric(horizontal: 14),
-      color: p.border,
-    );
-
-    final statReplies = stat(
-      Icons.chat_bubble_outline_rounded,
-      '${a.runs}',
-      'Replies',
-    );
-
-    final statTrigger = stat(
-      Icons.bolt_rounded,
-      _triggerLabel(a.trigger),
-      'Trigger',
-    );
-
-    final statStatus = stat(
-      Icons.power_settings_new_rounded,
-      isLive ? 'Live' : 'Paused',
-      'Status',
-    );
-
-    final toggle = Switch(
+  Widget _buildSwitch(
+    BuildContext context,
+    AppPalette p,
+    bool connected,
+    bool isLive,
+  ) {
+    return Switch(
       value: isLive,
       activeThumbColor: Colors.white,
       activeTrackColor: p.mint,
       onChanged: connected
-          ? (_) async {
-              // try {
-              //   await s.toggleAsync(a);
-              //   if (!context.mounted) return;
-              //   ScaffoldMessenger.of(context).showSnackBar(
-              //     const SnackBar(content: Text('Automation status updated.')),
-              //   );
-              // } catch (e) {
-              //   if (!context.mounted) return;
-              //   ScaffoldMessenger.of(context).showSnackBar(
-              //     SnackBar(content: Text('Could not update automation: $e')),
-              //   );
-              // }
+          ? (value) async {
+              _log('Toggling automation "${a.name}" (id: ${a.id}) to $value');
               try {
                 await s.toggleAsync(a);
-
                 if (!context.mounted) return;
-
                 AppSnackBar.success(context, 'Automation status updated.');
-              } catch (e) {
+              } catch (e, stack) {
+                _log(
+                  'Failed to toggle automation "${a.name}"',
+                  error: e,
+                  stackTrace: stack,
+                );
                 if (!context.mounted) return;
-
                 AppSnackBar.error(context, 'Could not update automation: $e');
               }
             }
           : null,
     );
+  }
 
-    final menu = _menu(context, p);
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final connected = s.accounts[a.channel] != null;
+    final isLive = a.live && connected;
+
+    final tile = SizedBox(
+      width: 60,
+      height: 60,
+      child: Center(child: ChannelBadge(a.channel, size: 60)),
+    );
+
+    final info = _buildInfo(context, p, connected, isLive);
+
+    final statTrigger = _Stat(
+      icon: Icons.bolt_rounded,
+      value: _triggerLabel(a.trigger),
+      label: 'Trigger',
+    );
+
+    final statStatus = _Stat(
+      icon: Icons.power_settings_new_rounded,
+      value: isLive ? 'Live' : 'Paused',
+      label: 'Status',
+    );
+
+    final toggle = _buildSwitch(context, p, connected, isLive);
+    final menu = _buildMenu(context, p);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1262,13 +1376,8 @@ class _AutoCard extends StatelessWidget {
                   tile,
                   const SizedBox(width: 20),
                   Expanded(child: info),
-                  const SizedBox(width: 18),
-                  Container(width: 1, height: 52, color: p.border),
-                  const SizedBox(width: 18),
-                  SizedBox(width: 118, child: statReplies),
-                  vline(),
                   SizedBox(width: 128, child: statTrigger),
-                  vline(),
+                  _buildVerticalDivider(p.border),
                   SizedBox(width: 110, child: statStatus),
                   const SizedBox(width: 20),
                   toggle,
@@ -1296,10 +1405,8 @@ class _AutoCard extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 10),
                   child: Row(
                     children: [
-                      Expanded(child: statReplies),
-                      vline(),
                       Expanded(child: statTrigger),
-                      vline(),
+                      _buildVerticalDivider(p.border),
                       Expanded(child: statStatus),
                     ],
                   ),
@@ -1312,7 +1419,7 @@ class _AutoCard extends StatelessWidget {
     );
   }
 
-  Widget _menu(BuildContext context, AppPalette p) {
+  Widget _buildMenu(BuildContext context, AppPalette p) {
     return PopupMenuButton<String>(
       tooltip: 'Automation options',
       color: p.surface,
@@ -1327,13 +1434,9 @@ class _AutoCard extends StatelessWidget {
       onSelected: (v) async {
         if (v == 'test') {
           showTest(context, s, a);
-        }
-
-        if (v == 'edit') {
+        } else if (v == 'edit') {
           openBuilder(context, s, existing: a);
-        }
-
-        if (v == 'delete') {
+        } else if (v == 'delete') {
           final ok = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -1372,34 +1475,19 @@ class _AutoCard extends StatelessWidget {
             ),
           );
 
-          // if (ok == true) {
-          //   try {
-          //     await s.removeAsync(a);
-
-          //     if (!context.mounted) return;
-
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       const SnackBar(content: Text('Automation deleted.')),
-          //     );
-          //   } catch (e) {
-          //     if (!context.mounted) return;
-
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       SnackBar(content: Text('Could not delete automation: $e')),
-          //     );
-          //   }
-          // }
-
           if (ok == true) {
+            _log('Deleting automation "${a.name}" (id: ${a.id})');
             try {
               await s.removeAsync(a);
-
               if (!context.mounted) return;
-
               AppSnackBar.success(context, 'Automation deleted.');
-            } catch (e) {
+            } catch (e, stack) {
+              _log(
+                'Failed to delete automation "${a.name}"',
+                error: e,
+                stackTrace: stack,
+              );
               if (!context.mounted) return;
-
               AppSnackBar.error(context, 'Could not delete automation: $e');
             }
           }
@@ -1459,6 +1547,8 @@ class _AutoCard extends StatelessWidget {
   }
 }
 
+// Shared micro widgets
+
 class _Tag extends StatelessWidget {
   const _Tag(this.text);
   final String text;
@@ -1486,8 +1576,10 @@ class _Tag extends StatelessWidget {
 
 class _Stat extends StatelessWidget {
   const _Stat({required this.icon, required this.value, required this.label});
+
   final IconData icon;
-  final String value, label;
+  final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {

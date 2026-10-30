@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
+import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
@@ -45,7 +46,7 @@ class AppTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_greeting(now.hour)}, Raigon 👋',
+                      '${_greeting(now.hour)}, ${AuthService.isAdmin ? 'Raigon' : 'Everyone'} 👋',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

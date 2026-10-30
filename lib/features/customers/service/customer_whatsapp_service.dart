@@ -99,38 +99,74 @@ class CustomerWhatsAppService {
         .join('\n');
   }
 
+  //   static String buildMessage(Customer customer) {
+  //     final balance = customer.total - customer.advance;
+
+  //     return '''
+  // 📦 *RAIGON ARTS WORKSHOP* - Order Confirmation
+  // ----------------------------------------
+  // Dear *${customer.name}*,
+
+  // Thank you for your framing order with Raigon Arts! Here are your complete order details:
+
+  // 🧾 *Order ID:* ${customer.id}
+  // 📅 *Order Date:* ${_formatDate(customer.orderDate)}
+  // 🚚 *Expected Delivery Date:* ${_formatDate(customer.expectedDelivery)}
+
+  // 🖼️ *Frame Details:*
+  // ${_frameDetails(customer)}
+
+  // 🎨 *Color Finish | Orientation:*
+  // ${_frameFinishes(customer)}
+
+  // 🔢 *Total Quantity:* ${customer.qty}
+
+  // 💰 *TOTAL AMOUNT:* ${_money(customer.total)}
+  // 💵 *Advance Paid:* ${_money(customer.advance)}
+  // 💳 *BALANCE DUE:* ${_money(balance)}
+  // 📌 *Payment Status:* ${_paymentStatus(customer)}
+  // 📋 *Order Status:* ${_orderStatus(customer.status)}
+  // ----------------------------------------
+  // 📍 *Workshop Address:* $kWorkshopAddress
+  // 📞 *Contact:* +91 $kWorkshopPhone
+
+  // Thank you for choosing Raigon Arts! ❤️
+  // '''
+  //         .trim();
+  //   }
+
   static String buildMessage(Customer customer) {
     final balance = customer.total - customer.advance;
 
     return '''
-📦 *RAIGON ARTS WORKSHOP* - Order Confirmation
+*RAIGON ARTS WORKSHOP* - Order Confirmation
 ----------------------------------------
 Dear *${customer.name}*,
 
 Thank you for your framing order with Raigon Arts! Here are your complete order details:
 
-🧾 *Order ID:* ${customer.id}
-📅 *Order Date:* ${_formatDate(customer.orderDate)}
-🚚 *Expected Delivery Date:* ${_formatDate(customer.expectedDelivery)}
+*Order ID:* ${customer.id}
+*Order Date:* ${_formatDate(customer.orderDate)}
+*Expected Delivery Date:* ${_formatDate(customer.expectedDelivery)}
 
-🖼️ *Frame Details:*
+*Frame Details:*
 ${_frameDetails(customer)}
 
-🎨 *Color Finish | Orientation:*
+*Color Finish | Orientation:*
 ${_frameFinishes(customer)}
 
-🔢 *Total Quantity:* ${customer.qty}
+*Total Quantity:* ${customer.qty}
 
-💰 *TOTAL AMOUNT:* ${_money(customer.total)}
-💵 *Advance Paid:* ${_money(customer.advance)}
-💳 *BALANCE DUE:* ${_money(balance)}
-📌 *Payment Status:* ${_paymentStatus(customer)}
-📋 *Order Status:* ${_orderStatus(customer.status)}
+*TOTAL AMOUNT:* ${_money(customer.total)}
+*Advance Paid:* ${_money(customer.advance)}
+*BALANCE DUE:* ${_money(balance)}
+*Payment Status:* ${_paymentStatus(customer)}
+*Order Status:* ${_orderStatus(customer.status)}
 ----------------------------------------
-📍 *Workshop Address:* $kWorkshopAddress
-📞 *Contact:* +91 $kWorkshopPhone
+*Workshop Address:* $kWorkshopAddress
+*Contact:* +91 $kWorkshopPhone
 
-Thank you for choosing Raigon Arts! ❤️
+Thank you for choosing Raigon Arts!
 '''
         .trim();
   }
@@ -151,34 +187,66 @@ Thank you for choosing Raigon Arts! ❤️
     return digits;
   }
 
+  //   static String buildPaymentReminderMessage(Customer customer) {
+  //     final balance = customer.total - customer.advance;
+
+  //     return '''
+  // 📦 *RAIGON ARTS WORKSHOP* - Payment Due Reminder
+  // ----------------------------------------
+  // Dear *${customer.name}*,
+
+  // Friendly reminder regarding your framing order with Raigon Arts:
+
+  // 🧾 *Order ID:* ${customer.id}
+  // 📅 *Order Date:* ${_formatDate(customer.orderDate)}
+  // 🚚 *Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+
+  // 🖼️ *Frame Details:*
+  // ${_frameDetails(customer)}
+
+  // 🔢 *Total Quantity:* ${customer.qty} Frame(s)
+
+  // 💰 *TOTAL AMOUNT:* ${_money(customer.total)}
+  // 💵 *Advance Paid:* ${_money(customer.advance)}
+  // 💳 *BALANCE DUE:* ${_money(balance)}
+  // 📌 *Payment Status:* ${_paymentStatus(customer)}
+  // ----------------------------------------
+  // 📍 *Workshop Address:* $kWorkshopAddress
+  // 📞 *Contact / GPay / UPI:* +91 $kWorkshopPhone
+
+  // Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
+  // '''
+  //         .trim();
+  //   }
+
   static String buildPaymentReminderMessage(Customer customer) {
     final balance = customer.total - customer.advance;
 
     return '''
-📦 *RAIGON ARTS WORKSHOP* - Payment Due Reminder
+*RAIGON ARTS WORKSHOP* - Payment Due Reminder
 ----------------------------------------
 Dear *${customer.name}*,
 
 Friendly reminder regarding your framing order with Raigon Arts:
 
-🧾 *Order ID:* ${customer.id}
-📅 *Order Date:* ${_formatDate(customer.orderDate)}
-🚚 *Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+*Order ID:* ${customer.id}
+*Order Date:* ${_formatDate(customer.orderDate)}
+*Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
 
-🖼️ *Frame Details:*
+*Frame Details:*
 ${_frameDetails(customer)}
 
-🔢 *Total Quantity:* ${customer.qty} Frame(s)
+*Total Quantity:* ${customer.qty} Frame(s)
 
-💰 *TOTAL AMOUNT:* ${_money(customer.total)}
-💵 *Advance Paid:* ${_money(customer.advance)}
-💳 *BALANCE DUE:* ${_money(balance)}
-📌 *Payment Status:* ${_paymentStatus(customer)}
+*TOTAL AMOUNT:* ${_money(customer.total)}
+*Advance Paid:* ${_money(customer.advance)}
+*BALANCE DUE:* ${_money(balance)}
+*Payment Status:* ${_paymentStatus(customer)}
 ----------------------------------------
-📍 *Workshop Address:* $kWorkshopAddress
-📞 *Contact / GPay / UPI:* +91 $kWorkshopPhone
+*Workshop Address:* $kWorkshopAddress
+*Contact / GPay / UPI:* +91 $kWorkshopPhone
 
-Kindly clear the pending balance at your earliest convenience. Thank you! ❤️
+Kindly clear the pending balance at your earliest convenience. Thank you!
 '''
         .trim();
   }

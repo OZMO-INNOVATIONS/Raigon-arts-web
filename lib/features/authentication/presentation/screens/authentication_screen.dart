@@ -212,19 +212,18 @@ class _AuthScreenState extends State<AuthScreen> {
     _auth.backToSignIn();
   }
 
-  void _goTo(AuthStep step) => _auth.goTo(step);
+  // void _goTo(AuthStep step) => _auth.goTo(step);
 
   @override
   Widget build(BuildContext context) {
-    final isAuth = context.select<AuthProvider, bool>((a) => a.isAuthenticated) ||
+    final isAuth =
+        context.select<AuthProvider, bool>((a) => a.isAuthenticated) ||
         AuthTokenManager.instance.isAuthenticated;
 
     if (isAuth) {
       return const Scaffold(
         backgroundColor: AppColors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.gold),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppColors.gold)),
       );
     }
 
@@ -349,13 +348,13 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: AuthTextLink(
-            label: 'Forgot Password?',
-            onTap: () => _goTo(AuthStep.forgot),
-          ),
-        ),
+        // Align(
+        //   alignment: Alignment.centerRight,
+        //   child: AuthTextLink(
+        //     label: 'Forgot Password?',
+        //     onTap: () => _goTo(AuthStep.forgot),
+        //   ),
+        // ),
         const SizedBox(height: 14),
         AuthButton(
           label: 'Sign In to Workshop',

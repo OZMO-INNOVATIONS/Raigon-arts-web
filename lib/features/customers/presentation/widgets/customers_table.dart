@@ -43,9 +43,21 @@ class _CustomersTableState extends State<CustomersTable> {
     'ORDER DATE',
     'ACTIONS',
   ];
-  static const _w = <double>[140, 260, 170, 170, 180, 160];
+  // static const _w = <double>[140, 260, 170, 170, 180, 160];
 
-  static const double _actionsMin = 200;
+  // static const double _actionsMin = 200;
+  static const double _minTableWidth = 1100;
+  static const double _avatarSize = 44;
+  static const double _nameGap = 14;
+  static const List<int> _columnFlex = [
+    10, // Customer ID
+    14, // Customer Name
+    12, // Phone
+    12, // City
+    13, // Order Status
+    12, // Order Date
+    15, // Actions
+  ];
   static const double _hPad = 28;
   int _hoveredIndex = -1;
 
@@ -59,15 +71,10 @@ class _CustomersTableState extends State<CustomersTable> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final fixed = _w.fold<double>(0, (a, b) => a + b);
-
     return Expanded(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final tableWidth = math.max(
-            constraints.maxWidth,
-            fixed + _actionsMin + _hPad * 2,
-          );
+          final tableWidth = math.max(constraints.maxWidth, _minTableWidth);
 
           return ScrollbarTheme(
             data: ScrollbarThemeData(
@@ -150,13 +157,19 @@ class _CustomersTableState extends State<CustomersTable> {
     );
   }
 
-  Widget _cells(List<Widget> cells, Widget actions) => Row(
-    children: [
-      for (var i = 0; i < _w.length; i++)
-        SizedBox(width: _w[i], child: cells[i]),
-      Expanded(child: actions),
-    ],
-  );
+  Widget _cells(List<Widget> cells, Widget actions) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Six data columns with responsive widths.
+        for (var i = 0; i < cells.length; i++)
+          Expanded(flex: _columnFlex[i], child: cells[i]),
+
+        // Actions column.
+        Expanded(flex: _columnFlex.last, child: actions),
+      ],
+    );
+  }
 
   Widget _headerRow(AppPalette p) {
     final style = TextStyle(
@@ -165,11 +178,25 @@ class _CustomersTableState extends State<CustomersTable> {
       letterSpacing: 1.2,
       color: p.headerText,
     );
+
     return Container(
       color: p.tableHeaderBg,
       padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 22),
       child: _cells(
-        [for (var i = 0; i < _w.length; i++) Text(_labels[i], style: style)],
+        [
+          Text(_labels[0], style: style),
+
+          Text(
+            _labels[1],
+            style: style,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(_labels[2], style: style),
+          Text(_labels[3], style: style),
+          Text(_labels[4], style: style),
+          Text(_labels[5], style: style),
+        ],
         Align(
           alignment: Alignment.center,
           child: Text(_labels.last, style: style),
@@ -211,8 +238,8 @@ class _CustomersTableState extends State<CustomersTable> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: _avatarSize,
+                    height: _avatarSize,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.avatarBg,
@@ -227,17 +254,19 @@ class _CustomersTableState extends State<CustomersTable> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
-
+                  const SizedBox(width: _nameGap),
                   Expanded(
-                    child: Text(
-                      c.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: p.textPrimary,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        c.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: p.textPrimary,
+                        ),
                       ),
                     ),
                   ),
@@ -266,7 +295,11 @@ class _CustomersTableState extends State<CustomersTable> {
             children: [
               _action(
                 onTap: () => widget.onView?.call(c),
-                child: Icon(RemixIcons.eye_line, size: 20, color: p.textPrimary),
+                child: Icon(
+                  RemixIcons.eye_line,
+                  size: 20,
+                  color: p.textPrimary,
+                ),
               ),
               const SizedBox(width: 10),
               _action(
@@ -350,7 +383,11 @@ class PhotoStrip extends StatelessWidget {
     Color(0xFFE2D8D0),
   ];
 
-  void _openViewer(BuildContext context, int initialIndex, List<String> validUrls) {
+  void _openViewer(
+    BuildContext context,
+    int initialIndex,
+    List<String> validUrls,
+  ) {
     if (customer != null) {
       showAppImageViewer(
         context: context,
@@ -382,8 +419,9 @@ class PhotoStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final validUrls = urls.where((u) => u.trim().isNotEmpty).toList();
-    final effectiveCount =
-        count > 0 ? count : math.max(validUrls.length, bytes.length);
+    final effectiveCount = count > 0
+        ? count
+        : math.max(validUrls.length, bytes.length);
 
     if (effectiveCount <= 0) {
       return Text(
@@ -416,7 +454,10 @@ class PhotoStrip extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => _openViewer(context, shown, validUrls),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.gold.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(5),
@@ -451,8 +492,9 @@ class PhotoStrip extends StatelessWidget {
     AppPalette p,
     List<String> validUrls,
   ) {
-    final rawUrl =
-        i < validUrls.length ? validUrls[i] : (i < urls.length ? urls[i] : '');
+    final rawUrl = i < validUrls.length
+        ? validUrls[i]
+        : (i < urls.length ? urls[i] : '');
     final url = ImageUrlHelper.resolve(rawUrl);
 
     Widget imageWidget;

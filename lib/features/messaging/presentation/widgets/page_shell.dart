@@ -25,22 +25,7 @@ class PageShell extends StatelessWidget {
 
     final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Text(
-        //   title,
-        //   style: TextStyle(
-        //     fontSize: narrow ? 26 : 30,
-        //     fontWeight: FontWeight.w800,
-        //     letterSpacing: -0.9,
-        //     color: p.textPrimary,
-        //   ),
-        // ),
-        // const SizedBox(height: 4),
-        // Text(
-        //   subtitle,
-        //   style: TextStyle(color: p.textMuted, fontSize: 14, height: 1.35),
-        // ),
-      ],
+      children: [],
     );
 
     // Header stays fixed above the scrollable content.

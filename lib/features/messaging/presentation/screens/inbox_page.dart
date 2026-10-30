@@ -297,34 +297,6 @@ class WhatsAppInboxService {
     return items;
   }
 
-  Future<void> sendAudio({
-    required String phone,
-    required Uint8List bytes,
-    required String mimeType,
-    bool voice = true,
-  }) async {
-    final data = await _request(
-      method: 'POST',
-      body: {
-        'action': 'send_audio',
-        'to': phone,
-        'audio_base64': base64Encode(bytes),
-        'mime_type': mimeType,
-        'voice': voice,
-      },
-    );
-    if (data['success'] != true) {
-      throw Exception(
-        data['error']?.toString() ?? 'Failed to send WhatsApp audio.',
-      );
-    }
-    if (data['saved'] == false) {
-      throw Exception(
-        'WhatsApp accepted the audio, but saving it to the inbox failed. Refresh the conversation.',
-      );
-    }
-  }
-
   Future<Uint8List> fetchAudioBytes(String messageId) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) throw Exception('Please sign in to play audio.');
@@ -470,16 +442,14 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   Timer? _waDebounce;
   Timer? _waPoll;
   bool _waPolling = false;
-  html.MediaStream? _recordingStream;
-  html.MediaRecorder? _mediaRecorder;
-  final List<html.Blob> _recordingChunks = [];
-  bool _recording = false;
-  bool _sendingAudio = false;
-  DateTime? _recordingStartedAt;
-  Timer? _recordingTimer;
-  int _recordingSeconds = 0;
   final Map<String, String> _audioObjectUrls = {};
+  final Map<String, html.AudioElement> _audioPlayers = {};
+  final Map<String, double> _audioPositions = {};
+  final Map<String, double> _audioDurations = {};
   final Set<String> _playingAudio = {};
+  final Set<String> _loadingAudio = {};
+  final Map<String, double> _audioSpeeds = {};
+  Timer? _audioProgressTimer;
 
   AppPalette get p => AppPalette.of(context);
 
@@ -535,8 +505,11 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     if (_waChannel != null) {
       Supabase.instance.client.removeChannel(_waChannel);
     }
-    _recordingTimer?.cancel();
-    _stopTracks();
+    _audioProgressTimer?.cancel();
+    for (final audio in _audioPlayers.values) {
+      audio.pause();
+      audio.src = '';
+    }
     for (final url in _audioObjectUrls.values) {
       html.Url.revokeObjectUrl(url);
     }
@@ -859,179 +832,14 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     }
   }
 
-  // ── voice recording / playback (web)
+  // ── Incoming WhatsApp audio playback (web)
 
-  void _stopTracks() {
-    try {
-      _recordingStream?.getTracks().forEach((track) => track.stop());
-    } catch (_) {}
-    _recordingStream = null;
-  }
-
-  String? _supportedRecordingMime() {
-    const candidates = [
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-      'audio/ogg',
-      'audio/mpeg',
-      'audio/aac',
-      'audio/3gpp',
-    ];
-    for (final type in candidates) {
-      try {
-        if (html.MediaRecorder.isTypeSupported(type)) return type;
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  Future<void> _startRecording() async {
-    if (_recording || _sendingAudio || _waSelected == null) return;
-    final mimeType = _supportedRecordingMime();
-    if (mimeType == null) {
-      _snack(
-        'This browser cannot record a WhatsApp-compatible audio format. '
-        'Try Safari or use an audio file in a supported format.',
-      );
-      return;
-    }
-    try {
-      final stream = await html.window.navigator.mediaDevices!.getUserMedia({
-        'audio': true,
-      });
-      final recorder = html.MediaRecorder(stream, {'mimeType': mimeType});
-      _recordingChunks.clear();
-      // DOM listeners: dart:html's MediaRecorder stream accessors are not
-      // exposed consistently by the current Dart SDK.
-      recorder.addEventListener('dataavailable', (html.Event event) {
-        final data = (event as dynamic).data as html.Blob?;
-        if (data != null && data.size > 0) {
-          _recordingChunks.add(data);
-        }
-      });
-      _recordingStream = stream;
-      _mediaRecorder = recorder;
-      recorder.start();
-      if (!mounted) return;
-      setState(() {
-        _recording = true;
-        _recordingSeconds = 0;
-        _recordingStartedAt = DateTime.now();
-      });
-      _recordingTimer?.cancel();
-      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted && _recordingStartedAt != null) {
-          setState(
-            () => _recordingSeconds = DateTime.now()
-                .difference(_recordingStartedAt!)
-                .inSeconds,
-          );
-        }
-      });
-    } catch (e) {
-      _stopTracks();
-      _snack('Microphone access failed: $e');
-    }
-  }
-
-  Future<void> _stopRecordingAndSend() async {
-    final recorder = _mediaRecorder;
-    final phone = _waSelected;
-    if (recorder == null || phone == null || !_recording || _sendingAudio) {
-      return;
-    }
-    final stopped = Completer<void>();
-    recorder.addEventListener('stop', (html.Event _) {
-      if (!stopped.isCompleted) stopped.complete();
-    });
-    try {
-      recorder.stop();
-      await stopped.future.timeout(const Duration(seconds: 5));
-      _recordingTimer?.cancel();
-      final chunks = List<html.Blob>.from(_recordingChunks);
-      final recordedMimeType = recorder.mimeType;
-      final mimeType = recordedMimeType != null && recordedMimeType.isNotEmpty
-          ? recordedMimeType.split(';').first
-          : (_supportedRecordingMime() ?? 'audio/mp4').split(';').first;
-      _stopTracks();
-      if (chunks.isEmpty) {
-        throw Exception('No audio was recorded. Please try again.');
-      }
-      final blob = html.Blob(chunks, mimeType);
-
-      final reader = html.FileReader();
-      reader.readAsDataUrl(blob);
-      await reader.onLoad.first;
-
-      final result = reader.result;
-
-      if (result is! String) {
-        throw Exception('Could not read the recorded audio.');
-      }
-
-      final commaIndex = result.indexOf(',');
-      if (commaIndex < 0) {
-        throw Exception('Invalid recorded audio data.');
-      }
-
-      final bytes = base64Decode(result.substring(commaIndex + 1));
-
-      if (bytes.isEmpty) {
-        throw Exception('The recorded audio is empty.');
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _recording = false;
-        _sendingAudio = true;
-      });
-      await _waService.sendAudio(
-        phone: phone,
-        bytes: bytes,
-        mimeType: mimeType,
-        voice: true,
-      );
-      _snack('WhatsApp voice message sent.');
-      await _refreshWa();
-    } catch (e) {
-      _snack('Could not send voice message: $e', error: true);
-    } finally {
-      _recordingTimer?.cancel();
-      _stopTracks();
-      if (mounted) {
-        setState(() {
-          _recording = false;
-          _sendingAudio = false;
-          _recordingStartedAt = null;
-          _recordingSeconds = 0;
-          _mediaRecorder = null;
-          _recordingChunks.clear();
-        });
-      }
-    }
-  }
-
-  Future<void> _cancelRecording() async {
-    try {
-      _mediaRecorder?.stop();
-    } catch (_) {}
-    _recordingTimer?.cancel();
-    _stopTracks();
-    if (mounted) {
-      setState(() {
-        _recording = false;
-        _recordingStartedAt = null;
-        _recordingSeconds = 0;
-        _mediaRecorder = null;
-        _recordingChunks.clear();
-      });
-    }
-  }
-
-  String _durationLabel(int seconds) {
-    final m = (seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
+  String _audioTimeLabel(double seconds) {
+    if (!seconds.isFinite || seconds < 0) seconds = 0;
+    final total = seconds.floor();
+    final minutes = (total ~/ 60).toString();
+    final secs = (total % 60).toString().padLeft(2, '0');
+    return '$minutes:$secs';
   }
 
   Future<void> _playAudio(WhatsAppInboxMessage message) async {
@@ -1040,6 +848,26 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
       _snack('This audio message has no WhatsApp message ID.');
       return;
     }
+
+    final existing = _audioPlayers[id];
+    if (existing != null) {
+      if (_playingAudio.contains(id)) {
+        existing.pause();
+        if (mounted) setState(() => _playingAudio.remove(id));
+      } else {
+        try {
+          await existing.play();
+          if (mounted) setState(() => _playingAudio.add(id));
+        } catch (e) {
+          _snack('Could not play voice message: $e');
+        }
+      }
+      return;
+    }
+
+    if (_loadingAudio.contains(id)) return;
+    setState(() => _loadingAudio.add(id));
+
     try {
       String? objectUrl = _audioObjectUrls[id];
       if (objectUrl == null) {
@@ -1048,19 +876,96 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         objectUrl = html.Url.createObjectUrlFromBlob(blob);
         _audioObjectUrls[id] = objectUrl;
       }
-      final audio = html.AudioElement(objectUrl);
-      audio.controls = true;
-      audio.autoplay = true;
+
+      // Pause any other message before starting this one.
+      for (final entry in _audioPlayers.entries) {
+        if (entry.key != id) {
+          entry.value.pause();
+        }
+      }
+
+      final audio = html.AudioElement(objectUrl)
+        ..preload = 'metadata'
+        ..controls = false;
+      _audioPlayers[id] = audio;
+      _audioSpeeds[id] = 1.0;
+
+      audio.onLoadedMetadata.listen((_) {
+        if (!mounted) return;
+        final duration = audio.duration.toDouble();
+        if (duration.isFinite && duration > 0) {
+          setState(() => _audioDurations[id] = duration);
+        }
+      });
+
+      audio.onEnded.listen((_) {
+        if (!mounted) return;
+        setState(() {
+          _playingAudio.remove(id);
+          _audioPositions[id] = 0;
+        });
+        audio.currentTime = 0;
+      });
+
       await audio.play();
       if (!mounted) return;
-      setState(() => _playingAudio.add(id));
-      audio.onEnded.first.then((_) {
-        if (mounted) setState(() => _playingAudio.remove(id));
+      setState(() {
+        _loadingAudio.remove(id);
+        _playingAudio
+          ..clear()
+          ..add(id);
+        final duration = audio.duration.toDouble();
+        if (duration.isFinite && duration > 0) {
+          _audioDurations[id] = duration;
+        }
       });
-      _snack('Playing voice message.');
+
+      _audioProgressTimer ??= Timer.periodic(
+        const Duration(milliseconds: 180),
+        (_) {
+          if (!mounted) return;
+          var changed = false;
+          for (final playingId in _playingAudio.toList()) {
+            final player = _audioPlayers[playingId];
+            if (player == null) continue;
+            final position = player.currentTime.toDouble();
+            if (position.isFinite) {
+              _audioPositions[playingId] = position;
+              changed = true;
+            }
+            final duration = player.duration.toDouble();
+            if (duration.isFinite && duration > 0) {
+              _audioDurations[playingId] = duration;
+            }
+          }
+          if (changed) setState(() {});
+        },
+      );
     } catch (e) {
+      if (mounted) {
+        setState(() => _loadingAudio.remove(id));
+      }
       _snack('Could not play voice message: $e');
     }
+  }
+
+  void _seekAudio(String id, double fraction) {
+    final audio = _audioPlayers[id];
+    if (audio == null) return;
+    final duration = audio.duration.toDouble();
+    if (!duration.isFinite || duration <= 0) return;
+    final next = (duration * fraction.clamp(0.0, 1.0)).toDouble();
+    audio.currentTime = next;
+    setState(() => _audioPositions[id] = next);
+  }
+
+  void _changeAudioSpeed(String id) {
+    final audio = _audioPlayers[id];
+    if (audio == null) return;
+    final current = _audioSpeeds[id] ?? 1.0;
+    final next = current == 1.0 ? 1.5 : (current == 1.5 ? 2.0 : 1.0);
+    audio.playbackRate = next;
+    setState(() => _audioSpeeds[id] = next);
   }
 
   // ───────────────────────── list state helpers ─────────────────────────
@@ -1363,32 +1268,204 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     );
   }
 
-  Widget _audioBody(WhatsAppInboxMessage m) {
-    final out = m.isOutgoing;
-    final playing = m.messageId != null && _playingAudio.contains(m.messageId);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: 'Play voice message',
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          onPressed: m.messageId == null ? null : () => _playAudio(m),
-          icon: Icon(
-            playing ? Icons.graphic_eq_rounded : Icons.play_circle_fill_rounded,
-            size: 34,
-            color: ChannelColors.waDeep,
+  Widget _audioBody(WhatsAppInboxMessage m, {required bool outgoing}) {
+    final id = m.messageId;
+    final isPlaying = id != null && _playingAudio.contains(id);
+    final isLoading = id != null && _loadingAudio.contains(id);
+    final position = id == null ? 0.0 : (_audioPositions[id] ?? 0.0);
+    final duration = id == null ? 0.0 : (_audioDurations[id] ?? 0.0);
+    final progress = duration > 0
+        ? (position / duration).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final speed = id == null ? 1.0 : (_audioSpeeds[id] ?? 1.0);
+
+    // Match the surrounding WhatsApp message bubble in both theme modes.
+    // Incoming uses the normal surface; outgoing uses the WhatsApp green bubble.
+    final foreground = outgoing ? _outText : p.textPrimary;
+    final secondary = outgoing ? _outMeta : p.textMuted;
+    final playedWave = outgoing
+        ? (p.isDark ? const Color(0xFF8DE2D0) : const Color(0xFF168A70))
+        : const Color(0xFF20A8A0);
+    final unplayedWave = foreground.withValues(alpha: p.isDark ? .32 : .24);
+    final playButtonFill = foreground.withValues(alpha: p.isDark ? .13 : .09);
+    final speedFill = foreground.withValues(alpha: p.isDark ? .14 : .08);
+
+    const barHeights = <double>[
+      12,
+      20,
+      15,
+      28,
+      18,
+      24,
+      13,
+      31,
+      20,
+      15,
+      26,
+      34,
+      18,
+      23,
+      14,
+      29,
+      19,
+      32,
+      14,
+      22,
+      27,
+      16,
+      34,
+      20,
+      13,
+      25,
+      18,
+      30,
+      15,
+      22,
+      34,
+      17,
+      26,
+      13,
+      21,
+      29,
+      16,
+      24,
+      32,
+      18,
+      27,
+      14,
+      22,
+      30,
+      17,
+      25,
+    ];
+
+    return SizedBox(
+      width: 300,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Material(
+                color: playButtonFill,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: id == null || isLoading ? null : () => _playAudio(m),
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: Center(
+                      child: isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: foreground,
+                              ),
+                            )
+                          : Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 30,
+                              color: foreground,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (details) {
+                        if (id == null || duration <= 0) return;
+                        _seekAudio(
+                          id,
+                          (details.localPosition.dx / constraints.maxWidth)
+                              .clamp(0.0, 1.0)
+                              .toDouble(),
+                        );
+                      },
+                      child: SizedBox(
+                        height: 42,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            for (var i = 0; i < barHeights.length; i++)
+                              Container(
+                                width: 2.4,
+                                height: barHeights[i],
+                                decoration: BoxDecoration(
+                                  color: i / barHeights.length < progress
+                                      ? playedWave
+                                      : unplayedWave,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: id == null ? null : () => _changeAudioSpeed(id),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 48,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: speedFill,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${speed == speed.roundToDouble() ? speed.toInt() : speed}×',
+                    style: TextStyle(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'Voice message',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: out ? _outText : p.textPrimary,
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              const SizedBox(width: 52),
+              Text(
+                duration > 0 ? _audioTimeLabel(duration) : '0:00',
+                style: TextStyle(
+                  color: secondary,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (isPlaying && position > 0)
+                Text(
+                  '-${_audioTimeLabel((duration - position).clamp(0.0, duration).toDouble())}',
+                  style: TextStyle(
+                    color: secondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              const SizedBox(width: 8),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1398,7 +1475,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
       outgoing: out,
       sender: out ? null : display,
       text: m.isAudio ? '' : m.text,
-      body: m.isAudio ? _audioBody(m) : null,
+      body: m.isAudio ? _audioBody(m, outgoing: out) : null,
       time: formatInboxTime(m.createdAt),
       status: m.status,
       outgoingColor: _outBubble,
@@ -1608,78 +1685,30 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (_recording)
-            IconButton(
-              tooltip: 'Cancel recording',
-              onPressed: _cancelRecording,
-              icon: const Icon(Icons.close_rounded, color: Colors.red),
-            )
-          else
-            IconButton(
-              tooltip: 'Record voice message',
-              onPressed: phone == null || _waSending || _sendingAudio
-                  ? null
-                  : _startRecording,
-              icon: Icon(Icons.mic_none_rounded, color: p.accent),
-            ),
-          if (_recording)
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.fiber_manual_record,
-                      size: 12,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Recording ${_durationLabel(_recordingSeconds)}',
-                        style: TextStyle(color: p.textPrimary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: TextField(
-                controller: _waText,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 4096,
-                enabled: phone != null && !_waSending && !_sendingAudio,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.send,
-                keyboardType: TextInputType.text,
-                onSubmitted: (_) => _sendWa(),
-                decoration: inboxPillField(
-                  p,
-                  phone == null
-                      ? 'Select a conversation'
-                      : 'Message on WhatsApp…',
-                ),
+          Expanded(
+            child: TextField(
+              controller: _waText,
+              minLines: 1,
+              maxLines: 4,
+              maxLength: 4096,
+              enabled: phone != null && !_waSending,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.send,
+              keyboardType: TextInputType.text,
+              onSubmitted: (_) => _sendWa(),
+              decoration: inboxPillField(
+                p,
+                phone == null
+                    ? 'Select a conversation'
+                    : 'Message on WhatsApp…',
               ),
             ),
+          ),
           const SizedBox(width: 10),
           SendButton(
-            tooltip: _recording
-                ? 'Send voice message'
-                : 'Send WhatsApp message',
-            busy: _waSending || _sendingAudio,
-            onPressed: phone == null || _waSending || _sendingAudio
-                ? null
-                : (_recording ? _stopRecordingAndSend : _sendWa),
+            tooltip: 'Send WhatsApp message',
+            busy: _waSending,
+            onPressed: phone == null || _waSending ? null : _sendWa,
           ),
         ],
       ),

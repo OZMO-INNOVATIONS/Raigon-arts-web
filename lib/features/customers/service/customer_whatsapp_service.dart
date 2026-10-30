@@ -8,7 +8,10 @@ import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 
 const String kWorkshopPhone = AuthModel.registeredPhone;
-const String kWorkshopAddress = 'Main Workshop, MG Road, Trivandrum';
+// const String kWorkshopAddress = 'Main Workshop, MG Road, Trivandrum';
+const String kWorkshopAddress =
+    'VP 302-A, R J Building, Kollamkonam Junction, '
+    'Vilappilsala, Thiruvananthapuram, Kerala 695573';
 
 class CustomerWhatsAppService {
   static String _formatDate(DateTime? date) {

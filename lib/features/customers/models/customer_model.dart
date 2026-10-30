@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Color;
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -5,6 +6,18 @@ import 'dart:typed_data';
 import 'package:raigon_art/core/utils/helper.dart';
 import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:raigon_art/core/models/status.dart';
+
+
+enum OrderPriority {
+  urgent('Urgent', Color(0xFFEF4444)),
+  high('High', Color(0xFFF59E0B)),
+  normal('Normal', Color(0xFF3B82F6)),
+  low('Low', Color(0xFF6B7280));
+
+  const OrderPriority(this.label, this.color);
+  final String label;
+  final Color color;
+}
 
 class Customer {
   const Customer({
@@ -21,6 +34,7 @@ class Customer {
     required this.advance,
     required this.status,
     required this.orderDate,
+    this.region = '',
     this.photoUrls = const [],
     this.altPhone = '',
     this.pincode = '',
@@ -37,6 +51,7 @@ class Customer {
   final String id;
   final String name;
   final String city;
+  final String region;
   final String phone;
   final String address;
   final int photoCount;
@@ -62,6 +77,38 @@ class Customer {
   int get balance => total - advance;
   String get orderDateLabel => Helper.formatDate(orderDate);
 
+  String get effectiveRegion =>
+      region.isNotEmpty ? region : (city.isNotEmpty ? city : 'Main Region');
+
+  /// Computes order priority based on delivery date urgency, status and pending balance.
+  OrderPriority get orderPriority {
+    if (status == Status.completed || status == Status.cancelled) {
+      return OrderPriority.low;
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (expectedDelivery != null) {
+      final exp = DateTime(
+        expectedDelivery!.year,
+        expectedDelivery!.month,
+        expectedDelivery!.day,
+      );
+      if (exp.isBefore(today) || exp.isAtSameMomentAs(today)) {
+        return OrderPriority.urgent;
+      }
+      if (exp.difference(today).inDays <= 3) {
+        return OrderPriority.high;
+      }
+    }
+    if (status == Status.inProgress && balance > 5000) {
+      return OrderPriority.high;
+    }
+    if (status == Status.inProgress) {
+      return OrderPriority.high;
+    }
+    return OrderPriority.normal;
+  }
+
   List<FrameSpec> get effectiveFrames => frames.isNotEmpty
       ? frames
       : [
@@ -80,6 +127,7 @@ class Customer {
     'id': id,
     'name': name,
     'city': city,
+    'region': region,
     'phone': phone,
     'altPhone': altPhone,
     'address': address,
@@ -107,6 +155,7 @@ class Customer {
     'id': id,
     'name': name,
     'city': city,
+    'region': region,
     'phone': phone,
     'altPhone': altPhone,
     'address': address,
@@ -282,6 +331,7 @@ class Customer {
       id: (j['id'] ?? '')?.toString() ?? '',
       name: (j['name'] ?? '')?.toString() ?? '',
       city: (j['city'] ?? '')?.toString() ?? '',
+      region: (j['region'] ?? j['regionId'] ?? j['region_id'] ?? j['city'] ?? '')?.toString() ?? '',
       phone: (j['phone'] ?? '')?.toString() ?? '',
       altPhone: (j['altPhone'] ?? j['alt_phone'] ?? '')?.toString() ?? '',
       address: (j['address'] ?? '')?.toString() ?? '',
@@ -310,6 +360,7 @@ class Customer {
 
   Customer copyWith({
     Status? status,
+    String? region,
     String? paymentStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -317,6 +368,7 @@ class Customer {
     id: id,
     name: name,
     city: city,
+    region: region ?? this.region,
     phone: phone,
     address: address,
     photoCount: photoCount,
@@ -341,6 +393,7 @@ class Customer {
   );
 
   Customer copyWithImages({
+    String? region,
     List<Uint8List>? photoBytes,
     List<String>? photoNames,
     List<String>? photoUrls,
@@ -352,6 +405,7 @@ class Customer {
     id: id,
     name: name,
     city: city,
+    region: region ?? this.region,
     phone: phone,
     address: address,
     photoCount: photoCount ?? this.photoCount,

@@ -5,6 +5,7 @@ enum NavDestination {
   dashboard,
   customers,
   orders,
+  reminders,
   photoCollection,
   frameSizes,
   messagingAutomation,
@@ -17,8 +18,9 @@ extension NavDestinationX on NavDestination {
     NavDestination.dashboard => 'Dashboard',
     NavDestination.customers => 'Customers',
     NavDestination.orders => 'Orders',
-    NavDestination.photoCollection => 'Photo Collection',
-    NavDestination.frameSizes => 'Frame Sizes',
+    NavDestination.reminders => 'Reminders',
+    NavDestination.photoCollection => 'Catalogue',
+    NavDestination.frameSizes => 'Material',
     NavDestination.messagingAutomation => 'Messaging Automation',
     NavDestination.reports => 'Reports',
     NavDestination.profile => 'Profile',
@@ -28,6 +30,7 @@ extension NavDestinationX on NavDestination {
     NavDestination.dashboard => RemixIcons.dashboard_line,
     NavDestination.customers => RemixIcons.team_line,
     NavDestination.orders => RemixIcons.inbox_line,
+    NavDestination.reminders => RemixIcons.alarm_line,
     NavDestination.photoCollection => RemixIcons.gallery_line,
     NavDestination.frameSizes => RemixIcons.ruler_line,
     NavDestination.messagingAutomation => RemixIcons.message_3_line,
@@ -39,6 +42,7 @@ extension NavDestinationX on NavDestination {
   bool get isStaffAllowed => switch (this) {
     NavDestination.customers ||
     NavDestination.orders ||
+    NavDestination.reminders ||
     NavDestination.photoCollection ||
     NavDestination.frameSizes ||
     NavDestination.messagingAutomation ||

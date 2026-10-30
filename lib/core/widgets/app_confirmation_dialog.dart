@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/widgets/customer_dialog_kit.dart';
@@ -74,6 +75,29 @@ Future<bool> showDeleteOrderConfirmationDialog(
     confirmLabel: 'Delete',
     cancelLabel: 'Cancel',
     icon: RemixIcons.delete_bin_line,
+  );
+}
+
+
+/// Confirmation dialog for deleting a reminder with high-end luxury styling.
+Future<bool> showDeleteReminderConfirmationDialog(
+  BuildContext context,
+  CustomerReminder reminder,
+) {
+  final title = reminder.title.trim().isNotEmpty
+      ? reminder.title.trim()
+      : 'this reminder';
+  final customer = reminder.customerName.trim().isNotEmpty
+      ? ' for ${reminder.customerName.trim()}'
+      : '';
+  return showAppConfirmationDialog(
+    context,
+    title: 'Delete Reminder',
+    message: 'Are you sure you want to delete "$title"$customer?',
+    confirmLabel: 'Delete',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.delete_bin_line,
+    isDestructive: true,
   );
 }
 

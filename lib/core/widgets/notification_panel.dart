@@ -40,7 +40,9 @@ class _NotificationPanelState extends State<NotificationPanel> {
           .where((n) => n.type == NotificationType.completed)
           .toList(),
     _Filter.dues =>
-      widget.notifications.where((n) => n.type == NotificationType.due).toList(),
+      widget.notifications
+          .where((n) => n.type == NotificationType.due)
+          .toList(),
   };
 
   @override
@@ -217,7 +219,11 @@ class _NotificationPanelState extends State<NotificationPanel> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(RemixIcons.arrow_right_line, size: 18, color: p.textPrimary),
+                    Icon(
+                      RemixIcons.arrow_right_line,
+                      size: 18,
+                      color: p.textPrimary,
+                    ),
                   ],
                 ),
               ),
@@ -447,14 +453,18 @@ class _NotificationPanelState extends State<NotificationPanel> {
                               onTap: () async {
                                 if (n.customer != null) {
                                   if (isDue) {
-                                    await CustomerWhatsAppService.openPaymentReminder(n.customer!);
+                                    await CustomerWhatsAppService.openPaymentReminder(
+                                      n.customer!,
+                                    );
                                   } else {
-                                    await CustomerWhatsAppService.openOrderConfirmation(n.customer!);
+                                    await CustomerWhatsAppService.openOrderConfirmation(
+                                      n.customer!,
+                                    );
                                   }
                                 } else {
                                   CustomerWhatsAppService.openDirectChat(
                                     n.phone,
-                                    'Hello! Regarding your Raigon Arts framing order: ${n.message}',
+                                    'Hello! Regarding your RAIGON ART framing order: ${n.message}',
                                   );
                                 }
                               },
@@ -465,10 +475,14 @@ class _NotificationPanelState extends State<NotificationPanel> {
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.green.withValues(alpha: 0.14),
+                                  color: AppColors.green.withValues(
+                                    alpha: 0.14,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: AppColors.green.withValues(alpha: 0.4),
+                                    color: AppColors.green.withValues(
+                                      alpha: 0.4,
+                                    ),
                                   ),
                                 ),
                                 child: Row(

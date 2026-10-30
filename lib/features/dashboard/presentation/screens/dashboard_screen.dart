@@ -121,11 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 'Total revenue and financial analytics on the dashboard are restricted to Administrator accounts. Please navigate to Customers or Orders to manage framing work.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: p.textMuted,
-                ),
+                style: TextStyle(fontSize: 14, height: 1.5, color: p.textMuted),
               ),
               const SizedBox(height: 24),
               AppPrimaryButton(
@@ -161,7 +157,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(RemixIcons.cloud_off_line, size: 54, color: AppColors.error),
+              const Icon(
+                RemixIcons.cloud_off_line,
+                size: 54,
+                color: AppColors.error,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Connection Issue',
@@ -185,16 +185,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Retry Connection',
                 icon: RemixIcons.refresh_line,
                 onPressed: () {
-                  customerAndOrderProvider.refresh().then((_) {
-                    if (context.mounted) {
-                      AppSnackBar.success(context, 'Connected successfully.');
-                    }
-                  }).catchError((e) {
-                    if (context.mounted) {
-                      final errText = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
-                      AppSnackBar.error(context, errText);
-                    }
-                  });
+                  customerAndOrderProvider
+                      .refresh()
+                      .then((_) {
+                        if (context.mounted) {
+                          AppSnackBar.success(
+                            context,
+                            'Connected successfully.',
+                          );
+                        }
+                      })
+                      .catchError((e) {
+                        if (context.mounted) {
+                          final errText = e is ApiException
+                              ? e.userFriendlyMessage
+                              : 'Retry failed.';
+                          AppSnackBar.error(context, errText);
+                        }
+                      });
                 },
               ),
             ],
@@ -274,7 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Welcome back, Raigon Arts Workshop Manager',
+          'Welcome back, RAIGON ART Workshop Manager',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 15.5, color: p.textMuted),

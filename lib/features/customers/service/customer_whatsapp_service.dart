@@ -106,11 +106,11 @@ class CustomerWhatsAppService {
   //     final balance = customer.total - customer.advance;
 
   //     return '''
-  // 📦 *RAIGON ARTS WORKSHOP* - Order Confirmation
+  // 📦 *RAIGON ART WORKSHOP* - Order Confirmation
   // ----------------------------------------
   // Dear *${customer.name}*,
 
-  // Thank you for your framing order with Raigon Arts! Here are your complete order details:
+  // Thank you for your framing order with RAIGON ART! Here are your complete order details:
 
   // 🧾 *Order ID:* ${customer.id}
   // 📅 *Order Date:* ${_formatDate(customer.orderDate)}
@@ -133,7 +133,7 @@ class CustomerWhatsAppService {
   // 📍 *Workshop Address:* $kWorkshopAddress
   // 📞 *Contact:* +91 $kWorkshopPhone
 
-  // Thank you for choosing Raigon Arts! ❤️
+  // Thank you for choosing RAIGON ART! ❤️
   // '''
   //         .trim();
   //   }
@@ -142,11 +142,11 @@ class CustomerWhatsAppService {
     final balance = customer.total - customer.advance;
 
     return '''
-*RAIGON ARTS WORKSHOP* - Order Confirmation
+*RAIGON ART WORKSHOP* - Order Confirmation
 ----------------------------------------
 Dear *${customer.name}*,
 
-Thank you for your framing order with Raigon Arts! Here are your complete order details:
+Thank you for your framing order with RAIGON ART! Here are your complete order details:
 
 *Order ID:* ${customer.id}
 *Order Date:* ${_formatDate(customer.orderDate)}
@@ -169,7 +169,7 @@ ${_frameFinishes(customer)}
 *Workshop Address:* $kWorkshopAddress
 *Contact:* +91 $kWorkshopPhone
 
-Thank you for choosing Raigon Arts!
+Thank you for choosing RAIGON ART!
 '''
         .trim();
   }
@@ -194,11 +194,11 @@ Thank you for choosing Raigon Arts!
   //     final balance = customer.total - customer.advance;
 
   //     return '''
-  // 📦 *RAIGON ARTS WORKSHOP* - Payment Due Reminder
+  // 📦 *RAIGON ART WORKSHOP* - Payment Due Reminder
   // ----------------------------------------
   // Dear *${customer.name}*,
 
-  // Friendly reminder regarding your framing order with Raigon Arts:
+  // Friendly reminder regarding your framing order with RAIGON ART:
 
   // 🧾 *Order ID:* ${customer.id}
   // 📅 *Order Date:* ${_formatDate(customer.orderDate)}
@@ -226,11 +226,11 @@ Thank you for choosing Raigon Arts!
     final balance = customer.total - customer.advance;
 
     return '''
-*RAIGON ARTS WORKSHOP* - Payment Due Reminder
+*RAIGON ART WORKSHOP* - Payment Due Reminder
 ----------------------------------------
 Dear *${customer.name}*,
 
-Friendly reminder regarding your framing order with Raigon Arts:
+Friendly reminder regarding your framing order with RAIGON ART:
 
 *Order ID:* ${customer.id}
 *Order Date:* ${_formatDate(customer.orderDate)}
@@ -316,6 +316,10 @@ Kindly clear the pending balance at your earliest convenience. Thank you!
       }
     }
   }
+
+  /// Alias for openDirectChat with named parameters
+  static Future<bool> openWhatsApp({required String phone, String? message}) =>
+      openDirectChat(phone, message);
 
   static Future<bool> sendApiOrderConfirmation(String customerId) async {
     try {

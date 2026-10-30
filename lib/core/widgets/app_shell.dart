@@ -1,3 +1,6 @@
+import 'package:raigon_art/features/reminders/models/reminder_model.dart';
+import 'package:raigon_art/features/reminders/presentation/screens/reminders_screen.dart';
+import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
@@ -52,6 +55,7 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
 
       context.read<CustomerAndOrderProvider>().init();
+      context.read<ReminderProvider?>()?.init();
     });
   }
 
@@ -99,6 +103,7 @@ class _AppShellState extends State<AppShell> {
     NavDestination.dashboard => const DashboardScreen(),
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
+    NavDestination.reminders => const RemindersScreen(),
     NavDestination.photoCollection => const PhotoCollectionScreen(),
     NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),
@@ -110,7 +115,14 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final customers = context.watch<CustomerAndOrderProvider>().customers;
-    final notifications = buildNotificationsFromCustomers(customers);
+    List<CustomerReminder> reminders = const [];
+    try {
+      final rp = context.watch<ReminderProvider?>();
+      reminders = rp?.reminderList ?? rp?.allReminders ?? const [];
+    } catch (_) {
+      reminders = const [];
+    }
+    final notifications = buildNotificationsFromCustomers(customers, reminders);
 
     return ShellScope(
       goTo: _goTo,
@@ -180,7 +192,9 @@ class _AppShellState extends State<AppShell> {
                   onViewAll: () => _goTo(NavDestination.orders),
                   onSelectNotification: (item) {
                     setState(() => _showNotifications = false);
-                    if (item.customer != null) {
+                    if (item.reminder != null) {
+                      _goTo(NavDestination.reminders);
+                    } else if (item.customer != null) {
                       showViewCustomerDialog(context, item.customer!);
                     } else {
                       _goTo(NavDestination.orders);

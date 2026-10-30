@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -34,6 +35,8 @@ class RaigonartApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FrameSizeProvider()),
         ChangeNotifierProvider(create: (_) => MessagingAutomationProvider()),
         ChangeNotifierProvider(create: (_) => CustomersScreenProvider()),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()),
+
         // ChangeNotifierProvider(create: (_) => AddCustomerProvider()),
       ],
       child: AnnotatedRegion<SystemUiOverlayStyle>(

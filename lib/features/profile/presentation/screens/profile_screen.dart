@@ -14,7 +14,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
-  String _businessName = 'Raigon Arts';
+  String _businessName = 'RAIGON ART';
   String _tagline = 'Photo Frames & Custom Framing';
   String _businessPhone = '8137922114';
   String _businessEmail = 'orders@raigonarts.com';
@@ -95,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final results = await Future.wait([
         service.getProfile().catchError(
           (_) => const WorkshopProfile(
-            businessName: 'Raigon Arts',
+            businessName: 'RAIGON ART',
             tagline: 'Photo Frames & Custom Framing',
             businessPhone: '8137922114',
             businessEmail: 'orders@raigonarts.com',
@@ -264,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Powered by Raigon Arts',
+                          'Powered by RAIGON ART',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

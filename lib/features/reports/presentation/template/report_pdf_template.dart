@@ -201,9 +201,9 @@ class ReportPdfTemplate {
 
   static Future<Uint8List> build(ReportPdfData d) async {
     final doc = pw.Document(
-      title: 'Raigon Arts - Reports & Business Analytics',
-      author: 'Raigon Arts',
-      creator: 'Raigon Arts',
+      title: 'RAIGON ART - Reports & Business Analytics',
+      author: 'RAIGON ART',
+      creator: 'RAIGON ART',
       subject: d.rangeLabel,
     );
 
@@ -271,7 +271,7 @@ class ReportPdfTemplate {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'RAIGON ARTS',
+              'RAIGON ART',
               style: pw.TextStyle(
                 fontSize: 8,
                 fontWeight: pw.FontWeight.bold,
@@ -302,7 +302,7 @@ class ReportPdfTemplate {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'Raigon Arts  |  Confidential owner report  |  Generated ${_dateOnly(d.generatedAt)}',
+              'RAIGON ART  |  Confidential owner report  |  Generated ${_dateOnly(d.generatedAt)}',
               style: pw.TextStyle(fontSize: 7.5, color: _C.muted),
             ),
             pw.Text(
@@ -338,7 +338,7 @@ class ReportPdfTemplate {
                 pw.Container(width: 36, height: 3, color: _C.gold),
                 pw.SizedBox(height: 10),
                 pw.Text(
-                  'RAIGON ARTS',
+                  'RAIGON ART',
                   style: pw.TextStyle(
                     fontSize: 9,
                     fontWeight: pw.FontWeight.bold,

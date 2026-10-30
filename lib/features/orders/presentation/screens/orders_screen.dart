@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,30 @@ import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customers_table.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 
+
+enum OrderTimeFilter {
+  all('All Orders'),
+  today('Today'),
+  yesterday('Yesterday'),
+  thisWeek('This Week'),
+  lastWeek('Last Week'),
+  thisMonth('This Month'),
+  lastMonth('Last Month');
+
+  final String label;
+  const OrderTimeFilter(this.label);
+}
+
+enum OrderSortMode {
+  priority('Priority Wise'),
+  newest('Newest First'),
+  oldest('Oldest First'),
+  amountHigh('Amount: High to Low');
+
+  final String label;
+  const OrderSortMode(this.label);
+}
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -28,6 +53,8 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   Status? _filter;
+  OrderTimeFilter _timeFilter = OrderTimeFilter.all;
+  OrderSortMode _sortMode = OrderSortMode.priority;
   String _query = '';
   static const int _pageSize = 10;
   static const double _minPageHeight = 560;
@@ -56,20 +83,94 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   final Map<String, Status> _statusOverride = {};
 
+  bool _matchesTimeFilter(Customer c, OrderTimeFilter filter) {
+    if (filter == OrderTimeFilter.all) return true;
+    final d = c.createdAt ?? c.orderDate;
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = todayStart.add(const Duration(days: 1));
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+
+    final currentWeekday = now.weekday;
+    final thisWeekStart = todayStart.subtract(
+      Duration(days: currentWeekday - 1),
+    );
+    final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+    final lastWeekEnd = thisWeekStart;
+
+    final thisMonthStart = DateTime(now.year, now.month, 1);
+    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final lastMonthEnd = thisMonthStart;
+
+    return switch (filter) {
+      OrderTimeFilter.all => true,
+      OrderTimeFilter.today => !d.isBefore(todayStart) && d.isBefore(todayEnd),
+      OrderTimeFilter.yesterday =>
+        !d.isBefore(yesterdayStart) && d.isBefore(todayStart),
+      OrderTimeFilter.thisWeek =>
+        !d.isBefore(thisWeekStart) && d.isBefore(todayEnd),
+      OrderTimeFilter.lastWeek =>
+        !d.isBefore(lastWeekStart) && d.isBefore(lastWeekEnd),
+      OrderTimeFilter.thisMonth =>
+        !d.isBefore(thisMonthStart) && d.isBefore(todayEnd),
+      OrderTimeFilter.lastMonth =>
+        !d.isBefore(lastMonthStart) && d.isBefore(lastMonthEnd),
+    };
+  }
+
+  static Widget _buildPriorityBadge(AppPalette p, OrderPriority priority) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: priority.color.withValues(alpha: p.isDark ? 0.18 : 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: priority.color.withValues(alpha: p.isDark ? 0.45 : 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: priority.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            priority.label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: priority.color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   // Column widths in logical pixels. Used both as the minimum width of each
   // column and as the flex proportion when the screen is wider than the table.
   static const _colWidths = <double>[
     110, // Order ID
-    170, // Customer
-    150, // Phone
-    130, // Photos
-    150, // Frame Specs
+    180, // Customer & Region
+    130, // Priority
+    140, // Phone
+    120, // Photos
+    160, // Frame Specs
     70, // Qty
     120, // Total
-    140, // Payment
-    170, // Status
-    140, // Delivery
-    160, // Actions
+    130, // Payment
+    160, // Status
+    130, // Delivery
+    180, // Actions
   ];
 
   static final double _minTableWidth =
@@ -81,9 +182,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
   static const _headers = [
     'ORDER ID',
     'CUSTOMER',
+    'PRIORITY',
     'PHONE NO',
     'PHOTOS',
-    'FRAME SPECS',
+    'MATERIAL & SPECS',
     'QTY',
     'TOTAL AMOUNT',
     'PAYMENT',
@@ -214,18 +316,50 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final all = List<Customer>.of(customerProvider.customers)
       ..sort(CustomerAndOrderProvider.compareLatestFirst);
     final q = _query.trim().toLowerCase();
-    final rows = all.where((c) {
+    final filtered = all.where((c) {
       if (_filter != null && _statusOf(c) != _filter) {
         return false;
       }
 
+      if (!_matchesTimeFilter(c, _timeFilter)) return false;
+
       if (q.isEmpty) return true;
 
-      return c.id.toLowerCase().contains(q) || c.name.toLowerCase().contains(q);
+      return c.id.toLowerCase().contains(q) ||
+          c.name.toLowerCase().contains(q) ||
+          c.phone.toLowerCase().contains(q) ||
+          c.effectiveRegion.toLowerCase().contains(q) ||
+          c.city.toLowerCase().contains(q);
     }).toList();
-    final totalPages = math.max(1, (rows.length / _pageSize).ceil());
+
+    filtered.sort((a, b) {
+      switch (_sortMode) {
+        case OrderSortMode.priority:
+          final pCompare = a.orderPriority.index.compareTo(
+            b.orderPriority.index,
+          );
+          if (pCompare != 0) return pCompare;
+          final dCompare = (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
+          if (dCompare != 0) return dCompare;
+          return b.id.compareTo(a.id);
+        case OrderSortMode.newest:
+          final dCompare = (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
+          if (dCompare != 0) return dCompare;
+          return b.id.compareTo(a.id);
+        case OrderSortMode.oldest:
+          final dCompare = (a.createdAt ?? a.orderDate).compareTo(b.createdAt ?? b.orderDate);
+          if (dCompare != 0) return dCompare;
+          return a.id.compareTo(b.id);
+        case OrderSortMode.amountHigh:
+          final amtCompare = b.total.compareTo(a.total);
+          if (amtCompare != 0) return amtCompare;
+          return (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
+      }
+    });
+
+    final totalPages = math.max(1, (filtered.length / _pageSize).ceil());
     final currentPage = _page.clamp(1, totalPages);
-    final pageRows = rows
+    final pageRows = filtered
         .skip((currentPage - 1) * _pageSize)
         .take(_pageSize)
         .toList();
@@ -258,11 +392,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   Padding(
                     padding: const EdgeInsets.all(20),
-                    child: _searchField(p),
+                    child: Row(
+                      children: [
+                        Expanded(child: _searchField(p)),
+                        const SizedBox(width: 12),
+                        _buildWebTimeFilterDropdown(p),
+                        const SizedBox(width: 10),
+                        _buildWebSortDropdown(p),
+                      ],
+                    ),
                   ),
                   Expanded(child: _table(p, pageRows)),
                   AppPaginationFooter(
-                    totalItems: rows.length,
+                    totalItems: filtered.length,
                     page: currentPage,
                     pageSize: _pageSize,
                     itemLabel: 'orders',
@@ -527,6 +669,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                         _statusOf(rows[i]) == Status.cancelled
                                         ? 'N/A'
                                         : _date(rows[i].expectedDelivery),
+                                    onRemind: () => showAddOrEditReminderDialog(
+                                      context: context,
+                                      initialCustomer: rows[i],
+                                    ),
                                     onStatus: (s) async {
                                       final oldStatus = _statusOf(rows[i]);
                                       setState(
@@ -581,6 +727,154 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  Widget _buildWebTimeFilterDropdown(AppPalette p) {
+    return PopupMenuButton<OrderTimeFilter>(
+      tooltip: 'Filter by time range',
+      onSelected: (tf) => setState(() {
+        _timeFilter = tf;
+        _page = 1;
+      }),
+      offset: const Offset(0, 44),
+      color: p.surface,
+      itemBuilder: (_) => [
+        for (final tf in OrderTimeFilter.values)
+          PopupMenuItem(
+            value: tf,
+            child: Row(
+              children: [
+                Icon(
+                  RemixIcons.calendar_line,
+                  size: 14,
+                  color: _timeFilter == tf ? AppColors.gold : p.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  tf.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: _timeFilter == tf
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: _timeFilter == tf ? AppColors.gold : p.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: p.chipFill,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _timeFilter != OrderTimeFilter.all
+                ? AppColors.gold
+                : p.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              RemixIcons.calendar_2_line,
+              size: 16,
+              color: _timeFilter != OrderTimeFilter.all
+                  ? AppColors.gold
+                  : p.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _timeFilter.label,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: _timeFilter != OrderTimeFilter.all
+                    ? AppColors.gold
+                    : p.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              RemixIcons.arrow_down_s_line,
+              size: 18,
+              color: p.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebSortDropdown(AppPalette p) {
+    return PopupMenuButton<OrderSortMode>(
+      tooltip: 'Sort orders',
+      onSelected: (sm) => setState(() {
+        _sortMode = sm;
+        _page = 1;
+      }),
+      offset: const Offset(0, 44),
+      color: p.surface,
+      itemBuilder: (_) => [
+        for (final sm in OrderSortMode.values)
+          PopupMenuItem(
+            value: sm,
+            child: Row(
+              children: [
+                const Icon(RemixIcons.sort_desc, size: 15, color: AppColors.gold),
+                const SizedBox(width: 8),
+                Text(
+                  sm.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: _sortMode == sm
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: _sortMode == sm ? AppColors.gold : p.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: p.chipFill,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _sortMode != OrderSortMode.newest
+                ? AppColors.gold
+                : p.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(RemixIcons.sort_desc, size: 16, color: AppColors.gold),
+            const SizedBox(width: 8),
+            Text(
+              _sortMode.label,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              RemixIcons.arrow_down_s_line,
+              size: 18,
+              color: p.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _headerRow(AppPalette p) {
     return Container(
       height: 50,
@@ -626,6 +920,7 @@ class _OrderRow extends StatefulWidget {
     required this.totalLabel,
     required this.deliveryLabel,
     required this.onStatus,
+    required this.onRemind,
     required this.onView,
     required this.onWhatsApp,
     required this.onEdit,
@@ -644,6 +939,7 @@ class _OrderRow extends StatefulWidget {
   final String totalLabel;
   final String deliveryLabel;
   final ValueChanged<Status> onStatus;
+  final VoidCallback onRemind;
   final VoidCallback onView;
   final VoidCallback onWhatsApp;
   final VoidCallback onEdit;
@@ -681,7 +977,7 @@ class _OrderRowState extends State<_OrderRow> {
     TextStyle body({FontWeight w = FontWeight.w500}) =>
         TextStyle(fontSize: 15, fontWeight: w, color: p.textPrimary);
 
-    final spec = c.effectiveFrames.first;
+    final spec = c.effectiveFrames.isNotEmpty ? c.effectiveFrames.first : null;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -702,11 +998,47 @@ class _OrderRowState extends State<_OrderRow> {
         child: Row(
           children: [
             cell(0, txt(c.id, body(w: FontWeight.w700))),
-            cell(1, txt(c.name, body(w: FontWeight.w600))),
-            cell(2, txt(c.phone, body())),
+            cell(
+              1,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  txt(c.name, body(w: FontWeight.w600)),
+                  if (c.effectiveRegion.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          RemixIcons.map_pin_2_line,
+                          size: 11,
+                          color: AppColors.gold,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            c.effectiveRegion,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: p.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            cell(2, _OrdersScreenState._buildPriorityBadge(p, c.orderPriority)),
+            cell(3, txt(c.phone, body())),
 
             cell(
-              3,
+              4,
               ClipRect(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -730,7 +1062,7 @@ class _OrderRowState extends State<_OrderRow> {
             ),
 
             cell(
-              4,
+              5,
               Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -739,18 +1071,22 @@ class _OrderRowState extends State<_OrderRow> {
                   txt(c.frameSize, body()),
                   const SizedBox(height: 2),
                   txt(
-                    c.frameType.isNotEmpty ? c.frameType : spec.frameType,
+                    c.frameType.isNotEmpty
+                        ? c.frameType
+                        : (spec != null && spec.frameType.isNotEmpty
+                            ? spec.frameType
+                            : 'Standard Frame'),
                     TextStyle(fontSize: 12.5, color: p.textMuted),
                   ),
                 ],
               ),
             ),
-            cell(5, txt('${c.qty}', body(w: FontWeight.w700))),
-            cell(6, txt(widget.totalLabel, body(w: FontWeight.w700))),
-            cell(7, _paymentChip()),
-            cell(8, _statusDropdown()),
-            cell(9, txt(widget.deliveryLabel, body())),
-            cell(10, _actions()),
+            cell(6, txt('${c.qty}', body(w: FontWeight.w700))),
+            cell(7, txt(widget.totalLabel, body(w: FontWeight.w700))),
+            cell(8, _paymentChip()),
+            cell(9, _statusDropdown()),
+            cell(10, txt(widget.deliveryLabel, body())),
+            cell(11, _actions()),
           ],
         ),
       ),
@@ -843,6 +1179,14 @@ class _OrderRowState extends State<_OrderRow> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        _iconBtn(
+          icon: RemixIcons.alarm_line,
+          color: AppColors.gold,
+          fill: AppColors.gold.withValues(alpha: p.isDark ? 0.2 : 0.14),
+          size: 17,
+          onTap: widget.onRemind,
+        ),
+        const SizedBox(width: 6),
         _iconBtn(
           icon: RemixIcons.eye_line,
           color: p.textPrimary,

@@ -90,12 +90,12 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       );
 
       if (!mounted) return;
-      AppSnackBar.success(context, 'Frame size added successfully.');
+      AppSnackBar.success(context, 'Material added successfully.');
     } catch (error) {
       if (!mounted) return;
       final msg = error is ApiException
           ? error.userFriendlyMessage
-          : 'Could not add frame size. Try again.';
+          : 'Could not add material. Try again.';
       AppSnackBar.error(context, msg);
     }
   }
@@ -123,12 +123,12 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       );
 
       if (!mounted) return;
-      AppSnackBar.success(context, 'Frame size updated successfully.');
+      AppSnackBar.success(context, 'Material updated successfully.');
     } catch (error) {
       if (!mounted) return;
       final msg = error is ApiException
           ? error.userFriendlyMessage
-          : 'Could not update frame size. Try again.';
+          : 'Could not update material. Try again.';
       AppSnackBar.error(context, msg);
     }
   }
@@ -145,12 +145,12 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       await context.read<FrameSizeProvider>().remove(size.code);
 
       if (!mounted) return;
-      AppSnackBar.success(context, 'Frame size deleted successfully.');
+      AppSnackBar.success(context, 'Material deleted successfully.');
     } catch (error) {
       if (!mounted) return;
       final msg = error is ApiException
           ? error.userFriendlyMessage
-          : 'Could not delete frame size. Try again.';
+          : 'Could not delete material. Try again.';
       AppSnackBar.error(context, msg);
     }
   }
@@ -267,7 +267,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                               const Icon(RemixIcons.cloud_off_line, size: 48, color: AppColors.error),
                               const SizedBox(height: 14),
                               Text(
-                                'Failed to load frame sizes catalog',
+                                'Failed to load materials catalog',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -287,7 +287,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                                 onPressed: () {
                                   context.read<FrameSizeProvider>().refresh().then((_) {
                                     if (context.mounted) {
-                                      AppSnackBar.success(context, 'Frame sizes loaded.');
+                                      AppSnackBar.success(context, 'Materials loaded.');
                                     }
                                   }).catchError((e) {
                                     if (context.mounted) {
@@ -326,7 +326,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Frame Size Management',
+                'Material & Size Management',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
@@ -335,7 +335,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Catalog of wholesale frame dimensions, moulding sizes, and custom cut specs',
+                'Catalog of wholesale frame materials, dimensions & specs',
                 style: TextStyle(fontSize: 14.5, color: p.textMuted),
               ),
             ],
@@ -344,7 +344,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
         const SizedBox(width: 16),
         _GradientButton(
           icon: RemixIcons.add_line,
-          label: 'Add Frame Size',
+          label: 'Add Material',
           onTap: _add,
           fontSize: 15.5,
           vPad: 14,
@@ -391,7 +391,7 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 48),
                     child: Text(
-                      'No frame sizes found',
+                      'No materials found',
                       style: TextStyle(fontSize: 15, color: p.textMuted),
                     ),
                   )
@@ -870,9 +870,9 @@ class _FrameSizeDialogState extends State<_FrameSizeDialog> {
     return _DialogShell(
       maxWidth: 520,
       title: edit
-          ? 'Edit Frame Size (${widget.initial!.code})'
-          : 'Add New Frame Size',
-      subtitle: 'Configure workshop frame dimensions & category',
+          ? 'Edit Material (${widget.initial!.code})'
+          : 'Add New Material',
+      subtitle: 'Configure workshop material dimensions & category',
       leading: Container(
         width: 40,
         height: 40,
@@ -960,7 +960,7 @@ class _FrameSizeDialogState extends State<_FrameSizeDialog> {
           const SizedBox(width: 14),
           _GradientButton(
             icon: RemixIcons.check_line,
-            label: 'Save Frame Size',
+            label: 'Save Material',
             onTap: _save,
           ),
         ],
@@ -1106,11 +1106,11 @@ class _DeleteDialog extends StatelessWidget {
     final p = AppPalette.of(context);
     return _DialogShell(
       maxWidth: 440,
-      title: 'Delete Frame Size',
+      title: 'Delete Material',
       body: Padding(
         padding: const EdgeInsets.fromLTRB(28, 26, 28, 26),
         child: Text(
-          'Are you sure you want to delete size "${size.name}" (${size.code})?',
+          'Are you sure you want to delete material "${size.name}" (${size.code})?',
           style: TextStyle(fontSize: 15, color: p.textPrimary),
         ),
       ),

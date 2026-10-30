@@ -249,7 +249,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
       }
 
       final folderName =
-          decoded['folderName']?.toString() ?? 'Photo Collection';
+          decoded['folderName']?.toString() ?? 'Catalogue';
 
       final files = decoded['files'];
 
@@ -701,7 +701,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Photo Collection',
+                'Catalogue',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
@@ -775,7 +775,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
               children: [
                 Text(
                   _folderName == null
-                      ? 'No photo collection selected'
+                      ? 'No catalogue selected'
                       : _folderName!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -801,7 +801,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
           _actionButton(
             p,
             icon: RemixIcons.folder_open_line,
-            label: _hasFolder ? 'Change Folder' : 'Select Photo Collection',
+            label: _hasFolder ? 'Change Folder' : 'Select Catalogue',
             onTap: _selectFolder,
           ),
 
@@ -844,7 +844,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
             const SizedBox(height: 18),
 
             Text(
-              'Select a photo collection',
+              'Select a catalogue',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -865,7 +865,7 @@ class _PhotoCollectionScreenState extends State<PhotoCollectionScreen> {
             _actionButton(
               p,
               icon: RemixIcons.folder_open_line,
-              label: 'Select Photo Collection',
+              label: 'Select Catalogue',
               onTap: _selectFolder,
             ),
           ],

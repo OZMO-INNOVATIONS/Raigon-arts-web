@@ -22,11 +22,14 @@ class WorkshopProfile {
 
   factory WorkshopProfile.fromJson(Map<String, dynamic> json) =>
       WorkshopProfile(
-        businessName: json['businessName'] as String? ?? 'Raigon Arts',
+        businessName: json['businessName'] as String? ?? 'RAIGON ART',
         tagline: json['tagline'] as String? ?? 'Photo Frames & Custom Framing',
         businessPhone: json['businessPhone'] as String? ?? '8137922114',
-        businessEmail: json['businessEmail'] as String? ?? 'orders@raigonarts.com',
-        workshopAddress: json['workshopAddress'] as String? ?? 'Main Workshop, MG Road, Trivandrum',
+        businessEmail:
+            json['businessEmail'] as String? ?? 'orders@raigonarts.com',
+        workshopAddress:
+            json['workshopAddress'] as String? ??
+            'Main Workshop, MG Road, Trivandrum',
         gstin: json['gstin'] as String? ?? '',
         businessHours: json['businessHours'] as List? ?? const [],
       );
@@ -73,7 +76,7 @@ class RetentionPolicy {
 
 class WorkshopSettingsService {
   WorkshopSettingsService({ApiClient? apiClient})
-      : _api = apiClient ?? ApiClient();
+    : _api = apiClient ?? ApiClient();
   final ApiClient _api;
 
   Future<WorkshopProfile> getProfile() async {
@@ -85,10 +88,7 @@ class WorkshopSettingsService {
   }
 
   Future<WorkshopProfile> updateProfile(Map<String, dynamic> data) async {
-    final response = await _api.put(
-      ApiConstants.workshopProfile,
-      body: data,
-    );
+    final response = await _api.put(ApiConstants.workshopProfile, body: data);
     final map = response is Map<String, dynamic>
         ? response
         : Map<String, dynamic>.from(response as Map);
@@ -110,11 +110,7 @@ class WorkshopSettingsService {
   }) async {
     final response = await _api.put(
       ApiConstants.retentionPolicy,
-      body: {
-        'days': days,
-        'enabled': enabled,
-        'target': target,
-      },
+      body: {'days': days, 'enabled': enabled, 'target': target},
     );
     final data = response is Map && response['data'] != null
         ? response['data']

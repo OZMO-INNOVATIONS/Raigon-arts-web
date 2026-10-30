@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -489,6 +490,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                     _idChip(p),
                     _infoChip(p, RemixIcons.phone_line, _c.phone),
                     _infoChip(p, RemixIcons.calendar_line, _c.orderDateLabel),
+                    if (_c.effectiveRegion.isNotEmpty)
+                      _infoChip(
+                        p,
+                        RemixIcons.map_pin_2_line,
+                        'Region: ${_c.effectiveRegion}',
+                      ),
                   ],
                 ),
               ],
@@ -1417,6 +1424,45 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          InkWell(
+            onTap: () => showAddOrEditReminderDialog(
+              context: context,
+              initialCustomer: _c,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: p.isDark ? 0.18 : 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: p.isDark ? 0.45 : 0.4),
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    RemixIcons.alarm_line,
+                    size: 16,
+                    color: AppColors.gold,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Set Reminder',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
                     ),
                   ),
                 ],

@@ -79,7 +79,7 @@ CREATE TABLE users (
 -- 2. WORKSHOP SETTINGS / PROFILE
 CREATE TABLE workshop_settings (
     id VARCHAR(50) PRIMARY KEY DEFAULT 'default',
-    business_name VARCHAR(150) NOT NULL DEFAULT 'Raigon Arts',
+    business_name VARCHAR(150) NOT NULL DEFAULT 'RAIGON ART',
     tagline VARCHAR(255) DEFAULT 'Photo Frames & Custom Framing',
     business_phone VARCHAR(20) NOT NULL DEFAULT '8137922114',
     business_email VARCHAR(150) DEFAULT 'orders@raigonarts.com',
@@ -660,7 +660,7 @@ CREATE TABLE activity_logs (
 {
   "success": true,
   "data": {
-    "businessName": "Raigon Arts",
+    "businessName": "RAIGON ART",
     "tagline": "Photo Frames & Custom Framing",
     "businessPhone": "8137922114",
     "businessEmail": "orders@raigonarts.com",

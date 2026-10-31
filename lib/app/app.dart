@@ -35,7 +35,7 @@ class RaigonartApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FrameSizeProvider()),
         ChangeNotifierProvider(create: (_) => MessagingAutomationProvider()),
         ChangeNotifierProvider(create: (_) => CustomersScreenProvider()),
-        ChangeNotifierProvider(create: (_) => ReminderProvider()),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()..init()),
 
         // ChangeNotifierProvider(create: (_) => AddCustomerProvider()),
       ],

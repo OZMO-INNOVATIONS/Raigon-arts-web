@@ -55,7 +55,7 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
 
       context.read<CustomerAndOrderProvider>().init();
-      context.read<ReminderProvider?>()?.init();
+      context.read<ReminderProvider>().init();
     });
   }
 
@@ -117,8 +117,8 @@ class _AppShellState extends State<AppShell> {
     final customers = context.watch<CustomerAndOrderProvider>().customers;
     List<CustomerReminder> reminders = const [];
     try {
-      final rp = context.watch<ReminderProvider?>();
-      reminders = rp?.reminderList ?? rp?.allReminders ?? const [];
+      final rp = context.watch<ReminderProvider>();
+      reminders = rp.reminderList;
     } catch (_) {
       reminders = const [];
     }

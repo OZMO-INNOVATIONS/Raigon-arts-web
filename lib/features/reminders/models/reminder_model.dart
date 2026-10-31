@@ -103,6 +103,24 @@ class CustomerReminder {
 
   bool get isAvailable => !isCompleted;
 
+  /// Whether this completed reminder was completed within the last 1 week (7 days).
+  /// Completed reminders remain visible in the "All" tab for 1 week.
+  /// After 1 week from completion, they are only visible in the "Completed" tab.
+  bool get isCompletedWithinOneWeek {
+    if (!isCompleted) return false;
+    if (completedAt == null) return true;
+    final now = DateTime.now();
+    return completedAt!.isAfter(now.subtract(const Duration(days: 7)));
+  }
+
+  /// Whether this reminder was completed more than 1 week ago.
+  bool get isCompletedOlderThanOneWeek {
+    if (!isCompleted) return false;
+    if (completedAt == null) return false;
+    final now = DateTime.now();
+    return completedAt!.isBefore(now.subtract(const Duration(days: 7)));
+  }
+
   ReminderStatus get status {
     if (isCompleted) return ReminderStatus.completed;
     if (isOverdue) return ReminderStatus.overdue;

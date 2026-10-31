@@ -43,7 +43,7 @@ class ApiConstants {
   // Module 9: Reminders Management
   static const String reminders = '/reminders';
   static const String reminderStats = '/reminders/summary/stats';
-  static String reminder(String id) => '/reminders/';
+  static String reminder(String id) => '/reminders/$id';
 
   // Module 5: Dashboard
   static const String dashboardStats = '/dashboard/stats';

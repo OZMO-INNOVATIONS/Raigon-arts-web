@@ -62,8 +62,7 @@ class AppSidebar extends StatelessWidget {
                         badge: destination == NavDestination.reminders
                             ? () {
                                 try {
-                                  final rp = context.watch<ReminderProvider?>();
-                                  if (rp == null) return null;
+                                  final rp = context.watch<ReminderProvider>();
                                   final due = rp.dueCount;
                                   if (due > 0) return due;
                                   final active = rp.activeCount;

@@ -21,34 +21,15 @@ class ReminderService {
     }
   }
 
-  /// Loads all reminders from local storage and attempts syncing with REST API and Supabase.
+  /// Loads all reminders from local storage and syncs with Supabase (priority) and REST API.
   Future<List<CustomerReminder>> getReminders() async {
     final localList = await _loadLocalReminders();
-
-    // 1. Attempt remote fetch from REST API
-    try {
-      final res = await ApiClient().get(ApiConstants.reminders);
-      if (res is Map && res['data'] is List) {
-        final apiList = (res['data'] as List)
-            .map((item) => CustomerReminder.fromJson(Map<String, dynamic>.from(item as Map)))
-            .toList();
-
-        final mergedMap = <String, CustomerReminder>{};
-        for (final r in localList) {
-          mergedMap[r.id] = r;
-        }
-        for (final r in apiList) {
-          mergedMap[r.id] = r;
-        }
-        final merged = mergedMap.values.toList();
-        await _saveLocalReminders(merged);
-        return merged;
-      }
-    } catch (e) {
-      debugPrint('[ReminderService] REST API fetch notice: $e (trying Supabase/local)');
+    final mergedMap = <String, CustomerReminder>{};
+    for (final r in localList) {
+      mergedMap[r.id] = r;
     }
 
-    // 2. Attempt remote fetch from Supabase
+    // 1. Remote fetch from Supabase (shared cloud PostgreSQL database for mobile & web)
     try {
       final client = _supabase;
       if (client != null) {
@@ -57,26 +38,47 @@ class ReminderService {
             .select()
             .order('reminder_date', ascending: true);
 
-        final remoteList = res
+        final remoteList = (res as List)
             .map((row) => CustomerReminder.fromJson(Map<String, dynamic>.from(row as Map)))
             .toList();
 
-        final mergedMap = <String, CustomerReminder>{};
-        for (final r in localList) {
-          mergedMap[r.id] = r;
-        }
         for (final r in remoteList) {
           mergedMap[r.id] = r;
         }
-        final merged = mergedMap.values.toList();
-        await _saveLocalReminders(merged);
-        return merged;
       }
     } catch (e) {
-      debugPrint('[ReminderService] Supabase remote fetch notice: $e (using local)');
+      debugPrint('[ReminderService] Supabase remote fetch notice: $e');
     }
 
-    return localList;
+    // 2. Remote fetch from REST API (with short timeout so cold starts never block UI)
+    try {
+      final res = await ApiClient()
+          .get(ApiConstants.reminders)
+          .timeout(const Duration(seconds: 4));
+
+      List<dynamic>? rawList;
+      if (res is List) {
+        rawList = res;
+      } else if (res is Map && res['data'] is List) {
+        rawList = res['data'] as List;
+      }
+
+      if (rawList != null) {
+        final apiList = rawList
+            .map((item) => CustomerReminder.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+
+        for (final r in apiList) {
+          mergedMap[r.id] = r;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ReminderService] REST API fetch notice: $e');
+    }
+
+    final merged = mergedMap.values.toList();
+    await _saveLocalReminders(merged);
+    return merged;
   }
 
   /// Saves or updates a reminder.
@@ -135,6 +137,7 @@ class ReminderService {
       if (client != null) {
         await client.from('reminders').update({
           'is_completed': true,
+          'status': 'completed',
           'completed_at': updated.completedAt!.toIso8601String(),
           'completed_by': completedBy,
         }).eq('id', id);
@@ -149,6 +152,7 @@ class ReminderService {
         ApiConstants.reminder(id),
         body: {
           'status': 'completed',
+          'isCompleted': true,
           'completedBy': completedBy,
           'completedAt': updated.completedAt?.toIso8601String(),
         },
@@ -196,12 +200,28 @@ class ReminderService {
       if (client != null) {
         await client.from('reminders').update({
           'is_completed': false,
+          'status': 'pending',
           'completed_at': null,
           'completed_by': null,
         }).eq('id', id);
       }
     } catch (e) {
       debugPrint('[ReminderService] Supabase reopen notice: $e');
+    }
+
+    // Sync to REST API
+    try {
+      await ApiClient().patch(
+        ApiConstants.reminder(id),
+        body: {
+          'status': 'pending',
+          'isCompleted': false,
+          'completedBy': null,
+          'completedAt': null,
+        },
+      );
+    } catch (e) {
+      debugPrint('[ReminderService] REST API reopen notice: $e');
     }
 
     return updated;

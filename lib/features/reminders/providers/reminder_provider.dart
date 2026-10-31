@@ -22,10 +22,16 @@ class ReminderProvider extends ChangeNotifier {
   ReminderFilter get currentFilter => _currentFilter;
 
   /// Reminders that are active and either due today or overdue.
+  /// Reminders that are active and either due today or overdue.
   int get dueCount => _reminders.where((r) => r.isDueOrOverdue).length;
 
   /// All uncompleted (active/available) reminders.
   int get activeCount => _reminders.where((r) => !r.isCompleted).length;
+
+  /// Reminders count displayed in the "All" tab:
+  /// Includes active reminders PLUS reminders completed within the last 1 week.
+  int get allTabCount =>
+      _reminders.where((r) => !r.isCompleted || r.isCompletedWithinOneWeek).length;
 
   int get todayCount => _reminders.where((r) => r.isDueToday).length;
 
@@ -74,7 +80,9 @@ class ReminderProvider extends ChangeNotifier {
 
     final byFilter = _reminders.where((r) {
       return switch (_currentFilter) {
-        ReminderFilter.all => !r.isCompleted,
+        // Reminders in "All": Active reminders + reminders completed within 1 week.
+        // Reminders completed more than 1 week ago only show under Completed!
+        ReminderFilter.all => !r.isCompleted || r.isCompletedWithinOneWeek,
         ReminderFilter.today => r.isDueToday,
         ReminderFilter.upcoming => r.isUpcoming,
         ReminderFilter.overdue => r.isOverdue,
@@ -93,18 +101,24 @@ class ReminderProvider extends ChangeNotifier {
           r.description.toLowerCase().contains(q);
     }).toList();
 
-    // Sort: Overdue/Today first, then upcoming, then completed; within tier by date
+    // Sort: Active first (overdue -> today -> upcoming by date), then completed (most recent completed first)
     result.sort((a, b) {
       if (a.isCompleted != b.isCompleted) {
         return a.isCompleted ? 1 : -1;
       }
-      if (a.isOverdue != b.isOverdue) {
-        return a.isOverdue ? -1 : 1;
+      if (!a.isCompleted) {
+        if (a.isOverdue != b.isOverdue) {
+          return a.isOverdue ? -1 : 1;
+        }
+        if (a.isDueToday != b.isDueToday) {
+          return a.isDueToday ? -1 : 1;
+        }
+        return a.reminderDate.compareTo(b.reminderDate);
+      } else {
+        final aComp = a.completedAt ?? a.reminderDate;
+        final bComp = b.completedAt ?? b.reminderDate;
+        return bComp.compareTo(aComp);
       }
-      if (a.isDueToday != b.isDueToday) {
-        return a.isDueToday ? -1 : 1;
-      }
-      return a.reminderDate.compareTo(b.reminderDate);
     });
 
     return result;

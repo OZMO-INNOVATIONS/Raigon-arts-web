@@ -991,6 +991,18 @@ class MessagingAutomationProvider extends ChangeNotifier {
       message: (row['reply_message'] ?? '').toString(),
       live: row['is_active'] == true,
       runs: 0,
+
+      // Audit information
+      createdBy: row['created_by']?.toString(),
+      createdByRole: row['created_by_role']?.toString(),
+      updatedBy: row['updated_by']?.toString(),
+      updatedByRole: row['updated_by_role']?.toString(),
+      createdAt: row['created_at'] != null
+          ? DateTime.tryParse(row['created_at'].toString())
+          : null,
+      updatedAt: row['updated_at'] != null
+          ? DateTime.tryParse(row['updated_at'].toString())
+          : null,
     );
   }
 

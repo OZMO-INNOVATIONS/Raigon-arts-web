@@ -1299,6 +1299,8 @@ class _AutoCard extends StatelessWidget {
               ),
           ],
         ),
+        const SizedBox(height: 10),
+        _buildAuditInfo(p),
       ],
     );
   }
@@ -1416,6 +1418,92 @@ class _AutoCard extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildAuditInfo(AppPalette p) {
+    String formatDateTime(DateTime? dateTime) {
+      if (dateTime == null) return 'Not available';
+
+      final date = dateTime.toLocal();
+
+      final day = date.day.toString().padLeft(2, '0');
+      final month = date.month.toString().padLeft(2, '0');
+      final year = date.year;
+
+      final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+      final minute = date.minute.toString().padLeft(2, '0');
+      final period = date.hour >= 12 ? 'PM' : 'AM';
+
+      return '$day/$month/$year  •  $hour:$minute $period';
+    }
+
+    Widget auditItem({
+      required IconData icon,
+      required String label,
+      required String role,
+      required DateTime? dateTime,
+    }) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: p.textMuted),
+          const SizedBox(width: 5),
+          Text(
+            '$label ',
+            style: TextStyle(
+              fontSize: 10.5,
+              color: p.textMuted,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          Text(
+            role,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: p.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: BoxDecoration(
+              color: p.textMuted.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            formatDateTime(dateTime),
+            style: TextStyle(
+              fontSize: 10,
+              color: p.textMuted,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        auditItem(
+          icon: Icons.person_outline_rounded,
+          label: 'Created by',
+          role: a.createdByLabel,
+          dateTime: a.createdAt,
+        ),
+        const SizedBox(height: 6),
+        auditItem(
+          icon: Icons.history_rounded,
+          label: 'Last updated',
+          role: a.updatedByLabel,
+          dateTime: a.updatedAt,
+        ),
+      ],
     );
   }
 

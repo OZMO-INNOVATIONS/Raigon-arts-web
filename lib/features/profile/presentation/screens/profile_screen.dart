@@ -16,8 +16,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String _businessName = 'RAIGON ART';
   String _tagline = 'Photo Frames & Custom Framing';
-  String _businessPhone = '8137922114';
-  String _businessEmail = 'orders@raigonarts.com';
+  String _businessPhone = '9747099559';
+  String _businessEmail = 'theraigonart@gmail.com';
   String _gstin = '32AAAAA0000A1Z5';
   int _retentionDays = 45;
   bool _autoCleanup = true;

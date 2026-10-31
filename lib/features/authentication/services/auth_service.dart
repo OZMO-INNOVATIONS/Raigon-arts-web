@@ -69,16 +69,34 @@ class AuthService {
             'Supabase authentication could not be verified.',
           );
         }
-      } catch (error) {
-        // Both checks are required. Do not retain a Render-only session.
-        try {
-          await Supabase.instance.client.auth.signOut();
-        } catch (_) {}
+        // } catch (error) {
+        //   // Both checks are required. Do not retain a Render-only session.
+        //   try {
+        //     await Supabase.instance.client.auth.signOut();
+        //   } catch (_) {}
 
+        //   await AuthTokenManager.instance.clear();
+
+        //   _lastError = 'Supabase authentication failed. Please contact your administrator.';
+        //   debugPrint('[AuthService] Supabase sign-in failed: $error');
+        //   return null;
+        // }
+      } on AuthException catch (error) {
+        debugPrint('[AuthService] Supabase Auth Error: ${error.message}');
+        debugPrint('[AuthService] Status: ${error.statusCode}');
+
+        await Supabase.instance.client.auth.signOut();
         await AuthTokenManager.instance.clear();
 
-        _lastError = 'Supabase authentication failed. Please contact your administrator.';
-        debugPrint('[AuthService] Supabase sign-in failed: $error');
+        _lastError = 'Supabase: ${error.message}';
+        return null;
+      } catch (error) {
+        debugPrint('[AuthService] Supabase unexpected error: $error');
+
+        await Supabase.instance.client.auth.signOut();
+        await AuthTokenManager.instance.clear();
+
+        _lastError = 'Supabase authentication failed: $error';
         return null;
       }
 

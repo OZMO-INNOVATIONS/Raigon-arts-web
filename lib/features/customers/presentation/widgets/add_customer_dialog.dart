@@ -1,10 +1,11 @@
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/core/widgets/app_image_viewer.dart';
+import 'package:raigon_art/features/customers/service/photo_capture_service.dart';
+
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:remixicon/remixicon.dart';
@@ -61,7 +62,9 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
 
     // Automatically open WhatsApp order confirmation receipt.
     try {
-      final opened = await CustomerWhatsAppService.openOrderConfirmation(result);
+      final opened = await CustomerWhatsAppService.openOrderConfirmation(
+        result,
+      );
 
       if (!opened && context.mounted) {
         showDialog(
@@ -76,7 +79,11 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
               ),
               title: Row(
                 children: [
-                  const Icon(RemixIcons.whatsapp_fill, color: AppColors.green, size: 24),
+                  const Icon(
+                    RemixIcons.whatsapp_fill,
+                    color: AppColors.green,
+                    size: 24,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     'Open WhatsApp Receipt',
@@ -101,15 +108,23 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: () {
                     Navigator.of(ctx).pop();
                     CustomerWhatsAppService.openOrderConfirmation(result);
                   },
                   icon: const Icon(RemixIcons.whatsapp_fill, size: 16),
-                  label: const Text('Open WhatsApp', style: TextStyle(fontWeight: FontWeight.w700)),
+                  label: const Text(
+                    'Open WhatsApp',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             );
@@ -207,7 +222,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   DateTime? _delivery;
   String _payment = 'Unpaid';
   bool _paymentTouched = false;
-  Status _status = Status.inProgress;
+  Status _status = Status.pending;
 
   @override
   void initState() {
@@ -256,7 +271,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       for (var i = 0; i < c.photoUrls.length; i++) {
         final u = c.photoUrls[i];
         if (u.trim().isNotEmpty) {
-          final n = i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
+          final n = i < c.photoNames.length
+              ? c.photoNames[i]
+              : 'Photo_${i + 1}.webp';
           _existingPhotos.add(_ExistingPhotoItem(url: u, name: n));
         }
       }
@@ -277,10 +294,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         if (frames.first.photoUrl != null &&
             frames.first.photoUrl!.isNotEmpty &&
             !_existingPhotos.any((e) => e.url == frames.first.photoUrl)) {
-          _existingPhotos.add(_ExistingPhotoItem(
-            url: frames.first.photoUrl!,
-            name: frames.first.photoName ?? 'Frame_Photo.webp',
-          ));
+          _existingPhotos.add(
+            _ExistingPhotoItem(
+              url: frames.first.photoUrl!,
+              name: frames.first.photoName ?? 'Frame_Photo.webp',
+            ),
+          );
         }
       }
       if (c.frames.isEmpty) {
@@ -314,44 +333,19 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
 
   Future<List<PickedPhoto>> _pick({bool multiple = true}) async {
     try {
-      debugPrint('========== FILE PICK START ==========');
-      debugPrint('Multiple: $multiple');
-
-      final List<PlatformFile> files;
-
-      if (multiple) {
-        files = await FilePicker.pickFiles(type: FileType.image);
-      } else {
-        final file = await FilePicker.pickFile(type: FileType.image);
-
-        if (file == null) {
-          debugPrint('File picking cancelled.');
-          return [];
-        }
-
-        files = [file];
-      }
-
-      debugPrint('Files selected: ${files.length}');
-
-      final result = <PickedPhoto>[];
-
-      for (final file in files) {
-        debugPrint('Reading: ${file.name}');
-
-        final bytes = await file.readAsBytes();
-
-        result.add(
-          PickedPhoto(name: file.name, bytes: bytes, size: bytes.length),
-        );
-      }
-
-      debugPrint('========== FILE PICK SUCCESS: ${result.length} ==========');
-
-      return result;
+      debugPrint('========== PHOTO PICK START ==========');
+      final photos = await PhotoCaptureService.showPhotoSourceSelector(
+        context,
+        multiple: multiple,
+      );
+      debugPrint('========== PHOTO PICK SUCCESS: ${photos.length} ==========');
+      return photos;
     } catch (error) {
-      debugPrint('[CustomerImages] File selection failed: $error');
-      rethrow;
+      debugPrint('[CustomerImages] Photo selection failed: $error');
+      if (mounted) {
+        AppSnackBar.error(context, 'Photo selection error: $error');
+      }
+      return [];
     }
   }
 
@@ -495,7 +489,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         : [for (final e in _entries) e.spec.toSpec(e.photo)];
     final int qty = same
         ? frames.first.qty *
-            math.max(1, _existingPhotos.length + photos.length).toInt()
+              math.max(1, _existingPhotos.length + photos.length).toInt()
         : frames.fold<int>(0, (a, f) => a + f.qty);
 
     final remainingUrls = same
@@ -536,7 +530,10 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoCount: totalPhotoCount > 0
           ? totalPhotoCount
           : (widget.existing?.photoCount ?? 0),
-      photoBytes: [for (final p in photos) p.bytes],
+      photoBytes: [
+        for (final p in photos)
+          if (p.bytes != null) p.bytes!,
+      ],
       frameSize: _join([for (final f in frames) f.sizeLabel]),
       frameType: _join([for (final f in frames) f.frameType]),
       qty: qty,
@@ -559,100 +556,149 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Widget build(BuildContext context) {
     final c = FormColors.of(context);
     final p = c.p;
-    final size = MediaQuery.of(context).size;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
-          ),
-        ),
-        Center(
-          child: Padding(
-            padding: EdgeInsets.all(size.width < 600 ? 12 : 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 840,
-                maxHeight: size.height - 48,
-              ),
-              child: Material(
-                color: c.modalBg,
-                elevation: 24,
-                shadowColor: Colors.black.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(24),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _header(p),
-                    Divider(height: 1, color: p.border),
-                    Flexible(child: _body(c)),
-                    Divider(height: 1, color: p.border),
-                    _footer(c),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final isNarrow = size.width < 600;
+    final verticalPadding = isNarrow ? 12.0 : 24.0;
+    final availableHeight =
+        size.height - keyboardHeight - (verticalPadding * 2);
 
-  Widget _header(AppPalette p) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
-      child: Row(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: Stack(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: AppColors.iconDarkGradient,
-              borderRadius: BorderRadius.circular(14),
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
-            child: const Icon(RemixIcons.user_add_line, color: Colors.white, size: 26),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.existing == null
-                      ? 'Add New Customer & Frame Order'
-                      : 'Edit Customer & Order (${widget.existing!.id})',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
+          SafeArea(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(
+                bottom: keyboardHeight,
+                left: isNarrow ? 8 : 24,
+                right: isNarrow ? 8 : 24,
+                top: isNarrow ? 8 : 20,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 840,
+                    maxHeight: availableHeight.clamp(240.0, size.height),
+                  ),
+                  child: Material(
+                    color: c.modalBg,
+                    elevation: 24,
+                    shadowColor: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(isNarrow ? 16 : 24),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _header(p),
+                        Divider(height: 1, color: p.border),
+                        Flexible(child: _body(c)),
+                        Divider(height: 1, color: p.border),
+                        _footer(c),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Fill in customer profile, workshop framing details, and photos',
-                  style: TextStyle(fontSize: 13.5, color: p.textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: p.chipFill,
-                shape: BoxShape.circle,
               ),
-              child: Icon(RemixIcons.close_line, size: 21, color: p.textPrimary),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _header(AppPalette p) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 500;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            isNarrow ? 16 : 24,
+            isNarrow ? 16 : 20,
+            isNarrow ? 16 : 24,
+            isNarrow ? 14 : 18,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: isNarrow ? 42 : 52,
+                height: isNarrow ? 42 : 52,
+                decoration: BoxDecoration(
+                  gradient: AppColors.iconDarkGradient,
+                  borderRadius: BorderRadius.circular(isNarrow ? 10 : 14),
+                ),
+                child: Icon(
+                  RemixIcons.user_add_line,
+                  color: Colors.white,
+                  size: isNarrow ? 22 : 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.existing == null
+                          ? 'Add Customer & Order'
+                          : 'Edit Order (${widget.existing!.id})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isNarrow ? 18 : 22,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isNarrow ? 'Workshop framing details & photos' : 'Fill in customer profile, workshop framing details, and photos',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isNarrow ? 12 : 13.5,
+                        color: p.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: isNarrow ? 36 : 40,
+                  height: isNarrow ? 36 : 40,
+                  decoration: BoxDecoration(
+                    color: p.chipFill,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: p.border),
+                  ),
+                  child: Icon(
+                    RemixIcons.close_line,
+                    size: isNarrow ? 18 : 20,
+                    color: p.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -796,7 +842,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                     ),
                   ),
                   LabeledField(
-                    label: 'Expected Delivery Date',
+                    label: 'Expected Date',
                     child: DateField(
                       value: _delivery,
                       onChanged: (d) => setState(() => _delivery = d),
@@ -852,7 +898,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                     label: 'Order Status',
                     child: FormDropdown<Status>(
                       value: _status,
-                      items: Status.values,
+                      items: Status.standardStatuses,
                       labelOf: (status) => status.label,
                       onChanged: (value) {
                         setState(() => _status = value);
@@ -979,7 +1025,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               child: Column(
                 children: [
-                  Icon(RemixIcons.upload_cloud_2_line, size: 58, color: p.textPrimary),
+                  Icon(
+                    RemixIcons.upload_cloud_2_line,
+                    size: 58,
+                    color: p.textPrimary,
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Drag & Drop Customer Photos Here',
@@ -1042,7 +1092,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(RemixIcons.gallery_line, size: 16, color: AppColors.gold),
+              const Icon(
+                RemixIcons.gallery_line,
+                size: 16,
+                color: AppColors.gold,
+              ),
               const SizedBox(width: 8),
               Text(
                 '${_existingPhotos.length + _photos.length} photos attached'
@@ -1130,7 +1184,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                         top: 5,
                         right: 5,
                         child: InkWell(
-                          onTap: () => setState(() => _existingPhotos.removeAt(i)),
+                          onTap: () =>
+                              setState(() => _existingPhotos.removeAt(i)),
                           customBorder: const CircleBorder(),
                           child: Container(
                             width: 22,
@@ -1184,10 +1239,15 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                             borderRadius: BorderRadius.circular(10),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                _photos[i].bytes,
-                                fit: BoxFit.cover,
-                              ),
+                              child: _photos[i].bytes != null
+                                  ? Image.memory(
+                                      _photos[i].bytes!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      color: p.chipFill,
+                                      child: const Icon(Icons.image),
+                                    ),
                             ),
                           ),
                         ),
@@ -1255,7 +1315,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(RemixIcons.add_circle_line, size: 22, color: p.textPrimary),
+                  Icon(
+                    RemixIcons.add_circle_line,
+                    size: 22,
+                    color: p.textPrimary,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     'Add Another Photo & Frame',
@@ -1308,16 +1372,23 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             color: p.avatarBg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: photo != null
-              ? Image.memory(photo.bytes, fit: BoxFit.cover)
+          child: (photo != null && photo.bytes != null)
+              ? Image.memory(photo.bytes!, fit: BoxFit.cover)
+              : (photo != null && photo.url != null)
+              ? Image.network(
+                  ImageUrlHelper.resolve(photo.url!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+                )
               : hasExisting
-                  ? Image.network(
-                      ImageUrlHelper.resolve(e.existingUrl!),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
-                    )
-                  : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+              ? Image.network(
+                  ImageUrlHelper.resolve(e.existingUrl!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+                )
+              : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
         ),
       ),
     );
@@ -1331,7 +1402,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                photo?.name ?? e.existingName ?? (hasExisting ? 'Attached Photo' : 'No photo selected'),
+                photo?.name ??
+                    e.existingName ??
+                    (hasExisting ? 'Attached Photo' : 'No photo selected'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1494,42 +1567,71 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
 
   Widget _footer(FormColors c) {
     final p = c.p;
-    return Container(
-      color: c.footerBg,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-              decoration: p.isDark
-                  ? BoxDecoration(
-                      color: p.chipFill,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: p.border),
-                    )
-                  : null,
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w600,
-                  color: p.textPrimary,
-                ),
+
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final isNarrow = constraints.maxWidth < 540;
+
+        final cancelBtn = InkWell(
+          onTap: () => Navigator.of(context).pop(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 16 : 20,
+              vertical: 13,
+            ),
+            alignment: isNarrow ? Alignment.center : null,
+            decoration: p.isDark
+                ? BoxDecoration(
+                    color: p.chipFill,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: p.border),
+                  )
+                : BoxDecoration(
+                    color: p.chipFill.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          AppPrimaryButton(
-            label: 'Save Customer & Order',
-            icon: RemixIcons.check_line,
-            onPressed: _save,
+        );
+
+        final saveBtn = AppPrimaryButton(
+          label: isNarrow ? 'Save Order' : 'Save Customer & Order',
+          icon: RemixIcons.check_line,
+          padding: EdgeInsets.symmetric(
+            horizontal: isNarrow ? 12 : 22,
+            vertical: 14,
           ),
-        ],
-      ),
+          onPressed: _save,
+        );
+
+        return Container(
+          color: c.footerBg,
+          padding: EdgeInsets.symmetric(
+            horizontal: isNarrow ? 16 : 24,
+            vertical: 14,
+          ),
+          child: isNarrow
+              ? Row(
+                  children: [
+                    Expanded(child: cancelBtn),
+                    const SizedBox(width: 10),
+                    Expanded(child: saveBtn),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [cancelBtn, const SizedBox(width: 14), saveBtn],
+                ),
+        );
+      },
     );
   }
 }

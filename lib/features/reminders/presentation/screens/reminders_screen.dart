@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
@@ -9,6 +11,7 @@ import 'package:raigon_art/features/customers/service/customer_whatsapp_service.
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
+import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RemindersScreen extends StatefulWidget {
@@ -20,10 +23,15 @@ class RemindersScreen extends StatefulWidget {
 
 class _RemindersScreenState extends State<RemindersScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+  final ReminderAudioService _audioService = ReminderAudioService();
+  StreamSubscription? _playerSub;
 
   @override
   void initState() {
     super.initState();
+    _playerSub = _audioService.onPlayerStateChanged.listen((_) {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<ReminderProvider>().init();
@@ -33,8 +41,24 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   @override
   void dispose() {
+    _playerSub?.cancel();
+    _playerSub = null;
     _searchCtrl.dispose();
+    _audioService.dispose();
     super.dispose();
+  }
+
+  Future<void> _togglePlayReminderVoice(CustomerReminder r) async {
+    if (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying) {
+      await _audioService.stop();
+    } else {
+      if (r.voiceBytes != null && r.voiceBytes!.isNotEmpty) {
+        await _audioService.playBytes(r.voiceBytes!, mediaId: r.id);
+      } else if (r.voiceUrl.isNotEmpty) {
+        await _audioService.playUrl(r.voiceUrl, mediaId: r.id);
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _callCustomer(String phone) async {
@@ -547,6 +571,73 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
             ),
           ],
+          if (r.hasVoice) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => _togglePlayReminderVoice(r),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: AppColors.gold,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: AppColors.black,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Voice Reminder',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
+                              ? 'Playing voice note...'
+                              : (r.voiceDurationSeconds > 0
+                                  ? '${r.voiceDurationSeconds}s audio recording'
+                                  : 'Tap play to listen'),
+                          style: TextStyle(fontSize: 11, color: p.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
 
           // Metadata row: Customer Name, Phone, Date, Staff
@@ -646,6 +737,73 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   fontWeight: FontWeight.w600,
                   color: AppPalette.statusGreen,
                 ),
+              ),
+            ),
+          ],
+          if (r.hasVoice) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => _togglePlayReminderVoice(r),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: AppColors.gold,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: AppColors.black,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Voice Reminder',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
+                              ? 'Playing voice note...'
+                              : (r.voiceDurationSeconds > 0
+                                  ? '${r.voiceDurationSeconds}s audio recording'
+                                  : 'Tap play to listen'),
+                          style: TextStyle(fontSize: 11, color: p.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

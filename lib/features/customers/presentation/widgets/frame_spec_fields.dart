@@ -2,13 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:raigon_art/core/theme/app_colors.dart';
-import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/features/customers/models/frame_spec.dart';
+import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
-const kUnits = ['Inch', 'CM', 'MM'];
+const kUnits = ['Inches', 'Centimetres', 'Feet'];
 const kFrameTypes = [
   'Wooden Frame',
   'Premium Frame',
@@ -32,7 +31,7 @@ class FrameSpecData {
       notes = TextEditingController();
 
   String size = '';
-  String unit = 'Inch';
+  String unit = 'Inches';
   String type = 'Wooden Frame';
   String orientation = 'Landscape (Horizontal)';
   String? existingPhotoUrl;
@@ -57,7 +56,7 @@ class FrameSpecData {
     notes: notes.text.trim(),
     photoName: photo?.name ?? existingPhotoName,
     photoBytes: photo?.bytes,
-    photoUrl: photo != null ? null : existingPhotoUrl,
+    photoUrl: photo?.url ?? (photo != null ? null : existingPhotoUrl),
   );
 
   void dispose() {
@@ -71,7 +70,8 @@ class FrameSpecData {
 
   void loadSpec(FrameSpec s) {
     size = s.size;
-    unit = s.unit;
+    final parsed = FrameUnit.fromString(s.unit);
+    unit = parsed.label;
     type = s.frameType;
     orientation = s.orientation;
     width.text = s.customWidth;
@@ -95,10 +95,32 @@ class FrameSpecFields extends StatelessWidget {
   final FrameSpecData data;
   final VoidCallback onChanged;
 
+  void _onUnitChanged(String newUnit) {
+    final from = FrameUnit.fromString(data.unit);
+    final to = FrameUnit.fromString(newUnit);
+    if (from != to) {
+      if (data.width.text.trim().isNotEmpty) {
+        data.width.text = FrameMeasurementHelper.convertString(
+          valueStr: data.width.text,
+          from: from,
+          to: to,
+        );
+      }
+      if (data.height.text.trim().isNotEmpty) {
+        data.height.text = FrameMeasurementHelper.convertString(
+          valueStr: data.height.text,
+          from: from,
+          to: to,
+        );
+      }
+    }
+    data.unit = newUnit;
+    onChanged();
+  }
+
   @override
   Widget build(BuildContext context) {
     const gap = SizedBox(height: 18);
-    final c = FormColors.of(context);
 
     final provider = context.watch<FrameSizeProvider>();
     final savedSizes = provider.sizes;
@@ -117,54 +139,22 @@ class FrameSpecFields extends StatelessWidget {
     }
 
     final sizeNames = availableSizes.map((frame) => frame.name).toList();
-
     final selectedSize = sizeNames.contains(data.size) ? data.size : null;
+    final currentUnitObj = FrameUnit.fromString(data.unit);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FormRow(
           children: [
             LabeledField(
-              label: 'Frame Size',
-              child: provider.isLoading && sizeNames.isEmpty
-                  ? InputDecorator(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: c.p.border),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.gold,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Loading frame sizes...',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: c.p.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
+              label: 'Frame Size Preset',
+              child: sizeNames.isEmpty
+                  ? const InputDecorator(
+                      decoration: InputDecoration(border: OutlineInputBorder()),
+                      child: Text('No frame sizes available'),
                     )
-                  : sizeNames.isEmpty
-                      ? const InputDecorator(
-                          decoration: InputDecoration(border: OutlineInputBorder()),
-                          child: Text('No frame sizes available'),
-                        )
-                      : FormDropdown<String>(
+                  : FormDropdown<String>(
                       key: ValueKey(selectedSize),
                       value: selectedSize,
                       hint: 'Select Frame Size',
@@ -177,26 +167,25 @@ class FrameSpecFields extends StatelessWidget {
                           (frame) => frame.name == value,
                         );
 
-                        data.width.text = selectedFrame.width.toString();
-                        data.height.text = selectedFrame.height.toString();
-                        data.unit = kUnits.contains(selectedFrame.unit)
-                            ? selectedFrame.unit
-                            : 'Inch';
+                        final frameUnit = FrameUnit.fromString(selectedFrame.unit);
+                        data.width.text = FrameMeasurementHelper.formatDimension(selectedFrame.width);
+                        data.height.text = FrameMeasurementHelper.formatDimension(selectedFrame.height);
+                        data.unit = frameUnit.label;
 
                         onChanged();
                       },
                     ),
             ),
             LabeledField(
-              label: 'Unit',
+              label: 'Measurement Unit',
               child: FormDropdown<String>(
-                value: data.unit,
+                value: kUnits.contains(data.unit) ? data.unit : currentUnitObj.label,
                 items: kUnits,
-                labelOf: (unit) => unit,
-                onChanged: (value) {
-                  data.unit = value;
-                  onChanged();
+                labelOf: (unit) {
+                  final u = FrameUnit.fromString(unit);
+                  return '${u.label} (${u.symbol})';
                 },
+                onChanged: (value) => _onUnitChanged(value),
               ),
             ),
           ],
@@ -205,21 +194,23 @@ class FrameSpecFields extends StatelessWidget {
         FormRow(
           children: [
             LabeledField(
-              label: 'Custom Width',
+              label: 'Width (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.width,
-                hint: 'Width (e.g. 12)',
+                hint: 'Width in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '2' : (currentUnitObj == FrameUnit.centimetres ? '60' : '24')})',
                 allowDecimal: true,
                 dim: true,
+                onChanged: (_) => onChanged(),
               ),
             ),
             LabeledField(
-              label: 'Custom Height',
+              label: 'Height (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.height,
-                hint: 'Height (e.g. 18)',
+                hint: 'Height in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '3' : (currentUnitObj == FrameUnit.centimetres ? '90' : '36')})',
                 allowDecimal: true,
                 dim: true,
+                onChanged: (_) => onChanged(),
               ),
             ),
           ],

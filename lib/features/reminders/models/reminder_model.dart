@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart' show Color, DateUtils;
 
 enum ReminderPriority {
@@ -56,6 +60,11 @@ class CustomerReminder {
     required this.createdAt,
     this.phone = '',
     this.region = '',
+    this.voiceUrl = '',
+    this.voiceDurationSeconds = 0,
+    this.voiceBytes,
+    this.isDeleted = false,
+    this.deletedAt,
   });
 
   final String id;
@@ -75,6 +84,21 @@ class CustomerReminder {
   final DateTime createdAt;
   final String phone;
   final String region;
+  final String voiceUrl;
+  final int voiceDurationSeconds;
+  final Uint8List? voiceBytes;
+  final bool isDeleted;
+  final DateTime? deletedAt;
+
+  bool get hasVoice =>
+      voiceUrl.isNotEmpty || (voiceBytes != null && voiceBytes!.isNotEmpty);
+
+  /// Calculates days remaining before permanent purge (14-day policy)
+  int get daysRemainingInTrash {
+    if (deletedAt == null) return 14;
+    final elapsed = DateTime.now().difference(deletedAt!).inDays;
+    return math.max(0, 14 - elapsed);
+  }
 
   DateTime get dateOnly =>
       DateTime(reminderDate.year, reminderDate.month, reminderDate.day);
@@ -104,8 +128,6 @@ class CustomerReminder {
   bool get isAvailable => !isCompleted;
 
   /// Whether this completed reminder was completed within the last 1 week (7 days).
-  /// Completed reminders remain visible in the "All" tab for 1 week.
-  /// After 1 week from completion, they are only visible in the "Completed" tab.
   bool get isCompletedWithinOneWeek {
     if (!isCompleted) return false;
     if (completedAt == null) return true;
@@ -129,8 +151,18 @@ class CustomerReminder {
 
   String get dateFormatted {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final m = months[reminderDate.month - 1];
     return '$m ${reminderDate.day}, ${reminderDate.year}';
@@ -153,6 +185,11 @@ class CustomerReminder {
     DateTime? createdAt,
     String? phone,
     String? region,
+    String? voiceUrl,
+    int? voiceDurationSeconds,
+    Uint8List? voiceBytes,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) {
     return CustomerReminder(
       id: id,
@@ -172,6 +209,11 @@ class CustomerReminder {
       createdAt: createdAt ?? this.createdAt,
       phone: phone ?? this.phone,
       region: region ?? this.region,
+      voiceUrl: voiceUrl ?? this.voiceUrl,
+      voiceDurationSeconds: voiceDurationSeconds ?? this.voiceDurationSeconds,
+      voiceBytes: voiceBytes ?? this.voiceBytes,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 
@@ -193,6 +235,11 @@ class CustomerReminder {
     'createdAt': createdAt.toIso8601String(),
     'phone': phone,
     'region': region,
+    'voiceUrl': voiceUrl,
+    'voiceDurationSeconds': voiceDurationSeconds,
+    if (voiceBytes != null) 'voiceBytes': base64Encode(voiceBytes!),
+    'is_deleted': isDeleted,
+    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
   };
 
   Map<String, dynamic> toSupabaseMap() => {
@@ -213,12 +260,27 @@ class CustomerReminder {
     'created_at': createdAt.toIso8601String(),
     'phone': phone,
     'region': region,
+    'voice_url': voiceUrl,
+    'voice_duration_seconds': voiceDurationSeconds,
+    'is_deleted': isDeleted,
+    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
   };
 
   factory CustomerReminder.fromJson(Map<String, dynamic> j) {
     DateTime parseDate(dynamic v) {
       if (v == null) return DateTime.now();
       return DateTime.tryParse(v.toString()) ?? DateTime.now();
+    }
+
+    Uint8List? parseBytes(dynamic v) {
+      if (v == null) return null;
+      if (v is Uint8List) return v;
+      if (v is String && v.isNotEmpty) {
+        try {
+          return base64Decode(v);
+        } catch (_) {}
+      }
+      return null;
     }
 
     return CustomerReminder(
@@ -229,18 +291,34 @@ class CustomerReminder {
       orderId: (j['orderId'] ?? j['order_id'] ?? '').toString(),
       description: (j['description'] ?? '').toString(),
       reminderDate: parseDate(j['reminderDate'] ?? j['reminder_date']),
-      reminderTime: (j['reminderTime'] ?? j['reminder_time'] ?? '10:00 AM').toString(),
-      assignedStaff: (j['assignedStaff'] ?? j['assigned_staff'] ?? 'Admin').toString(),
-      priority: ReminderPriority.fromString((j['priority'] ?? 'Medium').toString()),
+      reminderTime: (j['reminderTime'] ?? j['reminder_time'] ?? '10:00 AM')
+          .toString(),
+      assignedStaff: (j['assignedStaff'] ?? j['assigned_staff'] ?? 'Admin')
+          .toString(),
+      priority: ReminderPriority.fromString(
+        (j['priority'] ?? 'Medium').toString(),
+      ),
       isCompleted: j['isCompleted'] == true || j['is_completed'] == true,
       completedAt: j['completedAt'] != null || j['completed_at'] != null
-          ? DateTime.tryParse((j['completedAt'] ?? j['completed_at']).toString())
+          ? DateTime.tryParse(
+              (j['completedAt'] ?? j['completed_at']).toString(),
+            )
           : null,
       completedBy: (j['completedBy'] ?? j['completed_by'])?.toString(),
       createdBy: (j['createdBy'] ?? j['created_by'] ?? 'Admin').toString(),
       createdAt: parseDate(j['createdAt'] ?? j['created_at']),
       phone: (j['phone'] ?? '').toString(),
       region: (j['region'] ?? '').toString(),
+      voiceUrl: (j['voiceUrl'] ?? j['voice_url'] ?? '').toString(),
+      voiceDurationSeconds:
+          (j['voiceDurationSeconds'] ?? j['voice_duration_seconds'] as num?)
+              ?.toInt() ??
+          0,
+      voiceBytes: parseBytes(j['voiceBytes']),
+      isDeleted: j['is_deleted'] == true || j['isDeleted'] == true,
+      deletedAt: j['deleted_at'] != null || j['deletedAt'] != null
+          ? DateTime.tryParse((j['deleted_at'] ?? j['deletedAt']).toString())
+          : null,
     );
   }
 }

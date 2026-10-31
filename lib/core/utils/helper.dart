@@ -18,8 +18,29 @@ class Helper {
     'Dec',
   ];
 
+  static const _fullMonths = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
   static String formatDate(DateTime d) =>
       '${_months[d.month - 1]} ${d.day}, ${d.year}';
+
+  static String formatExpectedDate(DateTime d) {
+    final dayStr = d.day.toString().padLeft(2, '0');
+    final monthStr = _fullMonths[d.month - 1];
+    return '$dayStr $monthStr ${d.year}';
+  }
 
   // Instagram connection debugging
   static const bool debugInstagram = true;

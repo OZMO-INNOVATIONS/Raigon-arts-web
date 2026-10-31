@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/trash/presentation/screens/trash_screen.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/presentation/screens/reminders_screen.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
@@ -104,6 +105,7 @@ class _AppShellState extends State<AppShell> {
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
     NavDestination.reminders => const RemindersScreen(),
+    NavDestination.trash => const TrashScreen(),
     NavDestination.photoCollection => const PhotoCollectionScreen(),
     NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),

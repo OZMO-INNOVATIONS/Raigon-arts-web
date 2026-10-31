@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
@@ -265,4 +266,54 @@ class AppConfirmationDialog extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Confirmation dialog for permanently purging an item.
+Future<bool> showPermanentDeleteConfirmationDialog(
+  BuildContext context, {
+  required String itemLabel,
+}) {
+  return showAppConfirmationDialog(
+    context,
+    title: 'Delete Permanently',
+    message: 'Are you sure you want to permanently delete $itemLabel? This action cannot be undone.',
+    confirmLabel: 'Delete Forever',
+    cancelLabel: 'Keep',
+    icon: RemixIcons.delete_bin_2_fill,
+    confirmColor: const Color(0xFFEF4444),
+    isDestructive: true,
+  );
+}
+
+/// Confirmation dialog for emptying the entire trash bin.
+Future<bool> showEmptyTrashConfirmationDialog(BuildContext context, {int count = 0}) {
+  final countStr = count > 0 ? ' all $count items from' : '';
+  return showAppConfirmationDialog(
+    context,
+    title: 'Empty Trash Bin',
+    message: 'Are you sure you want to permanently delete$countStr the bin? All data and uploaded files will be permanently erased.',
+    confirmLabel: 'Empty Trash',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.delete_bin_7_fill,
+    confirmColor: const Color(0xFFEF4444),
+    isDestructive: true,
+  );
+}
+
+/// Confirmation dialog for restoring an item.
+Future<bool> showRestoreConfirmationDialog(
+  BuildContext context, {
+  required String itemLabel,
+}) {
+  return showAppConfirmationDialog(
+    context,
+    title: 'Restore Item',
+    message: 'Restore $itemLabel back to active records?',
+    confirmLabel: 'Restore',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.restart_line,
+    iconColor: AppColors.gold,
+    confirmColor: AppColors.gold,
+    isDestructive: false,
+  );
 }

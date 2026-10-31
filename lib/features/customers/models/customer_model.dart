@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart' show Color;
-import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:raigon_art/core/utils/helper.dart';
-import 'package:raigon_art/features/customers/models/frame_spec.dart';
+import 'package:flutter/material.dart' show Color;
 import 'package:raigon_art/core/models/status.dart';
-
+import 'package:raigon_art/core/utils/helper.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/features/customers/models/frame_spec.dart';
 
 enum OrderPriority {
   urgent('Urgent', Color(0xFFEF4444)),
@@ -17,6 +17,40 @@ enum OrderPriority {
   const OrderPriority(this.label, this.color);
   final String label;
   final Color color;
+}
+
+class OrderStatusHistoryItem {
+  final Status previousStatus;
+  final Status newStatus;
+  final DateTime updatedAt;
+  final String updatedBy;
+  final String notes;
+
+  const OrderStatusHistoryItem({
+    required this.previousStatus,
+    required this.newStatus,
+    required this.updatedAt,
+    required this.updatedBy,
+    this.notes = '',
+  });
+
+  Map<String, dynamic> toJson() => {
+    'previousStatus': previousStatus.name,
+    'newStatus': newStatus.name,
+    'updatedAt': updatedAt.toIso8601String(),
+    'updatedBy': updatedBy,
+    'notes': notes,
+  };
+
+  factory OrderStatusHistoryItem.fromJson(Map<String, dynamic> j) {
+    return OrderStatusHistoryItem(
+      previousStatus: Customer.parseStatus(j['previousStatus'] ?? j['previous_status']),
+      newStatus: Customer.parseStatus(j['newStatus'] ?? j['new_status']),
+      updatedAt: DateTime.tryParse((j['updatedAt'] ?? j['updated_at'] ?? '').toString()) ?? DateTime.now(),
+      updatedBy: (j['updatedBy'] ?? j['updated_by'] ?? 'Workshop Staff').toString(),
+      notes: (j['notes'] ?? '').toString(),
+    );
+  }
 }
 
 class Customer {
@@ -44,9 +78,30 @@ class Customer {
     this.photoBytes = const [],
     this.photoNames = const [],
     this.photoSizeLabels = const [],
+    this.statusHistory = const [],
     this.createdAt,
     this.updatedAt,
+    this.isDeleted = false,
+    this.deletedAt,
   });
+
+  static Status parseStatus(dynamic value) {
+    if (value == null) return Status.pending;
+    if (value is Status) return value;
+    final s = value.toString().trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    if (s == 'confirmed') return Status.confirmed;
+    if (s == 'onhold' || s == 'hold') return Status.onHold;
+    if (s == 'cancelled' || s == 'canceled') return Status.cancelled;
+    if (s == 'editingprogress' || s == 'editing') return Status.editingProgress;
+    if (s == 'dispatchforprinting' || s == 'dispatch' || s == 'printing') {
+      return Status.dispatchForPrinting;
+    }
+    if (s == 'printreceived' || s == 'printed') return Status.printReceived;
+    if (s == 'framingprocess' || s == 'framing') return Status.framingProcess;
+    if (s == 'completed') return Status.completed;
+    if (s == 'inprogress') return Status.inProgress;
+    return Status.pending;
+  }
 
   final String id;
   final String name;
@@ -71,11 +126,26 @@ class Customer {
   final List<FrameSpec> frames;
   final List<Uint8List> photoBytes;
   final List<String> photoSizeLabels;
+  final List<OrderStatusHistoryItem> statusHistory;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isDeleted;
+  final DateTime? deletedAt;
+
+  /// Calculates days remaining before permanent purge (14-day policy)
+  int get daysRemainingInTrash {
+    if (deletedAt == null) return 14;
+    final elapsed = DateTime.now().difference(deletedAt!).inDays;
+    return math.max(0, 14 - elapsed);
+  }
 
   int get balance => total - advance;
   String get orderDateLabel => Helper.formatDate(orderDate);
+
+  String get expectedDateLabel {
+    if (expectedDelivery == null) return 'Not set';
+    return Helper.formatExpectedDate(expectedDelivery!);
+  }
 
   String get effectiveRegion =>
       region.isNotEmpty ? region : (city.isNotEmpty ? city : 'Main Region');
@@ -114,7 +184,7 @@ class Customer {
       : [
           FrameSpec(
             size: frameSize,
-            unit: 'Inch',
+            unit: 'Inches',
             frameType: frameType,
             material: 'Teak Wood Moulding',
             finish: 'Walnut Brown',
@@ -145,9 +215,13 @@ class Customer {
     'paymentStatus': paymentStatus,
     'status': status.name,
     'orderDate': orderDate.toIso8601String(),
-    'expectedDelivery': expectedDelivery?.toIso8601String(),
+    if (expectedDelivery != null)
+      'expectedDelivery': expectedDelivery!.toIso8601String(),
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'is_deleted': isDeleted,
+    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
+    'statusHistory': [for (final h in statusHistory) h.toJson()],
     'frames': [for (final f in frames) f.toJson()],
   };
 
@@ -172,6 +246,7 @@ class Customer {
       'expectedDelivery': expectedDelivery!.toIso8601String(),
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'statusHistory': [for (final h in statusHistory) h.toJson()],
     'frames': [
       for (final f in effectiveFrames)
         {
@@ -218,14 +293,6 @@ class Customer {
       return [];
     }
 
-    Status parseStatus(dynamic value) {
-      final s = value?.toString().toLowerCase().replaceAll('-', '').replaceAll('_', '') ?? '';
-      if (s == 'inprogress') return Status.inProgress;
-      if (s == 'completed') return Status.completed;
-      if (s == 'cancelled') return Status.cancelled;
-      return Status.pending;
-    }
-
     DateTime parseDate(dynamic value) {
       if (value == null) return DateTime.now();
       return DateTime.tryParse(value.toString()) ?? DateTime.now();
@@ -246,80 +313,55 @@ class Customer {
     if (rawUrls.isEmpty && rawCustPhotos is List) {
       for (final p in rawCustPhotos) {
         if (p is Map) {
-          final u = p['file_url'] ?? p['fileUrl'] ?? p['url'];
-          if (u != null && u.toString().trim().isNotEmpty) {
-            rawUrls.add(u.toString().trim());
-          }
-          final n = p['file_name'] ?? p['fileName'] ?? p['name'];
-          if (n != null && n.toString().trim().isNotEmpty) {
-            pNames.add(n.toString().trim());
+          final u = p['photo_url'] ?? p['url'];
+          final n = p['photo_name'] ?? p['file_name'];
+          if (u != null && u.toString().isNotEmpty) {
+            rawUrls.add(u.toString());
+            pNames.add(n?.toString() ?? 'Photo_${rawUrls.length}.jpg');
           }
         }
       }
     }
 
-    var pUrls = [
-      for (final u in rawUrls) ImageUrlHelper.resolve(u),
-    ].where((u) => u.isNotEmpty).toList();
+    final pUrls = <String>[];
+    for (final u in rawUrls) {
+      final res = ImageUrlHelper.resolve(u);
+      if (res.isNotEmpty && !pUrls.contains(res)) {
+        pUrls.add(res);
+      }
+    }
+
     final pSizeLabels = extractStrings(['photoSizeLabels', 'photo_size_labels']);
+    final rawPhotoCount = j['photoCount'] ?? j['photo_count'];
+    final photoCount = toInt(rawPhotoCount, math.max(pUrls.length, frames.length));
 
-    // Collect any frame photos that might not be in pUrls
-    for (var i = 0; i < frames.length; i++) {
-      final f = frames[i];
-      if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
-        final resolvedFrameUrl = ImageUrlHelper.resolve(f.photoUrl!);
-        if (!pUrls.contains(resolvedFrameUrl)) {
-          pUrls.add(resolvedFrameUrl);
-          final fname = f.photoName ?? 'Frame_${i + 1}.webp';
-          if (!pNames.contains(fname)) {
-            pNames.add(fname);
-          }
-        }
-      }
-    }
-
-    // Link frames to pUrls if frame has no photoUrl but customer vault has photos
     final resolvedFrames = <FrameSpec>[];
-    for (var i = 0; i < frames.length; i++) {
-      final f = frames[i];
-      if ((f.photoUrl == null || f.photoUrl!.isEmpty) && pUrls.isNotEmpty) {
-        final assignedUrl = i < pUrls.length ? pUrls[i] : pUrls.first;
-        final assignedName = i < pNames.length ? pNames[i] : 'Photo_${i + 1}';
-        resolvedFrames.add(FrameSpec(
-          size: f.size,
-          unit: f.unit,
-          customWidth: f.customWidth,
-          customHeight: f.customHeight,
-          frameType: f.frameType,
-          material: f.material,
-          finish: f.finish,
-          orientation: f.orientation,
-          qty: f.qty,
-          notes: f.notes,
-          photoName: f.photoName ?? assignedName,
-          photoUrl: assignedUrl,
-          photoBytes: f.photoBytes,
-        ));
-      } else {
-        resolvedFrames.add(f);
-      }
+    if (frames.isNotEmpty) {
+      resolvedFrames.addAll(frames);
     }
 
-    final rawPhotoCount = toInt(j['photoCount'] ?? j['photo_count'], 0);
-    final photoCount = frames.length > 1
-        ? frames.length
-        : (rawPhotoCount > 0
-            ? rawPhotoCount
-            : (pUrls.isNotEmpty ? pUrls.length : pNames.length));
-
-    final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
     final bytesList = <Uint8List>[];
+    final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
     if (rawBytes is List) {
       for (final s in rawBytes) {
-        if (s is String && s.isNotEmpty) {
+        if (s is Uint8List) {
+          bytesList.add(s);
+        } else if (s is String && s.isNotEmpty) {
           try {
             bytesList.add(base64Decode(s));
           } catch (_) {}
+        }
+      }
+    }
+
+    final historyList = <OrderStatusHistoryItem>[];
+    final rawHistory = j['statusHistory'] ?? j['status_history'];
+    if (rawHistory is List) {
+      for (final h in rawHistory) {
+        if (h is Map<String, dynamic>) {
+          historyList.add(OrderStatusHistoryItem.fromJson(h));
+        } else if (h is Map) {
+          historyList.add(OrderStatusHistoryItem.fromJson(Map<String, dynamic>.from(h)));
         }
       }
     }
@@ -328,6 +370,9 @@ class Customer {
     final rawExpectedDelivery = j['expectedDelivery'] ?? j['expected_delivery'];
     final rawCreatedAt = j['createdAt'] ?? j['created_at'];
     final rawUpdatedAt = j['updatedAt'] ?? j['updated_at'];
+    final isDeleted = j['is_deleted'] == true || j['isDeleted'] == true;
+    final rawDeletedAt = j['deleted_at'] ?? j['deletedAt'];
+    final deletedAt = rawDeletedAt != null ? DateTime.tryParse(rawDeletedAt.toString()) : null;
 
     return Customer(
       id: (j['id'] ?? '')?.toString() ?? '',
@@ -355,8 +400,11 @@ class Customer {
           ? null
           : DateTime.tryParse(rawExpectedDelivery.toString()),
       frames: resolvedFrames,
+      statusHistory: historyList,
       createdAt: rawCreatedAt != null ? DateTime.tryParse(rawCreatedAt.toString()) : null,
       updatedAt: rawUpdatedAt != null ? DateTime.tryParse(rawUpdatedAt.toString()) : null,
+      isDeleted: isDeleted,
+      deletedAt: deletedAt,
     );
   }
 
@@ -364,8 +412,12 @@ class Customer {
     Status? status,
     String? region,
     String? paymentStatus,
+    DateTime? expectedDelivery,
+    List<OrderStatusHistoryItem>? statusHistory,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) => Customer(
     id: id,
     name: name,
@@ -384,14 +436,17 @@ class Customer {
     photoUrls: photoUrls,
     altPhone: altPhone,
     pincode: pincode,
-    expectedDelivery: expectedDelivery,
+    expectedDelivery: expectedDelivery ?? this.expectedDelivery,
     paymentStatus: paymentStatus ?? this.paymentStatus,
     frames: frames,
     photoBytes: photoBytes,
     photoNames: photoNames,
     photoSizeLabels: photoSizeLabels,
+    statusHistory: statusHistory ?? this.statusHistory,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    isDeleted: isDeleted ?? this.isDeleted,
+    deletedAt: deletedAt ?? this.deletedAt,
   );
 
   Customer copyWithImages({
@@ -401,8 +456,12 @@ class Customer {
     List<String>? photoUrls,
     List<FrameSpec>? frames,
     int? photoCount,
+    DateTime? expectedDelivery,
+    List<OrderStatusHistoryItem>? statusHistory,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) => Customer(
     id: id,
     name: name,
@@ -422,12 +481,15 @@ class Customer {
     orderDate: orderDate,
     altPhone: altPhone,
     pincode: pincode,
-    expectedDelivery: expectedDelivery,
+    expectedDelivery: expectedDelivery ?? this.expectedDelivery,
     paymentStatus: paymentStatus,
     frames: frames ?? this.frames,
     photoBytes: photoBytes ?? this.photoBytes,
     photoSizeLabels: photoSizeLabels,
+    statusHistory: statusHistory ?? this.statusHistory,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    isDeleted: isDeleted ?? this.isDeleted,
+    deletedAt: deletedAt ?? this.deletedAt,
   );
 }

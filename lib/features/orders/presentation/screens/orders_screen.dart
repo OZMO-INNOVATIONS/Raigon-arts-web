@@ -1,4 +1,5 @@
 import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -19,7 +20,6 @@ import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/customers_table.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
-
 
 enum OrderTimeFilter {
   all('All Orders'),
@@ -155,7 +155,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-
   // Column widths in logical pixels. Used both as the minimum width of each
   // column and as the flex proportion when the screen is wider than the table.
   static const _colWidths = <double>[
@@ -190,7 +189,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     'TOTAL AMOUNT',
     'PAYMENT',
     'ORDER STATUS',
-    'DELIVERY DATE',
+    'EXPECTED DATE',
     'ACTIONS',
   ];
 
@@ -202,7 +201,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
     try {
       await context.read<CustomerAndOrderProvider>().remove(customer.id);
       if (mounted) {
-        AppSnackBar.success(context, 'Order ${customer.id} deleted successfully.');
+        AppSnackBar.success(
+          context,
+          'Order ${customer.id} moved to trash.',
+          actionLabel: 'View Trash',
+          onAction: () {
+            try {
+              ShellScope.of(context).goTo(NavDestination.trash);
+            } catch (_) {}
+          },
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -216,16 +224,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _sendWhatsApp(Customer customer) async {
     try {
-      final opened = await CustomerWhatsAppService.openOrderConfirmation(customer);
+      final opened = await CustomerWhatsAppService.openOrderConfirmation(
+        customer,
+      );
       if (!mounted) return;
       if (opened) {
-        AppSnackBar.success(context, 'WhatsApp opened with order confirmation.');
+        AppSnackBar.success(
+          context,
+          'WhatsApp opened with order confirmation.',
+        );
       } else {
-        AppSnackBar.error(context, 'Could not open WhatsApp. Please try again.');
+        AppSnackBar.error(
+          context,
+          'Could not open WhatsApp. Please try again.',
+        );
       }
     } catch (_) {
       if (!mounted) return;
-      AppSnackBar.error(context, 'Could not open WhatsApp. Check customer phone number.');
+      AppSnackBar.error(
+        context,
+        'Could not open WhatsApp. Check customer phone number.',
+      );
     }
   }
 
@@ -248,19 +267,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ? 'N/A'
       : '${_months[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
 
-  Color _statusColor(Status s) => switch (s) {
-    Status.inProgress => AppPalette.statusGold,
-    Status.pending => AppPalette.orange,
-    Status.completed => AppPalette.statusGreen,
-    Status.cancelled => AppPalette.statusRed,
-  };
+  Color _statusColor(Status s) => s.color;
 
-  String _statusLabel(Status s) => switch (s) {
-    Status.inProgress => 'In Progress',
-    Status.pending => 'Pending',
-    Status.completed => 'Completed',
-    Status.cancelled => 'Cancelled',
-  };
+  String _statusLabel(Status s) => s.label;
 
   String _paymentOf(Customer c) {
     if (c.advance <= 0) return 'Unpaid';
@@ -487,8 +496,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final items = <(String, Status?)>[
       ('All', null),
       ('Pending', Status.pending),
-      ('In Progress', Status.inProgress),
+      ('Confirmed', Status.confirmed),
+      ('Editing Progress', Status.editingProgress),
+      ('Dispatch for Printing', Status.dispatchForPrinting),
+      ('Print Received', Status.printReceived),
+      ('Framing Process', Status.framingProcess),
       ('Completed', Status.completed),
+      ('On Hold', Status.onHold),
       ('Cancelled', Status.cancelled),
     ];
     return Container(
@@ -790,11 +804,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(
-              RemixIcons.arrow_down_s_line,
-              size: 18,
-              color: p.textMuted,
-            ),
+            Icon(RemixIcons.arrow_down_s_line, size: 18, color: p.textMuted),
           ],
         ),
       ),
@@ -816,7 +826,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
             value: sm,
             child: Row(
               children: [
-                const Icon(RemixIcons.sort_desc, size: 15, color: AppColors.gold),
+                const Icon(
+                  RemixIcons.sort_desc,
+                  size: 15,
+                  color: AppColors.gold,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   sm.label,
@@ -858,11 +872,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(
-              RemixIcons.arrow_down_s_line,
-              size: 18,
-              color: p.textMuted,
-            ),
+            Icon(RemixIcons.arrow_down_s_line, size: 18, color: p.textMuted),
           ],
         ),
       ),
@@ -1068,8 +1078,8 @@ class _OrderRowState extends State<_OrderRow> {
                     c.frameType.isNotEmpty
                         ? c.frameType
                         : (spec != null && spec.frameType.isNotEmpty
-                            ? spec.frameType
-                            : 'Standard Frame'),
+                              ? spec.frameType
+                              : 'Standard Frame'),
                     TextStyle(fontSize: 12.5, color: p.textMuted),
                   ),
                 ],
@@ -1123,7 +1133,7 @@ class _OrderRowState extends State<_OrderRow> {
         offset: const Offset(0, 38),
         color: widget.p.surface,
         itemBuilder: (_) => [
-          for (final s in Status.values)
+          for (final s in Status.standardStatuses)
             PopupMenuItem(
               value: s,
               child: Text(

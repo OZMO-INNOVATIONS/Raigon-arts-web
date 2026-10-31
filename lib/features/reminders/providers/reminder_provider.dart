@@ -53,7 +53,8 @@ class ReminderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _reminders = await _service.getReminders();
+      final fetched = await _service.getReminders();
+      _reminders = fetched.where((r) => !r.isDeleted).toList();
       _initialized = true;
     } catch (e) {
       debugPrint('[ReminderProvider] Load error: $e');
@@ -137,6 +138,9 @@ class ReminderProvider extends ChangeNotifier {
     required String createdBy,
     String phone = '',
     String region = '',
+    String voiceUrl = '',
+    int voiceDurationSeconds = 0,
+    Uint8List? voiceBytes,
   }) async {
     final id = 'REM-${DateTime.now().millisecondsSinceEpoch}';
     final reminder = CustomerReminder(
@@ -154,6 +158,9 @@ class ReminderProvider extends ChangeNotifier {
       createdAt: DateTime.now(),
       phone: phone.trim(),
       region: region.trim(),
+      voiceUrl: voiceUrl,
+      voiceDurationSeconds: voiceDurationSeconds,
+      voiceBytes: voiceBytes,
     );
 
     _reminders.insert(0, reminder);

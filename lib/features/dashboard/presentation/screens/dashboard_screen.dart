@@ -345,6 +345,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final p = AppPalette.of(context);
     int count(Status s) => customers.where((c) => c.status == s).length;
+    final inProgressCount = customers
+        .where(
+          (c) =>
+              c.status == Status.inProgress ||
+              c.status == Status.confirmed ||
+              c.status == Status.editingProgress ||
+              c.status == Status.dispatchForPrinting ||
+              c.status == Status.printReceived ||
+              c.status == Status.framingProcess,
+        )
+        .length;
     final billable = customers
         .where((c) => c.status != Status.cancelled)
         .toList();
@@ -397,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           (
             title: 'In Progress',
-            value: '${count(Status.inProgress)}',
+            value: '$inProgressCount',
             icon: RemixIcons.hammer_line,
             tileBg: p.tileTeal,
             tileIcon: AppPalette.teal,
@@ -703,7 +714,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         txt(
-                          o.effectiveRegion.isNotEmpty ? o.effectiveRegion : o.city,
+                          o.effectiveRegion.isNotEmpty
+                              ? o.effectiveRegion
+                              : o.city,
                           TextStyle(fontSize: 13, color: p.textMuted),
                         ),
                       ],

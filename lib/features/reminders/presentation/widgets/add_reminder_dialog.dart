@@ -1,6 +1,12 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
+import 'package:raigon_art/core/services/storage_service.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
@@ -8,6 +14,7 @@ import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
+import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 
 Future<void> showAddOrEditReminderDialog({
   required BuildContext context,
@@ -54,6 +61,16 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
   late String _assignedStaff;
   bool _isSaving = false;
 
+  final ReminderAudioService _audioService = ReminderAudioService();
+  String _voiceUrl = '';
+  int _voiceDurationSeconds = 0;
+  Uint8List? _voiceBytes;
+  bool _isRecording = false;
+  int _recordingSeconds = 0;
+  bool _isPlaying = false;
+  StreamSubscription? _recSub;
+  StreamSubscription? _playerSub;
+
   @override
   void initState() {
     super.initState();
@@ -87,10 +104,25 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     _selectedTime = const TimeOfDay(hour: 10, minute: 0);
     _priority = rem?.priority ?? ReminderPriority.medium;
     _assignedStaff = rem?.assignedStaff ?? (AuthService.isAdmin ? 'Admin' : 'Workshop Staff');
+
+    _voiceUrl = rem?.voiceUrl ?? '';
+    _voiceDurationSeconds = rem?.voiceDurationSeconds ?? 0;
+    _voiceBytes = rem?.voiceBytes;
+
+    _recSub = _audioService.onRecordSecondsChanged.listen((sec) {
+      if (mounted) setState(() => _recordingSeconds = sec);
+    });
+
+    _playerSub = _audioService.onPlayerStateChanged.listen((state) {
+      if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+    });
   }
 
   @override
   void dispose() {
+    _recSub?.cancel();
+    _playerSub?.cancel();
+    _audioService.dispose();
     _titleCtrl.dispose();
     _customerNameCtrl.dispose();
     _customerIdCtrl.dispose();
@@ -99,6 +131,76 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     _regionCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    final ok = await _audioService.startRecording();
+    if (ok) {
+      setState(() => _isRecording = true);
+    } else {
+      if (mounted) {
+        AppSnackBar.error(context, 'Microphone permission denied or recording unavailable.');
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    final result = await _audioService.stopRecording();
+    setState(() {
+      _isRecording = false;
+      if (result != null) {
+        _voiceBytes = result.bytes;
+        _voiceDurationSeconds = result.durationSeconds;
+        _voiceUrl = '';
+      }
+    });
+  }
+
+  Future<void> _cancelRecording() async {
+    await _audioService.cancelRecording();
+    setState(() => _isRecording = false);
+  }
+
+  Future<void> _pickAudioFile() async {
+    try {
+      final res = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'webm'],
+      );
+      if (res.isNotEmpty) {
+        final bytes = await res.first.readAsBytes();
+        setState(() {
+          _voiceBytes = bytes;
+          _voiceDurationSeconds = 10;
+          _voiceUrl = '';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to pick audio file: $e');
+      }
+    }
+  }
+
+  Future<void> _toggleAudioPlayback() async {
+    if (_isPlaying) {
+      await _audioService.pause();
+    } else {
+      if (_voiceBytes != null && _voiceBytes!.isNotEmpty) {
+        await _audioService.playBytes(_voiceBytes!);
+      } else if (_voiceUrl.isNotEmpty) {
+        await _audioService.playUrl(_voiceUrl);
+      }
+    }
+  }
+
+  void _clearVoice() {
+    _audioService.stop();
+    setState(() {
+      _voiceBytes = null;
+      _voiceUrl = '';
+      _voiceDurationSeconds = 0;
+    });
   }
 
   Future<void> _pickDate() async {
@@ -173,6 +275,19 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final isEdit = widget.existingReminder != null;
     final timeStr = _selectedTime.format(context);
 
+    // If audio bytes are present but not yet uploaded, upload to storage
+    if (_voiceBytes != null && _voiceBytes!.isNotEmpty && _voiceUrl.isEmpty) {
+      try {
+        final fileName = 'voice_rem_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final uploaded = await StorageService().uploadFile(_voiceBytes!, fileName);
+        if (uploaded.fileUrl.isNotEmpty) {
+          _voiceUrl = uploaded.fileUrl;
+        }
+      } catch (e) {
+        debugPrint('[AddReminder] Storage voice upload notice: $e (stored locally)');
+      }
+    }
+
     try {
       if (isEdit) {
         final updated = widget.existingReminder!.copyWith(
@@ -187,6 +302,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
           priority: _priority,
           phone: _phoneCtrl.text.trim(),
           region: _regionCtrl.text.trim(),
+          voiceUrl: _voiceUrl,
+          voiceDurationSeconds: _voiceDurationSeconds,
+          voiceBytes: _voiceBytes,
         );
         await provider.updateReminder(updated);
         if (mounted) {
@@ -207,6 +325,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
           createdBy: AuthService.isAdmin ? 'Admin' : 'Workshop Staff',
           phone: _phoneCtrl.text.trim(),
           region: _regionCtrl.text.trim(),
+          voiceUrl: _voiceUrl,
+          voiceDurationSeconds: _voiceDurationSeconds,
+          voiceBytes: _voiceBytes,
         );
         if (mounted) {
           Navigator.of(context).pop();
@@ -234,6 +355,8 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
         '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}';
     final timeFormatted = _selectedTime.format(context);
 
+    final hasVoice = _voiceUrl.isNotEmpty || (_voiceBytes != null && _voiceBytes!.isNotEmpty);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -241,21 +364,18 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
         constraints: const BoxConstraints(maxWidth: 580),
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: p.border.withValues(alpha: 0.9),
-            width: 1.2,
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: p.border, width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.15),
+              color: Colors.black.withValues(alpha: 0.35),
               blurRadius: 28,
               offset: const Offset(0, 10),
             ),
           ],
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           child: Form(
             key: _formKey,
             child: Column(
@@ -266,15 +386,14 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 Row(
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        gradient: p.goldAccentGradient,
+                        color: AppColors.gold.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
                         Icons.alarm_add_rounded,
-                        color: AppColors.black,
+                        color: AppColors.gold,
                         size: 22,
                       ),
                     ),
@@ -284,70 +403,74 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEdit ? 'Edit Reminder' : 'Create New Reminder',
+                            isEdit ? 'Edit Follow-up Reminder' : 'Schedule Customer Reminder',
                             style: TextStyle(
-                              fontSize: 19,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: p.textPrimary,
-                              letterSpacing: -0.2,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Schedule a date-based contact or follow-up notice',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: p.textMuted,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            'Text and voice reminders with automated alerts',
+                            style: TextStyle(fontSize: 12, color: p.textMuted),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close_rounded, color: p.textMuted),
+                      icon: const Icon(Icons.close_rounded),
+                      color: p.textMuted,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
+                Divider(height: 1, color: p.border),
+                const SizedBox(height: 18),
 
-                // Customer selection helper dropdown
+                // Link to Existing Customer (Quick Fill)
                 if (!isEdit && customers.isNotEmpty) ...[
-                  Text(
-                    'SELECT EXISTING CUSTOMER (OPTIONAL)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                      color: p.isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildLabel(p, 'LINK TO CUSTOMER (OPTIONAL)'),
+                      if (_customerIdCtrl.text.isNotEmpty)
+                        Text(
+                          'Linked: ${_customerIdCtrl.text}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: p.isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(12),
+                      color: p.chipFill,
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: p.border),
                     ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<Customer>(
                         isExpanded: true,
                         hint: Text(
-                          'Choose customer from list...',
-                          style: TextStyle(fontSize: 13.5, color: p.textMuted),
+                          _customerIdCtrl.text.isNotEmpty
+                              ? 'Customer: ${_customerNameCtrl.text}'
+                              : 'Select a customer to auto-fill details...',
+                          style: TextStyle(color: p.textMuted, fontSize: 13),
                         ),
-                        dropdownColor: p.surface,
                         items: [
-                          for (final c in customers.take(25))
+                          for (final c in customers)
                             DropdownMenuItem(
                               value: c,
                               child: Text(
-                                '${c.name} (#${c.id}) • ${c.phone}',
-                                style: TextStyle(fontSize: 13.5, color: p.textPrimary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                '${c.name} (${c.id}) • ${c.phone}',
+                                style: TextStyle(color: p.textPrimary, fontSize: 13),
                               ),
                             ),
                         ],
@@ -364,54 +487,44 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 _buildLabel(p, 'REMINDER TITLE *'),
                 TextFormField(
                   controller: _titleCtrl,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Reminder title is required' : null,
                   style: TextStyle(color: p.textPrimary, fontSize: 14),
-                  decoration: _buildInputDec(p, 'e.g. Call regarding wooden frame delivery'),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Title is required' : null,
+                  decoration: _buildInputDec(
+                    p,
+                    'e.g. Frame Preview Verification / Balance Collection',
+                    prefixIcon: const Icon(Icons.title_rounded, size: 18),
+                  ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
-                // Customer Name & Customer ID Row
+                // Customer Name & Phone
                 Row(
                   children: [
                     Expanded(
-                      flex: 6,
+                      flex: 3,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildLabel(p, 'CUSTOMER NAME *'),
                           TextFormField(
                             controller: _customerNameCtrl,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Customer name is required'
+                                : null,
                             style: TextStyle(color: p.textPrimary, fontSize: 14),
-                            decoration: _buildInputDec(p, 'Full name'),
-                            validator: (v) =>
-                                v == null || v.trim().isEmpty ? 'Required' : null,
+                            decoration: _buildInputDec(
+                              p,
+                              'e.g. Priya Sharma',
+                              prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabel(p, 'CUSTOMER ID'),
-                          TextFormField(
-                            controller: _customerIdCtrl,
-                            style: TextStyle(color: p.textPrimary, fontSize: 14),
-                            decoration: _buildInputDec(p, 'e.g. RA-1002'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Phone & Region Row
-                Row(
-                  children: [
-                    Expanded(
+                      flex: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -420,21 +533,11 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
                             style: TextStyle(color: p.textPrimary, fontSize: 14),
-                            decoration: _buildInputDec(p, '+91 9876543210'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabel(p, 'REGION / CITY'),
-                          TextFormField(
-                            controller: _regionCtrl,
-                            style: TextStyle(color: p.textPrimary, fontSize: 14),
-                            decoration: _buildInputDec(p, 'e.g. Kochi / Ernakulam'),
+                            decoration: _buildInputDec(
+                              p,
+                              '9998887776',
+                              prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                            ),
                           ),
                         ],
                       ),
@@ -443,7 +546,7 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // Date & Time Picker Row
+                // Date & Time Pickers
                 Row(
                   children: [
                     Expanded(
@@ -453,26 +556,25 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                           _buildLabel(p, 'REMINDER DATE *'),
                           InkWell(
                             onTap: _pickDate,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
-                                color: p.isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6),
-                                borderRadius: BorderRadius.circular(12),
+                                color: p.chipFill,
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: p.border),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.gold),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      dateFormatted,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: p.textPrimary,
-                                      ),
+                                  const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.gold),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    dateFormatted,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
                                     ),
                                   ),
                                 ],
@@ -487,29 +589,28 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel(p, 'TIME'),
+                          _buildLabel(p, 'REMINDER TIME *'),
                           InkWell(
                             onTap: _pickTime,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
-                                color: p.isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6),
-                                borderRadius: BorderRadius.circular(12),
+                                color: p.chipFill,
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: p.border),
                               ),
                               child: Row(
                                 children: [
                                   const Icon(Icons.access_time_rounded, size: 18, color: AppColors.gold),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      timeFormatted,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: p.textPrimary,
-                                      ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    timeFormatted,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
                                     ),
                                   ),
                                 ],
@@ -521,48 +622,38 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-
-                // Quick Date Preset Chips
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    _buildQuickChip('Today', DateTime.now()),
-                    _buildQuickChip('Tomorrow', DateTime.now().add(const Duration(days: 1))),
-                    _buildQuickChip('In 3 Days', DateTime.now().add(const Duration(days: 3))),
-                    _buildQuickChip('In 1 Week', DateTime.now().add(const Duration(days: 7))),
-                  ],
-                ),
                 const SizedBox(height: 16),
 
-                // Priority & Assigned Staff Row
+                // Priority & Assigned Staff
                 Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel(p, 'PRIORITY'),
+                          _buildLabel(p, 'PRIORITY LEVEL'),
                           Row(
                             children: [
                               for (final prio in ReminderPriority.values)
                                 Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.only(right: 6),
+                                    padding: EdgeInsets.only(
+                                      right: prio != ReminderPriority.high ? 6 : 0,
+                                    ),
                                     child: InkWell(
                                       onTap: () => setState(() => _priority = prio),
                                       borderRadius: BorderRadius.circular(8),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        height: 38,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
                                           color: _priority == prio
-                                              ? prio.color.withValues(alpha: 0.2)
-                                              : (p.isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6)),
+                                              ? prio.color.withValues(alpha: 0.18)
+                                              : p.chipFill,
                                           borderRadius: BorderRadius.circular(8),
                                           border: Border.all(
                                             color: _priority == prio ? prio.color : p.border,
-                                            width: _priority == prio ? 1.5 : 1.0,
+                                            width: _priority == prio ? 1.5 : 1,
                                           ),
                                         ),
                                         child: Text(
@@ -587,14 +678,164 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 const SizedBox(height: 16),
 
                 // Notes / Description
-                _buildLabel(p, 'DESCRIPTION / NOTES'),
+                _buildLabel(p, 'TEXT REMINDER / NOTES'),
                 TextFormField(
                   controller: _descCtrl,
-                  maxLines: 3,
+                  maxLines: 2,
                   style: TextStyle(color: p.textPrimary, fontSize: 13.5),
                   decoration: _buildInputDec(
                     p,
-                    'Add any notes or context for staff follow-up...',
+                    'Add specific instructions or context for staff follow-up...',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // VOICE MESSAGE SUPPORT
+                _buildLabel(p, 'VOICE REMINDER (AUDIO MESSAGE)'),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: p.chipFill.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: hasVoice ? AppColors.gold.withValues(alpha: 0.6) : p.border,
+                      width: hasVoice ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isRecording) ...[
+                        // Live recording indicator
+                        Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Recording... ${_formatDuration(_recordingSeconds)}',
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: _stopRecording,
+                              icon: const Icon(Icons.stop_circle_rounded, color: Colors.red),
+                              label: const Text('Stop & Attach', style: TextStyle(color: Colors.red)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: _cancelRecording,
+                              tooltip: 'Cancel recording',
+                            ),
+                          ],
+                        ),
+                      ] else if (hasVoice) ...[
+                        // Audio preview & playback
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: AppColors.gold.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                  color: AppColors.gold,
+                                  size: 20,
+                                ),
+                                onPressed: _toggleAudioPlayback,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.mic, size: 14, color: AppColors.gold),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Voice Message Attached',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: p.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _voiceDurationSeconds > 0
+                                        ? 'Duration: ${_formatDuration(_voiceDurationSeconds)}'
+                                        : 'Audio ready for playback',
+                                    style: TextStyle(fontSize: 11, color: p.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _clearVoice,
+                              icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
+                              label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // Action buttons to record or upload
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _startRecording,
+                                icon: const Icon(Icons.mic_rounded, size: 16),
+                                label: const Text('Record Voice'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.gold.withValues(alpha: 0.15),
+                                  foregroundColor: AppColors.gold,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: const BorderSide(color: AppColors.gold, width: 1),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _pickAudioFile,
+                                icon: const Icon(Icons.upload_file_rounded, size: 16),
+                                label: const Text('Upload Audio'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: p.textPrimary,
+                                  side: BorderSide(color: p.border),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -653,73 +894,56 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     );
   }
 
-  Widget _buildQuickChip(String label, DateTime targetDate) {
-    final isSelected = DateUtils.isSameDay(_selectedDate, targetDate);
-    final p = AppPalette.of(context);
-    return InkWell(
-      onTap: () => setState(() => _selectedDate = targetDate),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.gold.withValues(alpha: 0.2)
-              : (p.isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppColors.gold : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: isSelected ? AppColors.gold : p.textMuted,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(AppPalette p, String text) {
+  Widget _buildLabel(AppPalette p, String label) {
     return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 6),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Text(
-        text,
+        label,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.9,
-          color: p.isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+          fontWeight: FontWeight.w700,
+          color: p.textMuted,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  InputDecoration _buildInputDec(AppPalette p, String hint) {
+  InputDecoration _buildInputDec(
+    AppPalette p,
+    String hint, {
+    Widget? prefixIcon,
+  }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: p.textMuted, fontSize: 13),
+      hintStyle: TextStyle(color: p.textMuted.withValues(alpha: 0.6), fontSize: 13),
+      prefixIcon: prefixIcon != null
+          ? IconTheme(
+              data: IconThemeData(color: p.textMuted, size: 18),
+              child: prefixIcon,
+            )
+          : null,
       filled: true,
-      fillColor: p.isDark ? const Color(0xFF1F2937) : const Color(0xFFF9FAFB),
+      fillColor: p.chipFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: p.border),
+      ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: p.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppPalette.statusRed),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppPalette.statusRed, width: 1.5),
-      ),
     );
+  }
+
+  String _formatDuration(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 }

@@ -67,12 +67,7 @@ class CustomerWhatsAppService {
   }
 
   static String _orderStatus(Status status) {
-    return switch (status) {
-      Status.pending => 'Pending',
-      Status.inProgress => 'In Progress',
-      Status.completed => 'Completed',
-      Status.cancelled => 'Cancelled',
-    };
+    return status.label;
   }
 
   static String _orientation(String value) {
@@ -150,7 +145,7 @@ Thank you for your framing order with RAIGON ART! Here are your complete order d
 
 *Order ID:* ${customer.id}
 *Order Date:* ${_formatDate(customer.orderDate)}
-*Expected Delivery Date:* ${_formatDate(customer.expectedDelivery)}
+*Expected Date:* ${_formatDate(customer.expectedDelivery)}
 
 *Frame Details:*
 ${_frameDetails(customer)}

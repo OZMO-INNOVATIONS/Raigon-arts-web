@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/repository/customer_repository.dart';
+import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 
 class CustomerAndOrderProvider extends ChangeNotifier {
   static VoidCallback? onAnyOrderChange;
@@ -26,6 +28,18 @@ class CustomerAndOrderProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _initialized = false;
   Object? _error;
+
+  List<Customer> _trashOrders = [];
+  List<CustomerReminder> _trashReminders = [];
+  int _totalTrashCount = 0;
+  int _trashRetentionDays = 14;
+  bool _isLoadingTrash = false;
+
+  List<Customer> get trashOrders => List.unmodifiable(_trashOrders);
+  List<CustomerReminder> get trashReminders => List.unmodifiable(_trashReminders);
+  int get totalTrashCount => _totalTrashCount;
+  int get trashRetentionDays => _trashRetentionDays;
+  bool get isLoadingTrash => _isLoadingTrash;
 
   static int _extractIdNum(String id) {
     final matches = RegExp(r'(\d+)').allMatches(id);
@@ -89,15 +103,17 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll(
+      final loaded = await _repository.getAll(
         sortBy: 'createdAt',
         sortOrder: 'desc',
         limit: 1000,
       );
+      _customers = loaded.where((c) => !c.isDeleted).toList();
       _sortCustomers();
       _initialized = true;
 
       debugPrint('[CustomerProvider] Loaded ${_customers.length} customers.');
+      fetchTrash().ignore();
     } catch (error, stackTrace) {
       _error = error;
 
@@ -115,14 +131,16 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll(
+      final fresh = await _repository.getAll(
         sortBy: 'createdAt',
         sortOrder: 'desc',
         limit: 1000,
       );
+      _customers = fresh.where((c) => !c.isDeleted).toList();
       _sortCustomers();
       _initialized = true;
       _notifyOrderChange();
+      fetchTrash().ignore();
     } catch (error) {
       _error = error;
       rethrow;
@@ -252,6 +270,8 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
     try {
       await _repository.delete(id);
+      _totalTrashCount += 1;
+      fetchTrash().ignore();
     } catch (error) {
       _customers = previous;
       _error = error;
@@ -327,12 +347,34 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     return _statusOverride[customer.id] ?? customer.status;
   }
 
-  Future<void> setOrderStatus(Customer customer, Status status) async {
+  Future<void> setOrderStatus(
+    Customer customer,
+    Status status, {
+    String? updatedBy,
+    String? notes,
+  }) async {
     final oldStatus = statusOf(customer);
     _statusOverride[customer.id] = status;
+
+    final actor = updatedBy ??
+        (AuthService.currentUser?.name ??
+            (AuthService.isAdmin ? 'Admin' : 'Workshop Staff'));
+
+    final historyItem = OrderStatusHistoryItem(
+      previousStatus: oldStatus,
+      newStatus: status,
+      updatedAt: DateTime.now(),
+      updatedBy: actor,
+      notes: notes ?? '',
+    );
+
     final index = _customers.indexWhere((c) => c.id == customer.id);
     if (index != -1) {
-      _customers[index] = _customers[index].copyWith(status: status);
+      final updatedHistory = [historyItem, ..._customers[index].statusHistory];
+      _customers[index] = _customers[index].copyWith(
+        status: status,
+        statusHistory: updatedHistory,
+      );
     }
     notifyListeners();
     _notifyOrderChange();
@@ -416,21 +458,20 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
   Color statusColor(Status status) {
     return switch (status) {
-      Status.inProgress => AppPalette.statusGold,
       Status.pending => AppPalette.orange,
-      Status.completed => AppPalette.statusGreen,
+      Status.confirmed => const Color(0xFF2563EB),
+      Status.onHold => const Color(0xFFEA580C),
       Status.cancelled => AppPalette.statusRed,
+      Status.editingProgress => const Color(0xFF7C3AED),
+      Status.dispatchForPrinting => const Color(0xFF0D9488),
+      Status.printReceived => const Color(0xFF0284C7),
+      Status.framingProcess => AppPalette.statusGold,
+      Status.completed => AppPalette.statusGreen,
+      Status.inProgress => AppPalette.statusGold,
     };
   }
 
-  String statusLabel(Status status) {
-    return switch (status) {
-      Status.inProgress => 'In Progress',
-      Status.pending => 'Pending',
-      Status.completed => 'Completed',
-      Status.cancelled => 'Cancelled',
-    };
-  }
+  String statusLabel(Status status) => status.label;
 
   String paymentOf(Customer customer) {
     if (customer.advance <= 0) {
@@ -573,4 +614,94 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     return 'Raigon_Customers_'
         '${date.year}-${two(date.month)}-${two(date.day)}.csv';
   }
+
+  Future<void> fetchTrash() async {
+    _isLoadingTrash = true;
+    notifyListeners();
+
+    try {
+      final res = await _repository.getTrash();
+      _trashOrders = res.orders;
+      _trashReminders = res.reminders;
+      _totalTrashCount = res.totalCount;
+      _trashRetentionDays = res.retentionDays;
+      debugPrint(
+        '[CustomerProvider] Loaded ${_trashOrders.length} trashed orders, '
+        '${_trashReminders.length} trashed reminders (retention: $_trashRetentionDays days).',
+      );
+    } catch (e) {
+      debugPrint('[CustomerProvider] fetchTrash failed: $e');
+    } finally {
+      _isLoadingTrash = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> restoreOrder(String id) async {
+    try {
+      await _repository.restoreTrashItem('order', id);
+      _trashOrders.removeWhere((c) => c.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      await refresh();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] restoreOrder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> restoreReminder(String id) async {
+    try {
+      await _repository.restoreTrashItem('reminder', id);
+      _trashReminders.removeWhere((r) => r.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] restoreReminder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> permanentlyDeleteOrder(String id) async {
+    try {
+      await _repository.permanentlyDeleteTrashItem('order', id);
+      _trashOrders.removeWhere((c) => c.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] permanentlyDeleteOrder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> permanentlyDeleteReminder(String id) async {
+    try {
+      await _repository.permanentlyDeleteTrashItem('reminder', id);
+      _trashReminders.removeWhere((r) => r.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] permanentlyDeleteReminder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> emptyTrash() async {
+    try {
+      await _repository.emptyTrash();
+      _trashOrders.clear();
+      _trashReminders.clear();
+      _totalTrashCount = 0;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] emptyTrash failed: $e');
+      return false;
+    }
+  }
+
 }

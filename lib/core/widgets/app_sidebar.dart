@@ -1,3 +1,4 @@
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
@@ -72,7 +73,17 @@ class AppSidebar extends StatelessWidget {
                                   return null;
                                 }
                               }()
-                            : null,
+                            : destination == NavDestination.trash
+                                ? () {
+                                    try {
+                                      final tp = context.watch<CustomerAndOrderProvider>();
+                                      final count = tp.totalTrashCount;
+                                      return count > 0 ? count : null;
+                                    } catch (_) {
+                                      return null;
+                                    }
+                                  }()
+                                : null,
                         onTap: () => onSelect(destination),
                       ),
                   ],

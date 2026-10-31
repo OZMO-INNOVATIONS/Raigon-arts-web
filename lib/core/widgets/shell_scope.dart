@@ -6,6 +6,7 @@ enum NavDestination {
   customers,
   orders,
   reminders,
+  trash,
   photoCollection,
   frameSizes,
   messagingAutomation,
@@ -19,6 +20,7 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers => 'Customers',
     NavDestination.orders => 'Orders',
     NavDestination.reminders => 'Reminders',
+    NavDestination.trash => 'Trash & Bin',
     NavDestination.photoCollection => 'Catalogue',
     NavDestination.frameSizes => 'Material',
     NavDestination.messagingAutomation => 'Messaging Automation',
@@ -31,6 +33,7 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers => RemixIcons.team_line,
     NavDestination.orders => RemixIcons.inbox_line,
     NavDestination.reminders => RemixIcons.alarm_line,
+    NavDestination.trash => RemixIcons.delete_bin_line,
     NavDestination.photoCollection => RemixIcons.gallery_line,
     NavDestination.frameSizes => RemixIcons.ruler_line,
     NavDestination.messagingAutomation => RemixIcons.message_3_line,
@@ -43,6 +46,7 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers ||
     NavDestination.orders ||
     NavDestination.reminders ||
+    NavDestination.trash ||
     NavDestination.photoCollection ||
     NavDestination.frameSizes ||
     NavDestination.messagingAutomation ||

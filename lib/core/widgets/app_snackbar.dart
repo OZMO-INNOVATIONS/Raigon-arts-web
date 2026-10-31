@@ -6,15 +6,51 @@ class AppSnackBar {
   AppSnackBar._();
 
   static const double _width = 340;
-  static void success(BuildContext context, String message) =>
-      _show(context, message, isError: false);
-  static void error(BuildContext context, String message) =>
-      _show(context, message, isError: true);
+  static void success(
+    BuildContext context,
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) => _show(
+    context,
+    message,
+    isError: false,
+    actionLabel: actionLabel,
+    onAction: onAction,
+  );
+
+  static void info(
+    BuildContext context,
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) => _show(
+    context,
+    message,
+    isError: false,
+    actionLabel: actionLabel,
+    onAction: onAction,
+  );
+
+  static void error(
+    BuildContext context,
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) => _show(
+    context,
+    message,
+    isError: true,
+    actionLabel: actionLabel,
+    onAction: onAction,
+  );
 
   static void _show(
     BuildContext context,
     String message, {
     required bool isError,
+    String? actionLabel,
+    VoidCallback? onAction,
   }) {
     final messenger = ScaffoldMessenger.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -42,7 +78,9 @@ class AppSnackBar {
           content: Row(
             children: [
               Icon(
-                isError ? RemixIcons.error_warning_fill : RemixIcons.checkbox_circle_fill,
+                isError
+                    ? RemixIcons.error_warning_fill
+                    : RemixIcons.checkbox_circle_fill,
                 color: isError ? AppColors.error : AppColors.white,
                 size: 22,
               ),
@@ -57,6 +95,30 @@ class AppSnackBar {
                   ),
                 ),
               ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.gold,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: () {
+                    messenger.hideCurrentSnackBar();
+                    onAction();
+                  },
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

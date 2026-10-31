@@ -35,9 +35,9 @@ enum OrderTimeFilter {
 }
 
 enum OrderSortMode {
-  priority('Priority Wise'),
   newest('Newest First'),
   oldest('Oldest First'),
+  priority('Priority Wise'),
   amountHigh('Amount: High to Low');
 
   final String label;
@@ -54,7 +54,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   Status? _filter;
   OrderTimeFilter _timeFilter = OrderTimeFilter.all;
-  OrderSortMode _sortMode = OrderSortMode.priority;
+  OrderSortMode _sortMode = OrderSortMode.newest;
   String _query = '';
   static const int _pageSize = 10;
   static const double _minPageHeight = 560;
@@ -334,26 +334,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     filtered.sort((a, b) {
       switch (_sortMode) {
+        case OrderSortMode.newest:
+          return CustomerAndOrderProvider.compareLatestFirst(a, b);
+        case OrderSortMode.oldest:
+          return CustomerAndOrderProvider.compareLatestFirst(b, a);
         case OrderSortMode.priority:
           final pCompare = a.orderPriority.index.compareTo(
             b.orderPriority.index,
           );
           if (pCompare != 0) return pCompare;
-          final dCompare = (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
-          if (dCompare != 0) return dCompare;
-          return b.id.compareTo(a.id);
-        case OrderSortMode.newest:
-          final dCompare = (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
-          if (dCompare != 0) return dCompare;
-          return b.id.compareTo(a.id);
-        case OrderSortMode.oldest:
-          final dCompare = (a.createdAt ?? a.orderDate).compareTo(b.createdAt ?? b.orderDate);
-          if (dCompare != 0) return dCompare;
-          return a.id.compareTo(b.id);
+          return CustomerAndOrderProvider.compareLatestFirst(a, b);
         case OrderSortMode.amountHigh:
           final amtCompare = b.total.compareTo(a.total);
           if (amtCompare != 0) return amtCompare;
-          return (b.createdAt ?? b.orderDate).compareTo(a.createdAt ?? a.orderDate);
+          return CustomerAndOrderProvider.compareLatestFirst(a, b);
       }
     });
 

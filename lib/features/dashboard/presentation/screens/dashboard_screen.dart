@@ -39,8 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     (label: 'CUSTOMER ID', width: 130),
     (label: 'CUSTOMER NAME', width: 230),
     (label: 'PHONE NO', width: 150),
-    (label: 'FRAME SIZE', width: 130),
-    (label: 'FRAME TYPE', width: 150),
     (label: 'QTY', width: 70),
     (label: 'TOTAL', width: 130),
     (label: 'STATUS', width: 150),
@@ -705,7 +703,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         txt(
-                          o.city,
+                          o.effectiveRegion.isNotEmpty ? o.effectiveRegion : o.city,
                           TextStyle(fontSize: 13, color: p.textMuted),
                         ),
                       ],
@@ -715,12 +713,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             cellBox(2, txt(o.phone, cell)),
-            cellBox(3, txt(o.frameSize, cell)),
-            cellBox(4, txt(o.frameType, cell)),
-            cellBox(5, txt('${o.qty}', bold)),
-            cellBox(6, txt(_inr(o.total), bold)),
+            cellBox(3, txt('${o.qty}', bold)),
+            cellBox(4, txt(_inr(o.total), bold)),
             cellBox(
-              7,
+              5,
               Align(
                 alignment: Alignment.centerLeft,
                 child: FittedBox(
@@ -731,7 +727,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             cellBox(
-              8,
+              6,
               Align(
                 alignment: Alignment.centerLeft,
                 child: FittedBox(

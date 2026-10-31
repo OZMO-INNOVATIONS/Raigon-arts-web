@@ -74,7 +74,7 @@ class ReminderProvider extends ChangeNotifier {
 
     final byFilter = _reminders.where((r) {
       return switch (_currentFilter) {
-        ReminderFilter.all => true,
+        ReminderFilter.all => !r.isCompleted,
         ReminderFilter.today => r.isDueToday,
         ReminderFilter.upcoming => r.isUpcoming,
         ReminderFilter.overdue => r.isOverdue,

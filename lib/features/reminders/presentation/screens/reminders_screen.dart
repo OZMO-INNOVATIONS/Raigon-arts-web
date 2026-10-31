@@ -258,7 +258,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Widget _buildFilterTabs(AppPalette p, ReminderProvider provider) {
     final filters = [
-      (ReminderFilter.all, 'All', provider.allCount),
+      (ReminderFilter.all, 'All', provider.activeCount),
       (ReminderFilter.today, 'Today', provider.todayCount),
       (ReminderFilter.upcoming, 'Upcoming', provider.upcomingCount),
       (ReminderFilter.overdue, 'Overdue', provider.overdueCount),

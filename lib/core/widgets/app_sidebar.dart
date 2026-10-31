@@ -68,8 +68,7 @@ class AppSidebar extends StatelessWidget {
                                   if (due > 0) return due;
                                   final active = rp.activeCount;
                                   if (active > 0) return active;
-                                  final total = rp.reminderList.length;
-                                  return total > 0 ? total : null;
+                                  return null;
                                 } catch (_) {
                                   return null;
                                 }

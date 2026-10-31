@@ -36,10 +36,20 @@ class CustomerAndOrderProvider extends ChangeNotifier {
   }
 
   /// Sorts customers with latest records on top:
-  /// 1) Newest `createdAt` timestamp
-  /// 2) Newest `orderDate`
-  /// 3) Highest numeric order ID (e.g. RA-1005 > RA-1004)
+  /// 1) Highest numeric order ID (e.g. RA-1006 > RA-1005 > RA-1004 or 5 > 3 > 2 > 1)
+  /// 2) Lexicographical ID fallback
+  /// 3) Newest `createdAt` timestamp
+  /// 4) Newest `orderDate`
   static int compareLatestFirst(Customer a, Customer b) {
+    final numA = _extractIdNum(a.id);
+    final numB = _extractIdNum(b.id);
+    if (numA != numB) {
+      return numB.compareTo(numA);
+    }
+
+    final idCmp = b.id.compareTo(a.id);
+    if (idCmp != 0) return idCmp;
+
     if (a.createdAt != null && b.createdAt != null) {
       final cmp = b.createdAt!.compareTo(a.createdAt!);
       if (cmp != 0) return cmp;
@@ -49,15 +59,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       return 1;
     }
 
-    final orderCmp = b.orderDate.compareTo(a.orderDate);
-    if (orderCmp != 0) return orderCmp;
-
-    final numA = _extractIdNum(a.id);
-    final numB = _extractIdNum(b.id);
-    if (numA != numB) {
-      return numB.compareTo(numA);
-    }
-    return b.id.compareTo(a.id);
+    return b.orderDate.compareTo(a.orderDate);
   }
 
   void _sortCustomers() {

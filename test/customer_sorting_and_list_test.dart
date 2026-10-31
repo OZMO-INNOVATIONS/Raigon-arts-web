@@ -218,5 +218,42 @@ void main() {
 
       expect(gappedList.map((c) => c.id).toList(), ['5', '3', '2', '1']);
     });
+
+    test('Customer with individual frames calculates photoCount and effectiveFrames correctly', () {
+      final json = {
+        'id': 'RA-1007',
+        'name': 'Test Customer',
+        'phone': '9876543210',
+        'photoUrls': ['https://cdn.example.com/p1.webp', 'https://cdn.example.com/p2.webp'],
+        'frames': [
+          {
+            'size': '148 × 102 cm',
+            'frameType': 'Wooden Frame',
+            'material': 'Teak Wood Moulding',
+            'finish': 'Walnut Brown',
+            'orientation': 'Landscape',
+            'qty': 1,
+            'photoUrl': 'https://cdn.example.com/frame1.webp',
+          },
+          {
+            'size': '141 × 195 cm',
+            'frameType': 'Wooden Frame',
+            'material': 'Teak Wood Moulding',
+            'finish': 'Walnut Brown',
+            'orientation': 'Landscape',
+            'qty': 1,
+            'photoUrl': 'https://cdn.example.com/frame2.webp',
+          },
+        ],
+      };
+
+      final customer = Customer.fromJson(json);
+
+      expect(customer.effectiveFrames.length, 2);
+      expect(customer.photoCount, 2);
+      expect(customer.effectiveFrames[0].size, '148 × 102 cm');
+      expect(customer.effectiveFrames[1].size, '141 × 195 cm');
+    });
   });
 }
+

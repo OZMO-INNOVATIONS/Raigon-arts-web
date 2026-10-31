@@ -306,9 +306,11 @@ class Customer {
     }
 
     final rawPhotoCount = toInt(j['photoCount'] ?? j['photo_count'], 0);
-    final photoCount = rawPhotoCount > 0
-        ? rawPhotoCount
-        : (pUrls.isNotEmpty ? pUrls.length : pNames.length);
+    final photoCount = frames.length > 1
+        ? frames.length
+        : (rawPhotoCount > 0
+            ? rawPhotoCount
+            : (pUrls.isNotEmpty ? pUrls.length : pNames.length));
 
     final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
     final bytesList = <Uint8List>[];

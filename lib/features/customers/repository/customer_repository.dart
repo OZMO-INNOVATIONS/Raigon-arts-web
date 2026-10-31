@@ -152,20 +152,24 @@ class RestCustomerRepository implements CustomerRepository {
       if (hasPhotos || hasFramePhotos) {
         final files = <http.MultipartFile>[];
 
-        for (var i = 0; i < customer.photoBytes.length; i++) {
-          final bytes = customer.photoBytes[i];
-          final rawName = i < customer.photoNames.length
-              ? customer.photoNames[i]
-              : 'photo_${i + 1}.jpg';
-          final name = ensureImageFilename(rawName);
-          files.add(
-            http.MultipartFile.fromBytes(
-              'photos',
-              bytes,
-              filename: name,
-              contentType: detectMediaType(name),
-            ),
-          );
+        // When individual frames have their own photos, upload them as frame_photos.
+        // Only upload to 'photos' if frame_photos are not present, preventing duplicate uploads.
+        if (!hasFramePhotos) {
+          for (var i = 0; i < customer.photoBytes.length; i++) {
+            final bytes = customer.photoBytes[i];
+            final rawName = i < customer.photoNames.length
+                ? customer.photoNames[i]
+                : 'photo_${i + 1}.jpg';
+            final name = ensureImageFilename(rawName);
+            files.add(
+              http.MultipartFile.fromBytes(
+                'photos',
+                bytes,
+                filename: name,
+                contentType: detectMediaType(name),
+              ),
+            );
+          }
         }
 
         for (final frame in customer.frames) {
@@ -216,20 +220,24 @@ class RestCustomerRepository implements CustomerRepository {
       if (hasPhotos || hasFramePhotos) {
         final files = <http.MultipartFile>[];
 
-        for (var i = 0; i < customer.photoBytes.length; i++) {
-          final bytes = customer.photoBytes[i];
-          final rawName = i < customer.photoNames.length
-              ? customer.photoNames[i]
-              : 'photo_${i + 1}.jpg';
-          final name = ensureImageFilename(rawName);
-          files.add(
-            http.MultipartFile.fromBytes(
-              'photos',
-              bytes,
-              filename: name,
-              contentType: detectMediaType(name),
-            ),
-          );
+        // When individual frames have their own photos, upload them as frame_photos.
+        // Only upload to 'photos' if frame_photos are not present, preventing duplicate uploads.
+        if (!hasFramePhotos) {
+          for (var i = 0; i < customer.photoBytes.length; i++) {
+            final bytes = customer.photoBytes[i];
+            final rawName = i < customer.photoNames.length
+                ? customer.photoNames[i]
+                : 'photo_${i + 1}.jpg';
+            final name = ensureImageFilename(rawName);
+            files.add(
+              http.MultipartFile.fromBytes(
+                'photos',
+                bytes,
+                filename: name,
+                contentType: detectMediaType(name),
+              ),
+            );
+          }
         }
 
         for (final frame in customer.frames) {

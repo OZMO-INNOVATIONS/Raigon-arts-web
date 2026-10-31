@@ -78,6 +78,75 @@ void _showPhotoViewerDialog(
 List<_VaultPhoto> _photosOf(Customer c) {
   final photos = <_VaultPhoto>[];
 
+  // If customer has individual frames (> 1) configured, map each frame's photo directly
+  if (c.frames.length > 1) {
+    for (var i = 0; i < c.frames.length; i++) {
+      final f = c.frames[i];
+      if (f.photoBytes != null) {
+        final name = f.photoName ??
+            (i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.jpg');
+        photos.add(
+          _VaultPhoto(
+            name: name,
+            sizeLabel: PickedPhoto(
+              name: name,
+              bytes: f.photoBytes!,
+              size: f.photoBytes!.length,
+            ).sizeLabel,
+            image: MemoryImage(f.photoBytes!),
+          ),
+        );
+      } else if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
+        final url = ImageUrlHelper.resolve(f.photoUrl!);
+        final name = f.photoName ??
+            (i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp');
+        final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
+            ? c.photoSizeLabels[i]
+            : 'High-Res Vault Photo';
+        photos.add(
+          _VaultPhoto(
+            name: name,
+            sizeLabel: size,
+            image: NetworkImage(url),
+            url: url,
+          ),
+        );
+      } else if (i < c.photoBytes.length) {
+        final bytes = c.photoBytes[i];
+        final name =
+            i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.jpg';
+        photos.add(
+          _VaultPhoto(
+            name: name,
+            sizeLabel: PickedPhoto(
+              name: name,
+              bytes: bytes,
+              size: bytes.length,
+            ).sizeLabel,
+            image: MemoryImage(bytes),
+          ),
+        );
+      } else if (i < c.photoUrls.length) {
+        final url = ImageUrlHelper.resolve(c.photoUrls[i]);
+        if (url.trim().isNotEmpty) {
+          final name =
+              i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
+          photos.add(
+            _VaultPhoto(
+              name: name,
+              sizeLabel: 'High-Res Vault Photo',
+              image: NetworkImage(url),
+              url: url,
+            ),
+          );
+        }
+      }
+    }
+    if (photos.isNotEmpty) {
+      return photos;
+    }
+  }
+
   // 1. Show images stored in memory, if available.
   for (var i = 0; i < c.photoBytes.length; i++) {
     final bytes = c.photoBytes[i];
@@ -793,7 +862,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     List<_VaultPhoto> photos,
   ) {
     final p = c.p;
-    final int cardCount = math.max(frames.length, photos.length);
+    final int cardCount = frames.length > 1
+        ? frames.length
+        : math.max(frames.length, photos.length);
     if (cardCount == 0) {
       return const SizedBox.shrink();
     }
@@ -997,7 +1068,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
     // Resolve associated artwork photo for this frame
     _VaultPhoto? photo;
-    int photoIndex = index;
 
     if (f.photoBytes != null) {
       photo = _VaultPhoto(
@@ -1011,7 +1081,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       final matchedIndex = photos.indexWhere((item) => item.url == resolvedUrl);
       if (matchedIndex != -1) {
         photo = photos[matchedIndex];
-        photoIndex = matchedIndex;
       } else {
         photo = _VaultPhoto(
           name: f.photoName ??
@@ -1023,7 +1092,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       }
     } else if (index < photos.length) {
       photo = photos[index];
-      photoIndex = index;
     }
 
     return Container(
@@ -1056,7 +1124,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                           context,
                           photo!,
                           customer: _c,
-                          initialIndex: photoIndex,
+                          initialIndex: index,
                         ),
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
@@ -1157,7 +1225,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Photo #${photoIndex + 1}',
+                                'Photo #${index + 1}',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
@@ -1189,7 +1257,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                           context,
                           photo!,
                           customer: _c,
-                          initialIndex: photoIndex,
+                          initialIndex: index,
                         ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(

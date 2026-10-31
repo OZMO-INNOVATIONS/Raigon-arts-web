@@ -40,6 +40,54 @@ class AppViewerItem {
 List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
   final items = <AppViewerItem>[];
 
+  // If customer has individual frames (> 1), build viewer items directly from frames
+  if (customer.frames.length > 1) {
+    for (var i = 0; i < customer.frames.length; i++) {
+      final f = customer.frames[i];
+      final title = '${f.sizeLabel} · ${f.frameType}';
+      final photoName = f.photoName ??
+          (i < customer.photoNames.length
+              ? customer.photoNames[i]
+              : 'Photo #${i + 1}');
+      if (f.photoBytes != null) {
+        items.add(
+          AppViewerItem(
+            bytes: f.photoBytes!,
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+        );
+      } else if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
+        items.add(
+          AppViewerItem(
+            url: ImageUrlHelper.resolve(f.photoUrl!),
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+        );
+      } else if (i < customer.photoBytes.length) {
+        items.add(
+          AppViewerItem(
+            bytes: customer.photoBytes[i],
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+        );
+      } else if (i < customer.photoUrls.length) {
+        items.add(
+          AppViewerItem(
+            url: ImageUrlHelper.resolve(customer.photoUrls[i]),
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+        );
+      }
+    }
+    if (items.isNotEmpty) {
+      return items;
+    }
+  }
+
   // 1. Memory bytes
   for (var i = 0; i < customer.photoBytes.length; i++) {
     final b = customer.photoBytes[i];

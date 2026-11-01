@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_action_dialog.dart';
 import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
@@ -544,19 +545,23 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       ? '—'
       : (v.length == 1 ? v.first : '${v.first} +${v.length - 1} more');
 
-  void _save() {
+  Future<void> _save() async {
     final name = _name.text.trim();
     final phone = _phone.text.trim();
+
     if (name.isEmpty) {
       AppSnackBar.error(context, 'Enter the customer name.');
       return;
     }
+
     if (phone.length != 10) {
       AppSnackBar.error(context, 'Enter a valid 10-digit phone number.');
       return;
     }
+
     final total = (double.tryParse(_total.text) ?? 0).round();
     final advance = (double.tryParse(_advance.text) ?? 0).round();
+
     if (total > 0 && advance > total) {
       AppSnackBar.error(
         context,
@@ -565,16 +570,47 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       return;
     }
 
+    final isEdit = widget.existing != null;
+
+    // Confirmation before creating or updating customer.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AppActionDialog(
+          title: isEdit ? 'Update Customer?' : 'Create Customer?',
+          message: isEdit
+              ? 'Are you sure you want to save the changes for $name?'
+              : 'Are you sure you want to create a customer profile for $name?',
+          cancelLabel: 'Cancel',
+          actionLabel: 'Save',
+          icon: Icons.person_outline_rounded,
+          iconColor: AppColors.gold,
+          iconBg: AppColors.gold.withValues(alpha: 0.12),
+          actionColor: AppColors.gold,
+          isDestructive: false,
+          onCancel: () => Navigator.pop(dialogContext, false),
+          onAction: () => Navigator.pop(dialogContext, true),
+        );
+      },
+    );
+
+    // Cancel: stay on the form with all entered details.
+    if (confirmed != true || !mounted) return;
+
     final same = _mode == FrameMode.same;
+
     final photos = same
         ? List<PickedPhoto>.of(_photos)
         : [
             for (final e in _entries)
               if (e.photo != null) e.photo!,
           ];
+
     final frames = same
         ? [_shared.toSpec()]
         : [for (final e in _entries) e.spec.toSpec(e.photo)];
+
     final int qty = same
         ? frames.first.qty *
               math.max(1, _existingPhotos.length + photos.length).toInt()
@@ -589,6 +625,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   e.existingUrl!.isNotEmpty)
                 e.existingUrl!,
           ];
+
     final remainingNames = same
         ? [for (final e in _existingPhotos) e.name]
         : [
@@ -598,6 +635,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   e.existingName!.isNotEmpty)
                 e.existingName!,
           ];
+
     final newPhotoNames = [for (final p in photos) p.name];
     final allPhotoNames = [...remainingNames, ...newPhotoNames];
     final totalPhotoCount = remainingUrls.length + photos.length;
@@ -638,6 +676,10 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
+
+    if (!mounted) return;
+
+    // Return the customer only after Save is confirmed.
     Navigator.of(context).pop(customer);
   }
 

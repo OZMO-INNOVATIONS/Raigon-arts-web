@@ -4,6 +4,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:raigon_art/core/widgets/app_action_dialog.dart';
+import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:remixicon/remixicon.dart';
 
 import 'package:raigon_art/core/theme/app_colors.dart';
@@ -43,7 +45,9 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
 
       final custProvider = context.read<CustomerAndOrderProvider>();
       if (custProvider.customers.isNotEmpty) {
-        context.read<FrameSizeProvider>().syncCountsWithCustomers(custProvider.customers);
+        context.read<FrameSizeProvider>().syncCountsWithCustomers(
+          custProvider.customers,
+        );
       }
       final frameProvider = context.read<FrameSizeProvider>();
       if (!frameProvider.initialized && !frameProvider.isLoading) {
@@ -75,6 +79,25 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
 
     if (result == null || !mounted) return;
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AppActionDialog(
+        title: 'Add Material?',
+        message: 'Are you sure you want to add this material?',
+        cancelLabel: 'Cancel',
+        actionLabel: 'Add Material',
+        icon: RemixIcons.add_line,
+        iconColor: AppColors.green,
+        iconBg: AppColors.green.withValues(alpha: 0.10),
+        actionColor: AppColors.green,
+        onCancel: () => Navigator.pop(dialogContext, false),
+        onAction: () => Navigator.pop(dialogContext, true),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     final provider = context.read<FrameSizeProvider>();
 
     try {
@@ -93,9 +116,11 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       AppSnackBar.success(context, 'Material added successfully.');
     } catch (error) {
       if (!mounted) return;
+
       final msg = error is ApiException
           ? error.userFriendlyMessage
           : 'Could not add material. Try again.';
+
       AppSnackBar.error(context, msg);
     }
   }
@@ -107,6 +132,25 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
     );
 
     if (result == null || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AppActionDialog(
+        title: 'Update Material?',
+        message: 'Are you sure you want to save the changes to this material?',
+        cancelLabel: 'Cancel',
+        actionLabel: 'Save Changes',
+        icon: RemixIcons.edit_line,
+        iconColor: AppColors.gold,
+        iconBg: AppColors.gold.withValues(alpha: 0.10),
+        actionColor: AppColors.gold,
+        onCancel: () => Navigator.pop(dialogContext, false),
+        onAction: () => Navigator.pop(dialogContext, true),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
 
     try {
       await context.read<FrameSizeProvider>().update(
@@ -126,9 +170,11 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
       AppSnackBar.success(context, 'Material updated successfully.');
     } catch (error) {
       if (!mounted) return;
+
       final msg = error is ApiException
           ? error.userFriendlyMessage
           : 'Could not update material. Try again.';
+
       AppSnackBar.error(context, msg);
     }
   }
@@ -264,7 +310,11 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(RemixIcons.cloud_off_line, size: 48, color: AppColors.error),
+                              const Icon(
+                                RemixIcons.cloud_off_line,
+                                size: 48,
+                                color: AppColors.error,
+                              ),
                               const SizedBox(height: 14),
                               Text(
                                 'Failed to load materials catalog',
@@ -277,26 +327,42 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 provider.error is ApiException
-                                    ? (provider.error as ApiException).userFriendlyMessage
+                                    ? (provider.error as ApiException)
+                                          .userFriendlyMessage
                                     : 'Please check your connection to the server.',
-                                style: TextStyle(fontSize: 14, color: p.textMuted),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: p.textMuted,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  context.read<FrameSizeProvider>().refresh().then((_) {
-                                    if (context.mounted) {
-                                      AppSnackBar.success(context, 'Materials loaded.');
-                                    }
-                                  }).catchError((e) {
-                                    if (context.mounted) {
-                                      final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
-                                      AppSnackBar.error(context, msg);
-                                    }
-                                  });
+                                  context
+                                      .read<FrameSizeProvider>()
+                                      .refresh()
+                                      .then((_) {
+                                        if (context.mounted) {
+                                          AppSnackBar.success(
+                                            context,
+                                            'Materials loaded.',
+                                          );
+                                        }
+                                      })
+                                      .catchError((e) {
+                                        if (context.mounted) {
+                                          final msg = e is ApiException
+                                              ? e.userFriendlyMessage
+                                              : 'Retry failed.';
+                                          AppSnackBar.error(context, msg);
+                                        }
+                                      });
                                 },
-                                icon: const Icon(RemixIcons.refresh_line, size: 16),
+                                icon: const Icon(
+                                  RemixIcons.refresh_line,
+                                  size: 16,
+                                ),
                                 label: const Text('Retry'),
                               ),
                             ],
@@ -306,7 +372,9 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
                     )
                   else
                     Expanded(
-                      child: SingleChildScrollView(child: _table(p, list, provider)),
+                      child: SingleChildScrollView(
+                        child: _table(p, list, provider),
+                      ),
                     ),
                 ],
               ),
@@ -341,19 +409,20 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
             ],
           ),
         ),
-        const SizedBox(width: 16),
-        _GradientButton(
-          icon: RemixIcons.add_line,
+        AppPrimaryButton(
           label: 'Add Material',
-          onTap: _add,
-          fontSize: 15.5,
-          vPad: 14,
+          icon: RemixIcons.add_line,
+          onPressed: _add,
         ),
       ],
     );
   }
 
-  Widget _table(AppPalette p, List<FrameSize> list, FrameSizeProvider provider) {
+  Widget _table(
+    AppPalette p,
+    List<FrameSize> list,
+    FrameSizeProvider provider,
+  ) {
     return LayoutBuilder(
       builder: (context, c) {
         final w = math.max(c.maxWidth, 1100.0);
@@ -557,15 +626,10 @@ class _SizeRowState extends State<_SizeRow> {
   }
 }
 
-
 class _GradientButton extends StatelessWidget {
-  const _GradientButton({
-    required this.label,
-    required this.onTap,
-    this.icon,
-    this.fontSize = 15,
-    this.vPad = 13,
-  });
+  const _GradientButton({required this.label, required this.onTap, this.icon})
+    : vPad = 13,
+      fontSize = 15;
 
   final String label;
   final IconData? icon;
@@ -753,7 +817,11 @@ class _DialogShell extends StatelessWidget {
                         color: p.avatarBg,
                         border: Border.all(color: p.border),
                       ),
-                      child: Icon(RemixIcons.close_line, size: 18, color: p.textPrimary),
+                      child: Icon(
+                        RemixIcons.close_line,
+                        size: 18,
+                        color: p.textPrimary,
+                      ),
                     ),
                   ),
                 ],

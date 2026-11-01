@@ -24,7 +24,6 @@ import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_scr
 import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
 import 'package:raigon_art/features/messaging/presentation/screens/messaging_automation_screen.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
-import 'package:raigon_art/features/photo_collection/presentation/screens/photo_collection_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';
 import 'package:raigon_art/features/profile/presentation/screens/profile_screen.dart';
 
@@ -105,7 +104,6 @@ class _AppShellState extends State<AppShell> {
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
     NavDestination.reminders => const RemindersScreen(),
-    NavDestination.photoCollection => const PhotoCollectionScreen(),
     NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),
     NavDestination.reports => const ReportsScreen(),

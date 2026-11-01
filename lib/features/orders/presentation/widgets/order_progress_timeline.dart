@@ -115,13 +115,13 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     );
 
     final initialProgress = _progressFractionFor(widget.status);
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: initialProgress,
-    ).animate(CurvedAnimation(
-      parent: _progressController,
-      curve: Curves.easeInOutCubic,
-    ));
+    _progressAnimation = Tween<double>(begin: 0.0, end: initialProgress)
+        .animate(
+          CurvedAnimation(
+            parent: _progressController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
 
     _progressController.forward();
   }
@@ -133,13 +133,12 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       final oldProg = _progressAnimation.value;
       final newProg = _progressFractionFor(widget.status);
 
-      _progressAnimation = Tween<double>(
-        begin: oldProg,
-        end: newProg,
-      ).animate(CurvedAnimation(
-        parent: _progressController,
-        curve: Curves.easeInOutCubic,
-      ));
+      _progressAnimation = Tween<double>(begin: oldProg, end: newProg).animate(
+        CurvedAnimation(
+          parent: _progressController,
+          curve: Curves.easeInOutCubic,
+        ),
+      );
 
       _progressController.forward(from: 0.0);
     }
@@ -292,18 +291,18 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
 
     final Color bg = isCompletedOverall
         ? (isDark
-            ? const Color(0xFF064E3B).withValues(alpha: 0.3)
-            : const Color(0xFFECFDF5))
+              ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+              : const Color(0xFFECFDF5))
         : (isDark
-            ? const Color(0xFF064E3B).withValues(alpha: 0.22)
-            : const Color(0xFFF0FDF4));
+              ? const Color(0xFF064E3B).withValues(alpha: 0.22)
+              : const Color(0xFFF0FDF4));
     final Color border = isCompletedOverall
         ? (isDark
-            ? const Color(0xFF059669).withValues(alpha: 0.4)
-            : const Color(0xFFA7F3D0))
+              ? const Color(0xFF059669).withValues(alpha: 0.4)
+              : const Color(0xFFA7F3D0))
         : (isDark
-            ? const Color(0xFF047857).withValues(alpha: 0.35)
-            : const Color(0xFFBBF7D0));
+              ? const Color(0xFF047857).withValues(alpha: 0.35)
+              : const Color(0xFFBBF7D0));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -544,130 +543,123 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     final isCurrent = currentIdx == index;
     final timestamp = _timestampForStage(stage, index, currentIdx);
 
-    return InkWell(
-      onTap: widget.onStatusSelected != null
-          ? () => widget.onStatusSelected?.call(stage)
-          : null,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Circular Node
-            _buildNodeCircle(
-              stage: stage,
-              isCompleted: isCompleted,
-              isCurrent: isCurrent,
-              isDark: isDark,
-            ),
+    // Timeline stages are display-only. Status changes happen through
+    // the Update dropdown in the current-status header.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Circular Node
+          _buildNodeCircle(
+            stage: stage,
+            isCompleted: isCompleted,
+            isCurrent: isCurrent,
+            isDark: isDark,
+          ),
 
-            const SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-            // Step Badge + Active Badge
-            Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 4,
-              runSpacing: 4,
-              children: [
+          // Step Badge + Active Badge
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? const Color(0xFFFEF3C7)
+                      : (isCompleted
+                            ? const Color(0xFFECFDF5)
+                            : (isDark
+                                  ? const Color(0xFF26221E)
+                                  : const Color(0xFFF1F5F9))),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  'STEP ${index + 1}',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: isCurrent
+                        ? const Color(0xFFD97706)
+                        : (isCompleted
+                              ? const Color(0xFF059669)
+                              : (isDark
+                                    ? Colors.white38
+                                    : const Color(0xFF64748B))),
+                  ),
+                ),
+              ),
+              if (isCurrent)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
+                    horizontal: 5,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: isCurrent
-                        ? const Color(0xFFFEF3C7)
-                        : (isCompleted
-                            ? const Color(0xFFECFDF5)
-                            : (isDark
-                                ? const Color(0xFF26221E)
-                                : const Color(0xFFF1F5F9))),
+                    color: const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(5),
                   ),
-                  child: Text(
-                    'STEP ${index + 1}',
+                  child: const Text(
+                    'ACTIVE',
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
-                      color: isCurrent
-                          ? const Color(0xFFD97706)
-                          : (isCompleted
-                              ? const Color(0xFF059669)
-                              : (isDark
-                                  ? Colors.white38
-                                  : const Color(0xFF64748B))),
+                      color: Color(0xFFD97706),
                     ),
                   ),
                 ),
-                if (isCurrent)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: const Text(
-                      'ACTIVE',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: Color(0xFFD97706),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            ],
+          ),
 
-            const SizedBox(height: 6),
+          const SizedBox(height: 6),
 
-            // Stage Title
-            Text(
-              stage.label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isCurrent
-                    ? FontWeight.w800
-                    : (isCompleted ? FontWeight.w700 : FontWeight.w600),
-                color: isCurrent
-                    ? (isDark ? AppColors.gold : const Color(0xFF92400E))
-                    : (isCompleted
+          // Stage Title
+          Text(
+            stage.label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isCurrent
+                  ? FontWeight.w800
+                  : (isCompleted ? FontWeight.w700 : FontWeight.w600),
+              color: isCurrent
+                  ? (isDark ? AppColors.gold : const Color(0xFF92400E))
+                  : (isCompleted
                         ? (isDark
-                            ? const Color(0xFF34D399)
-                            : const Color(0xFF065F46))
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF065F46))
                         : (isDark ? Colors.white70 : const Color(0xFF475569))),
-                height: 1.25,
-              ),
+              height: 1.25,
             ),
+          ),
 
-            const SizedBox(height: 4),
+          const SizedBox(height: 4),
 
-            // Timestamp
-            Text(
-              timestamp,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                color: isCurrent
-                    ? const Color(0xFFD97706)
-                    : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
-              ),
+          // Timestamp
+          Text(
+            timestamp,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              color: isCurrent
+                  ? const Color(0xFFD97706)
+                  : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -729,9 +721,8 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
               color: isDark ? const Color(0xFF1E1B16) : Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(
-                    alpha: 0.25 + 0.3 * pulse,
-                  ),
+                  color: const Color(0xFFF59E0B)
+                      .withValues(alpha: 0.25 + 0.3 * pulse),
                   blurRadius: 6 + 6 * pulse,
                   spreadRadius: 1 + 2 * pulse,
                 ),
@@ -929,41 +920,11 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
                 SizedBox(height: 2),
                 Text(
                   'Workshop production is paused. Resume to continue the workflow.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFC2410C),
-                  ),
+                  style: TextStyle(fontSize: 11, color: Color(0xFFC2410C)),
                 ),
               ],
             ),
           ),
-          if (widget.onStatusSelected != null || widget.onResumeOrder != null)
-            ElevatedButton.icon(
-              onPressed: () {
-                if (widget.onResumeOrder != null) {
-                  widget.onResumeOrder!();
-                } else {
-                  widget.onStatusSelected?.call(Status.confirmed);
-                }
-              },
-              icon: const Icon(Icons.play_arrow_rounded, size: 16),
-              label: const Text('Resume Order'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEA580C),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -998,10 +959,7 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
                 SizedBox(height: 2),
                 Text(
                   'This order was cancelled and is excluded from active production.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFB91C1C),
-                  ),
+                  style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
                 ),
               ],
             ),
@@ -1030,8 +988,9 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
         return _formatTimelineTime(widget.customer!.orderDate);
       }
       if (widget.customer?.createdAt != null) {
-        final approx =
-            widget.customer!.createdAt!.add(Duration(hours: index * 6));
+        final approx = widget.customer!.createdAt!.add(
+          Duration(hours: index * 6),
+        );
         return _formatTimelineTime(approx);
       }
       return 'Done';
@@ -1073,7 +1032,8 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     }
 
     final now = DateTime.now();
-    final isToday = lastDt.year == now.year &&
+    final isToday =
+        lastDt.year == now.year &&
         lastDt.month == now.month &&
         lastDt.day == now.day;
     final hour = lastDt.hour % 12 == 0 ? 12 : lastDt.hour % 12;
@@ -1182,11 +1142,7 @@ class _HorizontalTimelineLinePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(
-      Offset(startX, centerY),
-      Offset(endX, centerY),
-      trackPaint,
-    );
+    canvas.drawLine(Offset(startX, centerY), Offset(endX, centerY), trackPaint);
 
     // 2. Animated Progress fill line
     if (progress > 0.0) {
@@ -1198,7 +1154,8 @@ class _HorizontalTimelineLinePainter extends CustomPainter {
         colors: [
           const Color(0xFF10B981), // Emerald green at start
           const Color(0xFF059669),
-          if (progress > 0.4) const Color(0xFFF59E0B), // Warm amber near active node
+          if (progress > 0.4)
+            const Color(0xFFF59E0B), // Warm amber near active node
         ],
       );
 

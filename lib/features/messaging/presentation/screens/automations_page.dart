@@ -278,7 +278,7 @@ class _ConnectPanel extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const ChannelBadge(size: 48),
+                const ChannelBadge(size: 18),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Row(

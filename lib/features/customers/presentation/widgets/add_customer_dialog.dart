@@ -1,10 +1,9 @@
-import 'package:raigon_art/core/utils/image_url_helper.dart';
-import 'package:raigon_art/core/widgets/app_image_viewer.dart';
-import 'package:raigon_art/features/customers/service/photo_capture_service.dart';
-
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -397,19 +396,44 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
 
   Future<List<PickedPhoto>> _pick({bool multiple = true}) async {
     try {
-      debugPrint('========== PHOTO PICK START ==========');
-      final photos = await PhotoCaptureService.showPhotoSourceSelector(
-        context,
-        multiple: multiple,
-      );
-      debugPrint('========== PHOTO PICK SUCCESS: ${photos.length} ==========');
-      return photos;
-    } catch (error) {
-      debugPrint('[CustomerImages] Photo selection failed: $error');
-      if (mounted) {
-        AppSnackBar.error(context, 'Photo selection error: $error');
+      debugPrint('========== FILE PICK START ==========');
+      debugPrint('Multiple: $multiple');
+
+      final List<PlatformFile> files;
+
+      if (multiple) {
+        files = await FilePicker.pickFiles(type: FileType.image);
+      } else {
+        final file = await FilePicker.pickFile(type: FileType.image);
+
+        if (file == null) {
+          debugPrint('File picking cancelled.');
+          return [];
+        }
+
+        files = [file];
       }
-      return [];
+
+      debugPrint('Files selected: ${files.length}');
+
+      final result = <PickedPhoto>[];
+
+      for (final file in files) {
+        debugPrint('Reading: ${file.name}');
+
+        final bytes = await file.readAsBytes();
+
+        result.add(
+          PickedPhoto(name: file.name, bytes: bytes, size: bytes.length),
+        );
+      }
+
+      debugPrint('========== FILE PICK SUCCESS: ${result.length} ==========');
+
+      return result;
+    } catch (error) {
+      debugPrint('[CustomerImages] File selection failed: $error');
+      rethrow;
     }
   }
 

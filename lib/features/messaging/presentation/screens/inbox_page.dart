@@ -484,8 +484,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
 
   bool _isUnread(_Convo c) => _unreadMessageCount(c) > 0;
 
-  int _unreadCount(List<_Convo> items) => items.where(_isUnread).length;
-
   List<_Convo> _view(List<_Convo> items) {
     final list = _unreadOnly
         ? items
@@ -570,14 +568,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
               _keepVisible.clear();
             }),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ChannelTabs(
-              active: Channel.instagram,
-              onChanged: (_) {},
-              badge: _unreadCount(activeAll),
-            ),
-          ),
+
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),

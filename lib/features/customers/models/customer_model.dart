@@ -44,11 +44,90 @@ class OrderStatusHistoryItem {
 
   factory OrderStatusHistoryItem.fromJson(Map<String, dynamic> j) {
     return OrderStatusHistoryItem(
-      previousStatus: Customer.parseStatus(j['previousStatus'] ?? j['previous_status']),
+      previousStatus: Customer.parseStatus(
+        j['previousStatus'] ?? j['previous_status'],
+      ),
       newStatus: Customer.parseStatus(j['newStatus'] ?? j['new_status']),
-      updatedAt: DateTime.tryParse((j['updatedAt'] ?? j['updated_at'] ?? '').toString()) ?? DateTime.now(),
-      updatedBy: (j['updatedBy'] ?? j['updated_by'] ?? 'Workshop Staff').toString(),
+      updatedAt:
+          DateTime.tryParse(
+            (j['updatedAt'] ?? j['updated_at'] ?? '').toString(),
+          ) ??
+          DateTime.now(),
+      updatedBy: (j['updatedBy'] ?? j['updated_by'] ?? 'Workshop Staff')
+          .toString(),
       notes: (j['notes'] ?? '').toString(),
+    );
+  }
+}
+
+class OrderVoiceNote {
+  final String id;
+  final String url;
+  final String name;
+  final int durationSeconds;
+  final DateTime createdAt;
+  final Uint8List? localBytes;
+
+  const OrderVoiceNote({
+    required this.id,
+    required this.url,
+    this.name = 'Voice Note',
+    this.durationSeconds = 0,
+    required this.createdAt,
+    this.localBytes,
+  });
+
+  bool get hasAudio =>
+      url.isNotEmpty || (localBytes != null && localBytes!.isNotEmpty);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'url': url,
+    'name': name,
+    'durationSeconds': durationSeconds,
+    'createdAt': createdAt.toIso8601String(),
+    if (localBytes != null) 'bytes': base64Encode(localBytes!),
+  };
+
+  factory OrderVoiceNote.fromJson(Map<String, dynamic> j) {
+    Uint8List? parseBytes(dynamic v) {
+      if (v == null) return null;
+      if (v is Uint8List) return v;
+      if (v is String && v.isNotEmpty) {
+        try {
+          return base64Decode(v);
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    return OrderVoiceNote(
+      id: (j['id'] ?? 'voice_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      url: (j['url'] ?? j['fileUrl'] ?? j['voiceUrl'] ?? '').toString(),
+      name: (j['name'] ?? j['title'] ?? 'Voice Note').toString(),
+      durationSeconds: (j['durationSeconds'] ?? j['duration'] ?? 0 as num).toInt(),
+      createdAt:
+          DateTime.tryParse((j['createdAt'] ?? j['created_at'] ?? '').toString()) ??
+          DateTime.now(),
+      localBytes: parseBytes(j['bytes'] ?? j['localBytes'] ?? j['voiceBytes']),
+    );
+  }
+
+  OrderVoiceNote copyWith({
+    String? id,
+    String? url,
+    String? name,
+    int? durationSeconds,
+    DateTime? createdAt,
+    Uint8List? localBytes,
+  }) {
+    return OrderVoiceNote(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      name: name ?? this.name,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      createdAt: createdAt ?? this.createdAt,
+      localBytes: localBytes ?? this.localBytes,
     );
   }
 }
@@ -79,6 +158,7 @@ class Customer {
     this.photoNames = const [],
     this.photoSizeLabels = const [],
     this.statusHistory = const [],
+    this.voiceNotes = const [],
     this.createdAt,
     this.updatedAt,
     this.isDeleted = false,
@@ -88,7 +168,10 @@ class Customer {
   static Status parseStatus(dynamic value) {
     if (value == null) return Status.pending;
     if (value is Status) return value;
-    final s = value.toString().trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    final s = value.toString().trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
     if (s == 'confirmed') return Status.confirmed;
     if (s == 'onhold' || s == 'hold') return Status.onHold;
     if (s == 'cancelled' || s == 'canceled') return Status.cancelled;
@@ -127,6 +210,7 @@ class Customer {
   final List<Uint8List> photoBytes;
   final List<String> photoSizeLabels;
   final List<OrderStatusHistoryItem> statusHistory;
+  final List<OrderVoiceNote> voiceNotes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool isDeleted;
@@ -213,7 +297,7 @@ class Customer {
     'total': total,
     'advance': advance,
     'paymentStatus': paymentStatus,
-    'status': status.name,
+    'status': status.apiValue,
     'orderDate': orderDate.toIso8601String(),
     if (expectedDelivery != null)
       'expectedDelivery': expectedDelivery!.toIso8601String(),
@@ -222,6 +306,8 @@ class Customer {
     'is_deleted': isDeleted,
     if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
     'statusHistory': [for (final h in statusHistory) h.toJson()],
+    'voiceNotes': [for (final v in voiceNotes) v.toJson()],
+    'voice_notes': [for (final v in voiceNotes) v.toJson()],
     'frames': [for (final f in frames) f.toJson()],
   };
 
@@ -240,13 +326,14 @@ class Customer {
     'total': total,
     'advance': advance,
     'paymentStatus': paymentStatus,
-    'status': status.name,
+    'status': status.apiValue,
     'orderDate': orderDate.toIso8601String(),
     if (expectedDelivery != null)
       'expectedDelivery': expectedDelivery!.toIso8601String(),
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     'statusHistory': [for (final h in statusHistory) h.toJson()],
+    'voiceNotes': [for (final v in voiceNotes) v.toJson()],
     'frames': [
       for (final f in effectiveFrames)
         {
@@ -272,7 +359,9 @@ class Customer {
     var j = raw;
     if (j.containsKey('data') && j['data'] is Map && !j.containsKey('id')) {
       j = Map<String, dynamic>.from(j['data'] as Map);
-    } else if (j.containsKey('customer') && j['customer'] is Map && !j.containsKey('id')) {
+    } else if (j.containsKey('customer') &&
+        j['customer'] is Map &&
+        !j.containsKey('id')) {
       j = Map<String, dynamic>.from(j['customer'] as Map);
     }
 
@@ -287,7 +376,10 @@ class Customer {
       for (final k in keys) {
         final list = j[k];
         if (list is List) {
-          return [for (final v in list) if (v != null) v.toString()];
+          return [
+            for (final v in list)
+              if (v != null) v.toString(),
+          ];
         }
       }
       return [];
@@ -301,8 +393,7 @@ class Customer {
     final rawFrames = j['frames'] ?? j['customer_frames'];
     final frames = [
       for (final f in (rawFrames is List ? rawFrames : const []))
-        if (f is Map)
-          FrameSpec.fromJson(Map<String, dynamic>.from(f)),
+        if (f is Map) FrameSpec.fromJson(Map<String, dynamic>.from(f)),
     ];
 
     final pNames = extractStrings(['photoNames', 'photo_names']);
@@ -331,9 +422,15 @@ class Customer {
       }
     }
 
-    final pSizeLabels = extractStrings(['photoSizeLabels', 'photo_size_labels']);
+    final pSizeLabels = extractStrings([
+      'photoSizeLabels',
+      'photo_size_labels',
+    ]);
     final rawPhotoCount = j['photoCount'] ?? j['photo_count'];
-    final photoCount = toInt(rawPhotoCount, math.max(pUrls.length, frames.length));
+    final photoCount = toInt(
+      rawPhotoCount,
+      math.max(pUrls.length, frames.length),
+    );
 
     final resolvedFrames = <FrameSpec>[];
     if (frames.isNotEmpty) {
@@ -361,8 +458,25 @@ class Customer {
         if (h is Map<String, dynamic>) {
           historyList.add(OrderStatusHistoryItem.fromJson(h));
         } else if (h is Map) {
-          historyList.add(OrderStatusHistoryItem.fromJson(Map<String, dynamic>.from(h)));
+          historyList.add(
+            OrderStatusHistoryItem.fromJson(Map<String, dynamic>.from(h)),
+          );
         }
+      }
+    }
+
+    final voiceNotesList = <OrderVoiceNote>[];
+    for (final v in (j['voiceNotes'] ?? j['voice_notes'] as List? ?? const [])) {
+      if (v is Map) {
+        voiceNotesList.add(OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)));
+      } else if (v is String && v.isNotEmpty) {
+        voiceNotesList.add(OrderVoiceNote(
+          id: 'voice_${voiceNotesList.length}',
+          url: v,
+          name: 'Voice Note ${voiceNotesList.length + 1}',
+          durationSeconds: 0,
+          createdAt: DateTime.now(),
+        ));
       }
     }
 
@@ -372,13 +486,18 @@ class Customer {
     final rawUpdatedAt = j['updatedAt'] ?? j['updated_at'];
     final isDeleted = j['is_deleted'] == true || j['isDeleted'] == true;
     final rawDeletedAt = j['deleted_at'] ?? j['deletedAt'];
-    final deletedAt = rawDeletedAt != null ? DateTime.tryParse(rawDeletedAt.toString()) : null;
+    final deletedAt = rawDeletedAt != null
+        ? DateTime.tryParse(rawDeletedAt.toString())
+        : null;
 
     return Customer(
       id: (j['id'] ?? '')?.toString() ?? '',
       name: (j['name'] ?? '')?.toString() ?? '',
       city: (j['city'] ?? '')?.toString() ?? '',
-      region: (j['region'] ?? j['regionId'] ?? j['region_id'] ?? j['city'] ?? '')?.toString() ?? '',
+      region:
+          (j['region'] ?? j['regionId'] ?? j['region_id'] ?? j['city'] ?? '')
+              ?.toString() ??
+          '',
       phone: (j['phone'] ?? '')?.toString() ?? '',
       altPhone: (j['altPhone'] ?? j['alt_phone'] ?? '')?.toString() ?? '',
       address: (j['address'] ?? '')?.toString() ?? '',
@@ -388,12 +507,20 @@ class Customer {
       photoUrls: pUrls,
       photoSizeLabels: pSizeLabels,
       photoBytes: bytesList,
-      frameSize: (j['frameSize'] ?? j['frame_size'] ?? j['frame_size_summary'] ?? '')?.toString() ?? '',
-      frameType: (j['frameType'] ?? j['frame_type'] ?? j['frame_type_summary'] ?? '')?.toString() ?? '',
+      frameSize:
+          (j['frameSize'] ?? j['frame_size'] ?? j['frame_size_summary'] ?? '')
+              ?.toString() ??
+          '',
+      frameType:
+          (j['frameType'] ?? j['frame_type'] ?? j['frame_type_summary'] ?? '')
+              ?.toString() ??
+          '',
       qty: toInt(j['qty'], 1),
       total: toInt(j['total'], 0),
       advance: toInt(j['advance'], 0),
-      paymentStatus: (j['paymentStatus'] ?? j['payment_status'] ?? 'Unpaid')?.toString() ?? 'Unpaid',
+      paymentStatus:
+          (j['paymentStatus'] ?? j['payment_status'] ?? 'Unpaid')?.toString() ??
+          'Unpaid',
       status: parseStatus(j['status']),
       orderDate: parseDate(rawOrderDate),
       expectedDelivery: rawExpectedDelivery == null
@@ -401,8 +528,13 @@ class Customer {
           : DateTime.tryParse(rawExpectedDelivery.toString()),
       frames: resolvedFrames,
       statusHistory: historyList,
-      createdAt: rawCreatedAt != null ? DateTime.tryParse(rawCreatedAt.toString()) : null,
-      updatedAt: rawUpdatedAt != null ? DateTime.tryParse(rawUpdatedAt.toString()) : null,
+      voiceNotes: voiceNotesList,
+      createdAt: rawCreatedAt != null
+          ? DateTime.tryParse(rawCreatedAt.toString())
+          : null,
+      updatedAt: rawUpdatedAt != null
+          ? DateTime.tryParse(rawUpdatedAt.toString())
+          : null,
       isDeleted: isDeleted,
       deletedAt: deletedAt,
     );
@@ -414,6 +546,7 @@ class Customer {
     String? paymentStatus,
     DateTime? expectedDelivery,
     List<OrderStatusHistoryItem>? statusHistory,
+    List<OrderVoiceNote>? voiceNotes,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isDeleted,
@@ -443,6 +576,7 @@ class Customer {
     photoNames: photoNames,
     photoSizeLabels: photoSizeLabels,
     statusHistory: statusHistory ?? this.statusHistory,
+    voiceNotes: voiceNotes ?? this.voiceNotes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     isDeleted: isDeleted ?? this.isDeleted,
@@ -455,6 +589,7 @@ class Customer {
     List<String>? photoNames,
     List<String>? photoUrls,
     List<FrameSpec>? frames,
+    List<OrderVoiceNote>? voiceNotes,
     int? photoCount,
     DateTime? expectedDelivery,
     List<OrderStatusHistoryItem>? statusHistory,
@@ -487,6 +622,7 @@ class Customer {
     photoBytes: photoBytes ?? this.photoBytes,
     photoSizeLabels: photoSizeLabels,
     statusHistory: statusHistory ?? this.statusHistory,
+    voiceNotes: voiceNotes ?? this.voiceNotes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     isDeleted: isDeleted ?? this.isDeleted,

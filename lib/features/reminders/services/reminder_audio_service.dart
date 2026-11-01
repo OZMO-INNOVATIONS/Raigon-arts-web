@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -133,7 +134,16 @@ class ReminderAudioService {
 
       if (path != null && path.isNotEmpty) {
         Uint8List bytes = Uint8List(0);
-        if (kIsWeb || path.startsWith('blob:') || path.startsWith('http')) {
+        if (path.startsWith('data:')) {
+          try {
+            final commaIdx = path.indexOf(',');
+            if (commaIdx != -1) {
+              bytes = base64Decode(path.substring(commaIdx + 1));
+            }
+          } catch (e) {
+            debugPrint('[ReminderAudioService] Decode data URI error: $e');
+          }
+        } else if (kIsWeb || path.startsWith('blob:') || path.startsWith('http')) {
           try {
             final res = await http.get(Uri.parse(path));
             if (res.statusCode == 200) {
@@ -209,6 +219,15 @@ class ReminderAudioService {
     } catch (_) {}
     _currentlyPlayingId = null;
     _currentPosition = Duration.zero;
+  }
+
+  Future<void> seek(Duration position) async {
+    if (_isDisposed) return;
+    try {
+      await _player.seek(position);
+    } catch (e) {
+      debugPrint('[ReminderAudioService] seek error: $e');
+    }
   }
 
   void dispose() {

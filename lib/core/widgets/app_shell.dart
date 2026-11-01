@@ -105,11 +105,11 @@ class _AppShellState extends State<AppShell> {
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
     NavDestination.reminders => const RemindersScreen(),
-    NavDestination.trash => const TrashScreen(),
     NavDestination.photoCollection => const PhotoCollectionScreen(),
     NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),
     NavDestination.reports => const ReportsScreen(),
+    NavDestination.trash => const TrashScreen(),
     NavDestination.profile => const ProfileScreen(),
   };
 

@@ -118,6 +118,71 @@ void main() {
       expect(restored.phone, equals('9876543210'));
       expect(restored.region, equals('South Region'));
     });
+
+    test('CustomerReminder supports multiple voice notes and serialization', () {
+      final voice1 = OrderVoiceNote(
+        id: 'vn-1',
+        url: 'https://example.com/audio1.m4a',
+        name: 'Urgent frame instruction',
+        durationSeconds: 15,
+        createdAt: DateTime(2026, 11, 1),
+      );
+      final voice2 = OrderVoiceNote(
+        id: 'vn-2',
+        url: 'https://example.com/audio2.m4a',
+        name: 'Follow up after 2pm',
+        durationSeconds: 28,
+        createdAt: DateTime(2026, 11, 1),
+      );
+
+      final rem = CustomerReminder(
+        id: 'REM-VOICE-100',
+        title: 'Customer Voice Check',
+        customerName: 'Raigon Admin',
+        reminderDate: DateTime(2026, 11, 2),
+        reminderTime: '11:00 AM',
+        createdAt: DateTime(2026, 11, 1),
+        voiceNotes: [voice1, voice2],
+        voiceUrl: voice1.url,
+        voiceDurationSeconds: voice1.durationSeconds,
+      );
+
+      expect(rem.hasVoice, isTrue);
+      expect(rem.effectiveVoiceNotes.length, equals(2));
+      expect(rem.effectiveVoiceNotes[0].name, equals('Urgent frame instruction'));
+      expect(rem.effectiveVoiceNotes[1].durationSeconds, equals(28));
+
+      // Supabase serialization test
+      final sbMap = rem.toSupabaseMap();
+      expect(sbMap['voice_url'], equals(voice1.url));
+      expect(sbMap['voice_duration_seconds'], equals(15));
+      expect(sbMap['voice_notes'], isA<List>());
+      expect((sbMap['voice_notes'] as List).length, equals(2));
+
+      // Deserialization test
+      final restored = CustomerReminder.fromJson(sbMap);
+      expect(restored.hasVoice, isTrue);
+      expect(restored.effectiveVoiceNotes.length, equals(2));
+      expect(restored.effectiveVoiceNotes[1].name, equals('Follow up after 2pm'));
+    });
+
+    test('CustomerReminder backward compatibility synthesizes single voice into effectiveVoiceNotes', () {
+      final legacyJson = {
+        'id': 'REM-LEGACY',
+        'title': 'Old Single Voice Reminder',
+        'customerName': 'Legacy Client',
+        'reminderDate': '2026-11-01',
+        'reminderTime': '10:00 AM',
+        'voiceUrl': 'https://example.com/old_voice.m4a',
+        'voiceDurationSeconds': 18,
+      };
+
+      final rem = CustomerReminder.fromJson(legacyJson);
+      expect(rem.hasVoice, isTrue);
+      expect(rem.effectiveVoiceNotes.length, equals(1));
+      expect(rem.effectiveVoiceNotes.first.url, equals('https://example.com/old_voice.m4a'));
+      expect(rem.effectiveVoiceNotes.first.durationSeconds, equals(18));
+    });
   });
 
   group('Customer Priority & Region Model Enhancements', () {

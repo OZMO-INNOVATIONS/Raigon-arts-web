@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' show Color, DateUtils;
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 
 enum ReminderPriority {
   low('Low', Color(0xFF10B981)),
@@ -63,6 +64,7 @@ class CustomerReminder {
     this.voiceUrl = '',
     this.voiceDurationSeconds = 0,
     this.voiceBytes,
+    this.voiceNotes = const [],
     this.isDeleted = false,
     this.deletedAt,
   });
@@ -87,11 +89,28 @@ class CustomerReminder {
   final String voiceUrl;
   final int voiceDurationSeconds;
   final Uint8List? voiceBytes;
+  final List<OrderVoiceNote> voiceNotes;
   final bool isDeleted;
   final DateTime? deletedAt;
 
-  bool get hasVoice =>
-      voiceUrl.isNotEmpty || (voiceBytes != null && voiceBytes!.isNotEmpty);
+  List<OrderVoiceNote> get effectiveVoiceNotes {
+    if (voiceNotes.isNotEmpty) return voiceNotes;
+    if (voiceUrl.isNotEmpty || (voiceBytes != null && voiceBytes!.isNotEmpty)) {
+      return [
+        OrderVoiceNote(
+          id: 'voice_${id}_1',
+          url: voiceUrl,
+          name: 'Voice Note #1',
+          durationSeconds: voiceDurationSeconds > 0 ? voiceDurationSeconds : 10,
+          createdAt: createdAt,
+          localBytes: voiceBytes,
+        ),
+      ];
+    }
+    return const [];
+  }
+
+  bool get hasVoice => effectiveVoiceNotes.isNotEmpty;
 
   /// Calculates days remaining before permanent purge (14-day policy)
   int get daysRemainingInTrash {
@@ -188,6 +207,7 @@ class CustomerReminder {
     String? voiceUrl,
     int? voiceDurationSeconds,
     Uint8List? voiceBytes,
+    List<OrderVoiceNote>? voiceNotes,
     bool? isDeleted,
     DateTime? deletedAt,
   }) {
@@ -212,59 +232,83 @@ class CustomerReminder {
       voiceUrl: voiceUrl ?? this.voiceUrl,
       voiceDurationSeconds: voiceDurationSeconds ?? this.voiceDurationSeconds,
       voiceBytes: voiceBytes ?? this.voiceBytes,
+      voiceNotes: voiceNotes ?? this.voiceNotes,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'customerName': customerName,
-    'customerId': customerId,
-    'orderId': orderId,
-    'description': description,
-    'reminderDate': reminderDate.toIso8601String(),
-    'reminderTime': reminderTime,
-    'assignedStaff': assignedStaff,
-    'priority': priority.name,
-    'isCompleted': isCompleted,
-    'completedAt': completedAt?.toIso8601String(),
-    'completedBy': completedBy,
-    'createdBy': createdBy,
-    'createdAt': createdAt.toIso8601String(),
-    'phone': phone,
-    'region': region,
-    'voiceUrl': voiceUrl,
-    'voiceDurationSeconds': voiceDurationSeconds,
-    if (voiceBytes != null) 'voiceBytes': base64Encode(voiceBytes!),
-    'is_deleted': isDeleted,
-    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
-  };
+  Map<String, dynamic> toJson() {
+    final vNotes = effectiveVoiceNotes;
+    final primaryUrl = voiceUrl.isNotEmpty
+        ? voiceUrl
+        : (vNotes.isNotEmpty ? vNotes.first.url : '');
+    final primaryDur = voiceDurationSeconds > 0
+        ? voiceDurationSeconds
+        : (vNotes.isNotEmpty ? vNotes.first.durationSeconds : 0);
 
-  Map<String, dynamic> toSupabaseMap() => {
-    'id': id,
-    'title': title,
-    'customer_name': customerName,
-    'customer_id': customerId,
-    'order_id': orderId,
-    'description': description,
-    'reminder_date': reminderDate.toIso8601String(),
-    'reminder_time': reminderTime,
-    'assigned_staff': assignedStaff,
-    'priority': priority.name,
-    'is_completed': isCompleted,
-    'completed_at': completedAt?.toIso8601String(),
-    'completed_by': completedBy,
-    'created_by': createdBy,
-    'created_at': createdAt.toIso8601String(),
-    'phone': phone,
-    'region': region,
-    'voice_url': voiceUrl,
-    'voice_duration_seconds': voiceDurationSeconds,
-    'is_deleted': isDeleted,
-    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
-  };
+    return {
+      'id': id,
+      'title': title,
+      'customerName': customerName,
+      'customerId': customerId,
+      'orderId': orderId,
+      'description': description,
+      'reminderDate': reminderDate.toIso8601String().split('T').first,
+      'reminderTime': reminderTime,
+      'assignedStaff': assignedStaff,
+      'priority': priority.name,
+      'isCompleted': isCompleted,
+      'completedAt': completedAt?.toIso8601String(),
+      'completedBy': completedBy,
+      'createdBy': createdBy,
+      'createdAt': createdAt.toIso8601String(),
+      'phone': phone,
+      'region': region,
+      'voiceUrl': primaryUrl,
+      'voiceDurationSeconds': primaryDur,
+      'voiceNotes': [for (final v in vNotes) v.toJson()],
+      'voice_notes': [for (final v in vNotes) v.toJson()],
+      if (voiceBytes != null) 'voiceBytes': base64Encode(voiceBytes!),
+      'is_deleted': isDeleted,
+      if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    final vNotes = effectiveVoiceNotes;
+    final primaryUrl = voiceUrl.isNotEmpty
+        ? voiceUrl
+        : (vNotes.isNotEmpty ? vNotes.first.url : '');
+    final primaryDur = voiceDurationSeconds > 0
+        ? voiceDurationSeconds
+        : (vNotes.isNotEmpty ? vNotes.first.durationSeconds : 0);
+
+    return {
+      'id': id,
+      'title': title,
+      'customer_name': customerName,
+      'customer_id': customerId,
+      'order_id': orderId,
+      'description': description,
+      'reminder_date': reminderDate.toIso8601String().split('T').first,
+      'reminder_time': reminderTime,
+      'assigned_staff': assignedStaff,
+      'priority': priority.name,
+      'is_completed': isCompleted,
+      'completed_at': completedAt?.toIso8601String(),
+      'completed_by': completedBy,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'phone': phone,
+      'region': region,
+      'voice_url': primaryUrl,
+      'voice_duration_seconds': primaryDur,
+      'voice_notes': [for (final v in vNotes) v.toJson()],
+      'is_deleted': isDeleted,
+      if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
+    };
+  }
 
   factory CustomerReminder.fromJson(Map<String, dynamic> j) {
     DateTime parseDate(dynamic v) {
@@ -281,6 +325,39 @@ class CustomerReminder {
         } catch (_) {}
       }
       return null;
+    }
+
+    final rawNotes = j['voiceNotes'] ?? j['voice_notes'];
+    final parsedNotes = <OrderVoiceNote>[];
+    if (rawNotes is List) {
+      for (final n in rawNotes) {
+        if (n is Map) {
+          parsedNotes.add(
+            OrderVoiceNote.fromJson(Map<String, dynamic>.from(n)),
+          );
+        }
+      }
+    }
+
+    final parsedVoiceUrl = (j['voiceUrl'] ?? j['voice_url'] ?? '').toString();
+    final parsedVoiceDur =
+        (j['voiceDurationSeconds'] ?? j['voice_duration_seconds'] as num?)
+            ?.toInt() ??
+        0;
+    final parsedVoiceBytes = parseBytes(j['voiceBytes']);
+
+    if (parsedNotes.isEmpty &&
+        (parsedVoiceUrl.isNotEmpty || parsedVoiceBytes != null)) {
+      parsedNotes.add(
+        OrderVoiceNote(
+          id: 'voice_${(j['id'] ?? '')}_1',
+          url: parsedVoiceUrl,
+          name: 'Voice Note #1',
+          durationSeconds: parsedVoiceDur > 0 ? parsedVoiceDur : 10,
+          createdAt: parseDate(j['createdAt'] ?? j['created_at']),
+          localBytes: parsedVoiceBytes,
+        ),
+      );
     }
 
     return CustomerReminder(
@@ -309,12 +386,10 @@ class CustomerReminder {
       createdAt: parseDate(j['createdAt'] ?? j['created_at']),
       phone: (j['phone'] ?? '').toString(),
       region: (j['region'] ?? '').toString(),
-      voiceUrl: (j['voiceUrl'] ?? j['voice_url'] ?? '').toString(),
-      voiceDurationSeconds:
-          (j['voiceDurationSeconds'] ?? j['voice_duration_seconds'] as num?)
-              ?.toInt() ??
-          0,
-      voiceBytes: parseBytes(j['voiceBytes']),
+      voiceUrl: parsedVoiceUrl,
+      voiceDurationSeconds: parsedVoiceDur,
+      voiceBytes: parsedVoiceBytes,
+      voiceNotes: parsedNotes,
       isDeleted: j['is_deleted'] == true || j['isDeleted'] == true,
       deletedAt: j['deleted_at'] != null || j['deletedAt'] != null
           ? DateTime.tryParse((j['deleted_at'] ?? j['deletedAt']).toString())

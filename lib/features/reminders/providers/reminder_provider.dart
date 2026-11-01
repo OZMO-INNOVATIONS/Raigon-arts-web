@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/services/reminder_service.dart';
 
 class ReminderProvider extends ChangeNotifier {
   ReminderProvider({ReminderService? service})
-      : _service = service ?? ReminderService.instance;
+    : _service = service ?? ReminderService.instance;
 
   final ReminderService _service;
 
@@ -30,8 +31,9 @@ class ReminderProvider extends ChangeNotifier {
 
   /// Reminders count displayed in the "All" tab:
   /// Includes active reminders PLUS reminders completed within the last 1 week.
-  int get allTabCount =>
-      _reminders.where((r) => !r.isCompleted || r.isCompletedWithinOneWeek).length;
+  int get allTabCount => _reminders
+      .where((r) => !r.isCompleted || r.isCompletedWithinOneWeek)
+      .length;
 
   int get todayCount => _reminders.where((r) => r.isDueToday).length;
 
@@ -141,8 +143,16 @@ class ReminderProvider extends ChangeNotifier {
     String voiceUrl = '',
     int voiceDurationSeconds = 0,
     Uint8List? voiceBytes,
+    List<OrderVoiceNote> voiceNotes = const [],
   }) async {
     final id = 'REM-${DateTime.now().millisecondsSinceEpoch}';
+    final primaryUrl = voiceUrl.trim().isNotEmpty
+        ? voiceUrl.trim()
+        : (voiceNotes.isNotEmpty ? voiceNotes.first.url : '');
+    final primaryDur = voiceDurationSeconds > 0
+        ? voiceDurationSeconds
+        : (voiceNotes.isNotEmpty ? voiceNotes.first.durationSeconds : 0);
+
     final reminder = CustomerReminder(
       id: id,
       title: title.trim(),
@@ -158,9 +168,10 @@ class ReminderProvider extends ChangeNotifier {
       createdAt: DateTime.now(),
       phone: phone.trim(),
       region: region.trim(),
-      voiceUrl: voiceUrl,
-      voiceDurationSeconds: voiceDurationSeconds,
+      voiceUrl: primaryUrl,
+      voiceDurationSeconds: primaryDur,
       voiceBytes: voiceBytes,
+      voiceNotes: voiceNotes,
     );
 
     _reminders.insert(0, reminder);
@@ -178,7 +189,10 @@ class ReminderProvider extends ChangeNotifier {
     await _service.saveReminder(reminder);
   }
 
-  Future<void> completeReminder(String id, {required String completedBy}) async {
+  Future<void> completeReminder(
+    String id, {
+    required String completedBy,
+  }) async {
     final index = _reminders.indexWhere((r) => r.id == id);
     if (index >= 0) {
       _reminders[index] = _reminders[index].copyWith(

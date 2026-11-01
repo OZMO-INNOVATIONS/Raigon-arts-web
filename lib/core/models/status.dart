@@ -64,4 +64,19 @@ enum Status {
   ];
 
   bool get isProductionStage => productionStages.contains(this);
+
+  /// Canonical status accepted by the backend REST API & database schema:
+  /// ('pending', 'inProgress', 'completed', 'cancelled').
+  String get apiValue => switch (this) {
+    Status.pending => 'pending',
+    Status.confirmed => 'inProgress',
+    Status.editingProgress => 'inProgress',
+    Status.dispatchForPrinting => 'inProgress',
+    Status.printReceived => 'inProgress',
+    Status.framingProcess => 'inProgress',
+    Status.completed => 'completed',
+    Status.onHold => 'pending',
+    Status.cancelled => 'cancelled',
+    Status.inProgress => 'inProgress',
+  };
 }

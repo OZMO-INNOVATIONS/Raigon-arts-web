@@ -21,6 +21,8 @@ import 'package:raigon_art/features/customers/presentation/widgets/add_customer_
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 import 'package:raigon_art/features/orders/presentation/widgets/order_progress_timeline.dart';
 import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
+import 'package:raigon_art/core/services/storage_service.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 
 enum _ViewAction { edit }
 
@@ -34,8 +36,10 @@ Future<void> showViewCustomerDialog(
     builder: (_) => ViewCustomerDialog(customer: customer),
   );
   if (action == _ViewAction.edit && context.mounted) {
-    final latest =
-        context.read<CustomerAndOrderProvider>().customers.firstWhere((c) => c.id == customer.id, orElse: () => customer);
+    final latest = context
+        .read<CustomerAndOrderProvider>()
+        .customers
+        .firstWhere((c) => c.id == customer.id, orElse: () => customer);
     await showEditCustomerDialog(context, latest);
   }
 }
@@ -97,34 +101,54 @@ List<_VaultPhoto> _photosOf(Customer c) {
   if (c.frames.isNotEmpty) {
     for (var i = 0; i < c.frames.length; i++) {
       final f = c.frames[i];
-      final bytes = f.photoBytes ?? (i < c.photoBytes.length ? c.photoBytes[i] : null);
+      final bytes =
+          f.photoBytes ?? (i < c.photoBytes.length ? c.photoBytes[i] : null);
       final rawUrl = (f.photoUrl != null && f.photoUrl!.isNotEmpty)
           ? f.photoUrl
           : (i < c.photoUrls.length ? c.photoUrls[i] : null);
-      final url = rawUrl != null && rawUrl.isNotEmpty ? ImageUrlHelper.resolve(rawUrl) : null;
+      final url = rawUrl != null && rawUrl.isNotEmpty
+          ? ImageUrlHelper.resolve(rawUrl)
+          : null;
 
       final name = (f.photoName != null && f.photoName!.isNotEmpty)
           ? f.photoName!
           : (i < c.photoNames.length && c.photoNames[i].isNotEmpty
-              ? c.photoNames[i]
-              : (url != null ? url.split('?').first.split('/').last : 'Artwork #${i + 1}'));
+                ? c.photoNames[i]
+                : (url != null
+                      ? url.split('?').first.split('/').last
+                      : 'Artwork #${i + 1}'));
 
-      final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
+      final size =
+          i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
           ? c.photoSizeLabels[i]
           : (bytes != null
-              ? PickedPhoto(name: name, bytes: bytes, size: bytes.length).sizeLabel
-              : 'Artwork Photo');
+                ? PickedPhoto(
+                    name: name,
+                    bytes: bytes,
+                    size: bytes.length,
+                  ).sizeLabel
+                : 'Artwork Photo');
 
       final key = url != null ? url.split('?').first.split('/').last : name;
 
       if (bytes != null) {
         addVaultPhoto(
-          _VaultPhoto(name: name, sizeLabel: size, image: MemoryImage(bytes), url: url),
+          _VaultPhoto(
+            name: name,
+            sizeLabel: size,
+            image: MemoryImage(bytes),
+            url: url,
+          ),
           key,
         );
       } else if (url != null && url.isNotEmpty) {
         addVaultPhoto(
-          _VaultPhoto(name: name, sizeLabel: size, image: NetworkImage(url), url: url),
+          _VaultPhoto(
+            name: name,
+            sizeLabel: size,
+            image: NetworkImage(url),
+            url: url,
+          ),
           key,
         );
       }
@@ -136,28 +160,46 @@ List<_VaultPhoto> _photosOf(Customer c) {
   for (var i = 0; i < maxExtra; i++) {
     final bytes = i < c.photoBytes.length ? c.photoBytes[i] : null;
     final rawUrl = i < c.photoUrls.length ? c.photoUrls[i] : null;
-    final url = rawUrl != null && rawUrl.isNotEmpty ? ImageUrlHelper.resolve(rawUrl) : null;
+    final url = rawUrl != null && rawUrl.isNotEmpty
+        ? ImageUrlHelper.resolve(rawUrl)
+        : null;
 
     final name = i < c.photoNames.length && c.photoNames[i].isNotEmpty
         ? c.photoNames[i]
-        : (url != null ? url.split('?').first.split('/').last : 'Photo_${i + 1}.jpg');
+        : (url != null
+              ? url.split('?').first.split('/').last
+              : 'Photo_${i + 1}.jpg');
 
     final size = i < c.photoSizeLabels.length && c.photoSizeLabels[i].isNotEmpty
         ? c.photoSizeLabels[i]
         : (bytes != null
-            ? PickedPhoto(name: name, bytes: bytes, size: bytes.length).sizeLabel
-            : 'Artwork Photo');
+              ? PickedPhoto(
+                  name: name,
+                  bytes: bytes,
+                  size: bytes.length,
+                ).sizeLabel
+              : 'Artwork Photo');
 
     final key = url != null ? url.split('?').first.split('/').last : name;
 
     if (bytes != null) {
       addVaultPhoto(
-        _VaultPhoto(name: name, sizeLabel: size, image: MemoryImage(bytes), url: url),
+        _VaultPhoto(
+          name: name,
+          sizeLabel: size,
+          image: MemoryImage(bytes),
+          url: url,
+        ),
         key,
       );
     } else if (url != null && url.isNotEmpty) {
       addVaultPhoto(
-        _VaultPhoto(name: name, sizeLabel: size, image: NetworkImage(url), url: url),
+        _VaultPhoto(
+          name: name,
+          sizeLabel: size,
+          image: NetworkImage(url),
+          url: url,
+        ),
         key,
       );
     }
@@ -252,6 +294,41 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               ? e.userFriendlyMessage
               : 'Could not load fresh details from server.';
         });
+      }
+    }
+  }
+
+  Future<void> _updateVoiceNotes(List<OrderVoiceNote> newNotes) async {
+    final updatedNotes = <OrderVoiceNote>[];
+    for (var i = 0; i < newNotes.length; i++) {
+      final vn = newNotes[i];
+      if (vn.url.isEmpty && vn.localBytes != null && vn.localBytes!.isNotEmpty) {
+        try {
+          final fileName =
+              'voice_order_${_c.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          final uploaded =
+              await StorageService().uploadFile(vn.localBytes!, fileName);
+          if (uploaded.fileUrl.isNotEmpty) {
+            updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
+            continue;
+          }
+        } catch (e) {
+          debugPrint('[VoiceNoteUpload] $e');
+        }
+      }
+      updatedNotes.add(vn);
+    }
+    final updatedCust = _c.copyWith(voiceNotes: updatedNotes);
+    setState(() => _c = updatedCust);
+    if (!mounted) return;
+    try {
+      await context.read<CustomerAndOrderProvider>().update(updatedCust);
+      if (mounted) {
+        AppSnackBar.success(context, 'Voice instructions updated.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to save voice instruction: $e');
       }
     }
   }
@@ -365,9 +442,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       children: [
                         Flexible(
                           child: Text(
-                            isNarrow
-                                ? 'Framing & order specifications'
-                                : 'Complete details and workshop framing specifications',
+                            isNarrow ? 'Framing & order specifications' : 'Complete details and workshop framing specifications',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -476,6 +551,13 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                   ),
                   SizedBox(height: isNarrow ? 20 : 28),
                   _framesSection(c, frames, photos),
+                  SizedBox(height: isNarrow ? 16 : 21),
+                  OrderVoiceNotesSection(
+                    voiceNotes: _c.voiceNotes,
+                    onChanged: _updateVoiceNotes,
+                    isEditable: true,
+                    title: 'Order Voice Instructions',
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -495,24 +577,39 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _highlightBg(p),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: p.isDark ? const Color(0xFF4B4D7E) : p.border,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OrderProgressTimeline(
             status: _c.status,
+            customer: _c,
+            statusHistory: _c.statusHistory,
             onStatusSelected: (newStatus) {
-              context.read<CustomerAndOrderProvider>().setOrderStatus(_c, newStatus);
+              context.read<CustomerAndOrderProvider>().setOrderStatus(
+                _c,
+                newStatus,
+              );
               setState(() {
                 _c = _c.copyWith(status: newStatus);
               });
             },
             onResumeOrder: () {
-              context.read<CustomerAndOrderProvider>().setOrderStatus(_c, Status.confirmed);
+              context.read<CustomerAndOrderProvider>().setOrderStatus(
+                _c,
+                Status.confirmed,
+              );
               setState(() {
                 _c = _c.copyWith(status: Status.confirmed);
               });
@@ -524,7 +621,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             const SizedBox(height: 14),
             Row(
               children: [
-                const Icon(Icons.history_rounded, size: 16, color: AppColors.gold),
+                const Icon(
+                  Icons.history_rounded,
+                  size: 16,
+                  color: AppColors.gold,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'STATUS WORKFLOW HISTORY (${_c.statusHistory.length})',
@@ -651,8 +752,16 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                   runSpacing: 8,
                   children: [
                     _infoChip(p, RemixIcons.phone_line, _c.phone),
-                    _infoChip(p, RemixIcons.calendar_line, 'Order Date: ${_c.orderDateLabel}'),
-                    _infoChip(p, RemixIcons.calendar_check_line, 'Expected Date: ${_c.expectedDateLabel}'),
+                    _infoChip(
+                      p,
+                      RemixIcons.calendar_line,
+                      'Order Date: ${_c.orderDateLabel}',
+                    ),
+                    _infoChip(
+                      p,
+                      RemixIcons.calendar_check_line,
+                      'Expected Date: ${_c.expectedDateLabel}',
+                    ),
                     if (_c.effectiveRegion.isNotEmpty)
                       _infoChip(
                         p,
@@ -701,8 +810,16 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       children: [
                         _idChip(p),
                         _infoChip(p, RemixIcons.phone_line, _c.phone),
-                        _infoChip(p, RemixIcons.calendar_line, 'Order Date: ${_c.orderDateLabel}'),
-                        _infoChip(p, RemixIcons.calendar_check_line, 'Expected Date: ${_c.expectedDateLabel}'),
+                        _infoChip(
+                          p,
+                          RemixIcons.calendar_line,
+                          'Order Date: ${_c.orderDateLabel}',
+                        ),
+                        _infoChip(
+                          p,
+                          RemixIcons.calendar_check_line,
+                          'Expected Date: ${_c.expectedDateLabel}',
+                        ),
                         if (_c.effectiveRegion.isNotEmpty)
                           _infoChip(
                             p,
@@ -1023,7 +1140,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
-  Widget _sameFrameHeaderBanner(AppPalette p, FrameSpec f, int qty, int photoCount) {
+  Widget _sameFrameHeaderBanner(
+    AppPalette p,
+    FrameSpec f,
+    int qty,
+    int photoCount,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
@@ -1119,11 +1241,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               if (isBannerNarrow) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerTitle,
-                    const SizedBox(height: 10),
-                    badge,
-                  ],
+                  children: [headerTitle, const SizedBox(height: 10), badge],
                 );
               }
 
@@ -1217,7 +1335,8 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               _specRow(
                 icon: RemixIcons.compass_3_line,
                 label: 'Orientation & Total Qty:',
-                value: '${_shortOrientation(f.orientation)} • $qty Frame${qty == 1 ? '' : 's'}',
+                value:
+                    '${_shortOrientation(f.orientation)} • $qty Frame${qty == 1 ? '' : 's'}',
                 p: p,
               ),
               if (f.notes.isNotEmpty) ...[
@@ -1235,7 +1354,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    const Icon(RemixIcons.image_line, size: 16, color: AppColors.gold),
+                    const Icon(
+                      RemixIcons.image_line,
+                      size: 16,
+                      color: AppColors.gold,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'ATTACHED ARTWORKS (${photos.length})',
@@ -1281,7 +1404,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: AppColors.gold.withValues(alpha: 0.5),
+                                    color: AppColors.gold.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                                 child: Image(
@@ -1303,7 +1428,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 150),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 150,
+                                    ),
                                     child: Text(
                                       photos[i].name,
                                       maxLines: 1,
@@ -1376,8 +1503,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             final isMulti = cardCount > 1;
             final isWide = cons.maxWidth >= 640 && isMulti;
             const gap = 20.0;
-            final cardWidth =
-                isWide ? (cons.maxWidth - gap) / 2 : cons.maxWidth;
+            final cardWidth = isWide
+                ? (cons.maxWidth - gap) / 2
+                : cons.maxWidth;
 
             return Wrap(
               spacing: gap,
@@ -1493,11 +1621,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               if (isBannerNarrow) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerTitle,
-                    const SizedBox(height: 10),
-                    badge,
-                  ],
+                  children: [headerTitle, const SizedBox(height: 10), badge],
                 );
               }
 
@@ -1543,7 +1667,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
     if (f.photoBytes != null) {
       photo = _VaultPhoto(
-        name: f.photoName ?? (index < photos.length ? photos[index].name : 'Artwork #${index + 1}'),
+        name:
+            f.photoName ??
+            (index < photos.length
+                ? photos[index].name
+                : 'Artwork #${index + 1}'),
         sizeLabel:
             '${(f.photoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB',
         image: MemoryImage(f.photoBytes!),
@@ -1556,9 +1684,14 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
         photoIndex = matchedIndex;
       } else {
         photo = _VaultPhoto(
-          name: f.photoName ??
-              (index < photos.length ? photos[index].name : 'Artwork #${index + 1}'),
-          sizeLabel: index < photos.length ? photos[index].sizeLabel : 'Artwork',
+          name:
+              f.photoName ??
+              (index < photos.length
+                  ? photos[index].name
+                  : 'Artwork #${index + 1}'),
+          sizeLabel: index < photos.length
+              ? photos[index].sizeLabel
+              : 'Artwork',
           image: NetworkImage(resolvedUrl),
           url: resolvedUrl,
         );
@@ -1596,11 +1729,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 onTap: photo == null
                     ? null
                     : () => _showPhotoViewerDialog(
-                          context,
-                          photo!,
-                          customer: _c,
-                          initialIndex: photoIndex,
-                        ),
+                        context,
+                        photo!,
+                        customer: _c,
+                        initialIndex: photoIndex,
+                      ),
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
                   children: [
@@ -1729,11 +1862,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 onTap: photo == null
                     ? null
                     : () => _showPhotoViewerDialog(
-                          context,
-                          photo!,
-                          customer: _c,
-                          initialIndex: photoIndex,
-                        ),
+                        context,
+                        photo!,
+                        customer: _c,
+                        initialIndex: photoIndex,
+                      ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -1765,7 +1898,11 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(RemixIcons.search_line, size: 13, color: Colors.white),
+                      Icon(
+                        RemixIcons.search_line,
+                        size: 13,
+                        color: Colors.white,
+                      ),
                       SizedBox(width: 5),
                       Text(
                         'View Photo',
@@ -1850,8 +1987,8 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: p.isDark
-                    ? Colors.transparent
-                    : const Color(0xFFF2DFC6),
+                      ? Colors.transparent
+                      : const Color(0xFFF2DFC6),
                 ),
               ),
               child: Row(
@@ -2086,7 +2223,23 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
         if (isNarrow) {
           return Container(
             width: double.infinity,
-            color: c.footerBg,
+            decoration: BoxDecoration(
+              color: c.footerBg,
+              border: Border(
+                top: BorderSide(
+                  color: p.isDark
+                      ? const Color(0xFF383A66)
+                      : p.border.withValues(alpha: 0.6),
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: p.isDark ? 0.3 : 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
@@ -2102,19 +2255,30 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
         return Container(
           width: double.infinity,
-          color: c.footerBg,
+          decoration: BoxDecoration(
+            color: c.footerBg,
+            border: Border(
+              top: BorderSide(
+                color: p.isDark
+                    ? const Color(0xFF383A66)
+                    : p.border.withValues(alpha: 0.6),
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.3 : 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
+              ),
+            ],
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           child: Wrap(
             alignment: WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 10,
             runSpacing: 10,
-            children: [
-              editButton,
-              whatsAppButton,
-              remindButton,
-              closeButton,
-            ],
+            children: [editButton, whatsAppButton, remindButton, closeButton],
           ),
         );
       },

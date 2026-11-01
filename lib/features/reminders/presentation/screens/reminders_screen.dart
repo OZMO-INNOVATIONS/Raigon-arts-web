@@ -7,6 +7,7 @@ import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
@@ -48,14 +49,23 @@ class _RemindersScreenState extends State<RemindersScreen> {
     super.dispose();
   }
 
-  Future<void> _togglePlayReminderVoice(CustomerReminder r) async {
-    if (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying) {
+  Future<void> _togglePlayReminderVoice(CustomerReminder r, [OrderVoiceNote? note]) async {
+    final targetNote = note ?? (r.effectiveVoiceNotes.isNotEmpty ? r.effectiveVoiceNotes.first : null);
+    final mediaId = targetNote != null ? '${r.id}_${targetNote.id}' : r.id;
+
+    if (_audioService.currentlyPlayingId == mediaId && _audioService.isPlaying) {
       await _audioService.stop();
     } else {
-      if (r.voiceBytes != null && r.voiceBytes!.isNotEmpty) {
-        await _audioService.playBytes(r.voiceBytes!, mediaId: r.id);
+      if (targetNote != null) {
+        if (targetNote.localBytes != null && targetNote.localBytes!.isNotEmpty) {
+          await _audioService.playBytes(targetNote.localBytes!, mediaId: mediaId);
+        } else if (targetNote.url.isNotEmpty) {
+          await _audioService.playUrl(targetNote.url, mediaId: mediaId);
+        }
+      } else if (r.voiceBytes != null && r.voiceBytes!.isNotEmpty) {
+        await _audioService.playBytes(r.voiceBytes!, mediaId: mediaId);
       } else if (r.voiceUrl.isNotEmpty) {
-        await _audioService.playUrl(r.voiceUrl, mediaId: r.id);
+        await _audioService.playUrl(r.voiceUrl, mediaId: mediaId);
       }
     }
     if (mounted) setState(() {});
@@ -573,69 +583,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
           ],
           if (r.hasVoice) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => _togglePlayReminderVoice(r),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.gold,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        color: AppColors.black,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Voice Reminder',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: p.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
-                              ? 'Playing voice note...'
-                              : (r.voiceDurationSeconds > 0
-                                  ? '${r.voiceDurationSeconds}s audio recording'
-                                  : 'Tap play to listen'),
-                          style: TextStyle(fontSize: 11, color: p.textMuted),
-                        ),
-                      ],
-                    ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var idx = 0; idx < r.effectiveVoiceNotes.length; idx++) ...[
+                  if (idx > 0) const SizedBox(height: 6),
+                  _buildVoiceTile(
+                    p,
+                    r,
+                    r.effectiveVoiceNotes[idx],
+                    idx,
+                    r.effectiveVoiceNotes.length,
                   ),
                 ],
-              ),
+              ],
             ),
           ],
           const SizedBox(height: 12),
@@ -737,73 +698,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   fontWeight: FontWeight.w600,
                   color: AppPalette.statusGreen,
                 ),
-              ),
-            ),
-          ],
-          if (r.hasVoice) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => _togglePlayReminderVoice(r),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.gold,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        color: AppColors.black,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Voice Reminder',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: p.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          (_audioService.currentlyPlayingId == r.id && _audioService.isPlaying)
-                              ? 'Playing voice note...'
-                              : (r.voiceDurationSeconds > 0
-                                  ? '${r.voiceDurationSeconds}s audio recording'
-                                  : 'Tap play to listen'),
-                          style: TextStyle(fontSize: 11, color: p.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -969,6 +863,84 @@ class _RemindersScreenState extends State<RemindersScreen> {
             label: const Text(
               'Create Reminder',
               style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceTile(
+    AppPalette p,
+    CustomerReminder r,
+    OrderVoiceNote note,
+    int index,
+    int totalCount,
+  ) {
+    final mediaId = '${r.id}_${note.id}';
+    final isThisPlaying =
+        _audioService.currentlyPlayingId == mediaId && _audioService.isPlaying;
+    final title =
+        totalCount > 1 ? 'Voice Note #${index + 1}' : 'Voice Reminder';
+    final durText = note.durationSeconds > 0
+        ? '${note.durationSeconds}s audio recording'
+        : (r.voiceDurationSeconds > 0
+            ? '${r.voiceDurationSeconds}s audio recording'
+            : 'Audio recording');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => _togglePlayReminderVoice(r, note),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: AppColors.gold,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isThisPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: AppColors.black,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
+                    const SizedBox(width: 4),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  isThisPlaying ? 'Playing voice note...' : durText,
+                  style: TextStyle(fontSize: 11, color: p.textMuted),
+                ),
+              ],
             ),
           ),
         ],

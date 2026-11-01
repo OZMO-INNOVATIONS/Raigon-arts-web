@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
@@ -109,6 +110,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         limit: 1000,
       );
       _customers = loaded.where((c) => !c.isDeleted).toList();
+      await _loadStatusOverrides();
       _sortCustomers();
       _initialized = true;
 
@@ -137,6 +139,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
         limit: 1000,
       );
       _customers = fresh.where((c) => !c.isDeleted).toList();
+      await _loadStatusOverrides();
       _sortCustomers();
       _initialized = true;
       _notifyOrderChange();
@@ -337,6 +340,38 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
   final Map<String, Status> _statusOverride = {};
 
+  static bool get _isTesting =>
+      const bool.fromEnvironment('flutter.test') ||
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
+  Future<void> _loadStatusOverrides() async {
+    if (_isTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final c in _customers) {
+        final saved = prefs.getString('order_status_override_${c.id}');
+        if (saved != null && saved.isNotEmpty) {
+          final overrideStatus = Customer.parseStatus(saved);
+          if (c.status == Status.inProgress || c.status == overrideStatus) {
+            _statusOverride[c.id] = overrideStatus;
+            final idx = _customers.indexWhere((item) => item.id == c.id);
+            if (idx != -1) {
+              _customers[idx] = _customers[idx].copyWith(status: overrideStatus);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveStatusOverride(String customerId, Status status) async {
+    if (_isTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('order_status_override_$customerId', status.name);
+    } catch (_) {}
+  }
+
   Status? get orderFilter => _orderFilter;
 
   String get orderQuery => _orderQuery;
@@ -381,6 +416,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
     try {
       await _repository.updateStatus(customer.id, status);
+      await _saveStatusOverride(customer.id, status);
     } catch (e) {
       debugPrint('[CustomerAndOrderProvider] Status persist error: $e');
       _statusOverride[customer.id] = oldStatus;

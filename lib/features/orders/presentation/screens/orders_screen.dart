@@ -169,7 +169,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     130, // Payment
     160, // Status
     130, // Delivery
-    180, // Actions
+    190, // Actions
   ];
 
   static final double _minTableWidth =
@@ -1009,7 +1009,48 @@ class _OrderRowState extends State<_OrderRow> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  txt(c.name, body(w: FontWeight.w600)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: txt(c.name, body(w: FontWeight.w600))),
+                      if (c.voiceNotes.isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: 0.45),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.mic_rounded,
+                                size: 10,
+                                color: AppColors.gold,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${c.voiceNotes.length}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.gold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   if (c.effectiveRegion.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Row(
@@ -1180,43 +1221,47 @@ class _OrderRowState extends State<_OrderRow> {
     final p = widget.p;
     const green = Color(0xFF25D366);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _iconBtn(
-          icon: RemixIcons.alarm_line,
-          color: AppColors.gold,
-          fill: AppColors.gold.withValues(alpha: p.isDark ? 0.2 : 0.14),
-          size: 17,
-          onTap: widget.onRemind,
-        ),
-        const SizedBox(width: 6),
-        _iconBtn(
-          icon: RemixIcons.eye_line,
-          color: p.textPrimary,
-          onTap: widget.onView,
-        ),
-        const SizedBox(width: 6),
-        _iconBtn(
-          icon: RemixIcons.whatsapp_fill,
-          color: green,
-          fill: green.withValues(alpha: p.isDark ? 0.22 : 0.18),
-          size: 18,
-          onTap: widget.onWhatsApp,
-        ),
-        const SizedBox(width: 6),
-        _iconBtn(
-          icon: RemixIcons.edit_line,
-          color: p.textPrimary,
-          onTap: widget.onEdit,
-        ),
-        const SizedBox(width: 6),
-        _iconBtn(
-          icon: RemixIcons.delete_bin_line,
-          color: const Color(0xFFE05C58),
-          onTap: widget.onDelete,
-        ),
-      ],
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _iconBtn(
+            icon: RemixIcons.alarm_line,
+            color: AppColors.gold,
+            fill: AppColors.gold.withValues(alpha: p.isDark ? 0.2 : 0.14),
+            size: 16,
+            onTap: widget.onRemind,
+          ),
+          const SizedBox(width: 5),
+          _iconBtn(
+            icon: RemixIcons.eye_line,
+            color: p.textPrimary,
+            onTap: widget.onView,
+          ),
+          const SizedBox(width: 5),
+          _iconBtn(
+            icon: RemixIcons.whatsapp_fill,
+            color: green,
+            fill: green.withValues(alpha: p.isDark ? 0.22 : 0.18),
+            size: 17,
+            onTap: widget.onWhatsApp,
+          ),
+          const SizedBox(width: 5),
+          _iconBtn(
+            icon: RemixIcons.edit_line,
+            color: p.textPrimary,
+            onTap: widget.onEdit,
+          ),
+          const SizedBox(width: 5),
+          _iconBtn(
+            icon: RemixIcons.delete_bin_line,
+            color: const Color(0xFFE05C58),
+            onTap: widget.onDelete,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1225,14 +1270,14 @@ class _OrderRowState extends State<_OrderRow> {
     required Color color,
     required VoidCallback onTap,
     Color? fill,
-    double size = 20,
+    double size = 18,
   }) {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: fill,

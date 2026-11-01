@@ -87,7 +87,14 @@ class InstagramInboxService {
         .timeout(const Duration(seconds: 20));
 
     if (response.statusCode != 200) {
-      throw Exception('Inbox API returned HTTP ${response.statusCode}.');
+      dynamic errorBody;
+      try {
+        errorBody = jsonDecode(response.body);
+      } catch (_) {}
+      final errorMsg = errorBody is Map ? errorBody['error']?.toString() : null;
+      throw Exception(
+        errorMsg ?? 'Inbox API returned HTTP ${response.statusCode}.',
+      );
     }
 
     final decoded = jsonDecode(response.body);

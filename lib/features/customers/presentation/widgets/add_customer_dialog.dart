@@ -23,6 +23,8 @@ import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/services/storage_service.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
 Future<void> showAddCustomerDialog(BuildContext context) async {
@@ -53,8 +55,38 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
   if (result == null || !context.mounted) return;
 
   try {
+    var finalResult = result;
+    if (result.voiceNotes.isNotEmpty) {
+      final updatedNotes = <OrderVoiceNote>[];
+      for (var i = 0; i < result.voiceNotes.length; i++) {
+        final vn = result.voiceNotes[i];
+        if (vn.url.isEmpty &&
+            vn.localBytes != null &&
+            vn.localBytes!.isNotEmpty) {
+          try {
+            final fileName =
+                'voice_order_${result.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            final uploaded = await StorageService().uploadFile(
+              vn.localBytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderSave] Voice note upload notice: $e');
+          }
+        }
+        updatedNotes.add(vn);
+      }
+      finalResult = result.copyWith(voiceNotes: updatedNotes);
+    }
+
+    if (!context.mounted) return;
+
     // Save the customer first.
-    await context.read<CustomerAndOrderProvider>().add(result);
+    await context.read<CustomerAndOrderProvider>().add(finalResult);
 
     if (!context.mounted) return;
 
@@ -63,7 +95,7 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
     // Automatically open WhatsApp order confirmation receipt.
     try {
       final opened = await CustomerWhatsAppService.openOrderConfirmation(
-        result,
+        finalResult,
       );
 
       if (!opened && context.mounted) {
@@ -159,7 +191,37 @@ Future<void> showEditCustomerDialog(
   if (result == null || !context.mounted) return;
 
   try {
-    await context.read<CustomerAndOrderProvider>().update(result);
+    var finalResult = result;
+    if (result.voiceNotes.isNotEmpty) {
+      final updatedNotes = <OrderVoiceNote>[];
+      for (var i = 0; i < result.voiceNotes.length; i++) {
+        final vn = result.voiceNotes[i];
+        if (vn.url.isEmpty &&
+            vn.localBytes != null &&
+            vn.localBytes!.isNotEmpty) {
+          try {
+            final fileName =
+                'voice_order_${result.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            final uploaded = await StorageService().uploadFile(
+              vn.localBytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderUpdate] Voice note upload notice: $e');
+          }
+        }
+        updatedNotes.add(vn);
+      }
+      finalResult = result.copyWith(voiceNotes: updatedNotes);
+    }
+
+    if (!context.mounted) return;
+
+    await context.read<CustomerAndOrderProvider>().update(finalResult);
 
     if (context.mounted) {
       AppSnackBar.success(context, 'Customer updated successfully.');
@@ -213,6 +275,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   final _balance = TextEditingController();
   final List<PickedPhoto> _photos = [];
   final List<_ExistingPhotoItem> _existingPhotos = [];
+  List<OrderVoiceNote> _voiceNotes = [];
   final FrameSpecData _shared = FrameSpecData();
   final List<_FrameEntry> _entries = [];
   FrameMode _mode = FrameMode.same;
@@ -247,6 +310,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     _delivery = c.expectedDelivery;
     _payment = c.paymentStatus;
     _status = c.status;
+    _voiceNotes = List<OrderVoiceNote>.of(c.voiceNotes);
 
     final frames = c.effectiveFrames;
     if (frames.length > 1) {
@@ -546,6 +610,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoUrls: remainingUrls,
       photoSizeLabels: widget.existing?.photoSizeLabels ?? const [],
       frames: frames,
+      voiceNotes: _voiceNotes,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -825,6 +890,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 _sameContent(c)
               else
                 _individualContent(c),
+              const SizedBox(height: 24),
+              OrderVoiceNotesSection(
+                voiceNotes: _voiceNotes,
+                onChanged: (notes) => setState(() => _voiceNotes = notes),
+                isEditable: true,
+              ),
               const SizedBox(height: 26),
               const SectionHeader(
                 icon: RemixIcons.bill_line,

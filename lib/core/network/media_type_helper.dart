@@ -15,6 +15,18 @@ MediaType detectMediaType(String filename) {
       return MediaType('image', 'heic');
     case 'pdf':
       return MediaType('application', 'pdf');
+    case 'm4a':
+      return MediaType('audio', 'm4a');
+    case 'mp3':
+      return MediaType('audio', 'mpeg');
+    case 'wav':
+      return MediaType('audio', 'wav');
+    case 'webm':
+      return MediaType('audio', 'webm');
+    case 'aac':
+      return MediaType('audio', 'aac');
+    case 'ogg':
+      return MediaType('audio', 'ogg');
     case 'jpg':
     case 'jpeg':
     default:
@@ -22,7 +34,7 @@ MediaType detectMediaType(String filename) {
   }
 }
 
-/// Ensures the filename has an allowed extension (jpg, jpeg, png, webp, heic, pdf)
+/// Ensures the filename has an allowed extension (jpg, jpeg, png, webp, heic, pdf, audio)
 /// so that backend multer fileFilter does not reject it.
 String ensureImageFilename(String filename, [String defaultExt = 'jpg']) {
   if (filename.isEmpty) return 'photo.$defaultExt';
@@ -30,7 +42,20 @@ String ensureImageFilename(String filename, [String defaultExt = 'jpg']) {
     return '$filename.$defaultExt';
   }
   final ext = filename.split('.').last.toLowerCase();
-  const allowed = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'pdf'];
+  const allowed = [
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'heic',
+    'pdf',
+    'm4a',
+    'mp3',
+    'wav',
+    'webm',
+    'aac',
+    'ogg',
+  ];
   if (!allowed.contains(ext)) {
     return '$filename.$defaultExt';
   }

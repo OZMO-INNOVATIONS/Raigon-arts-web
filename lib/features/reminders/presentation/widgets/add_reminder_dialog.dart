@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
 
-import 'package:audioplayers/audioplayers.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
@@ -12,9 +9,9 @@ import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
-import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 
 Future<void> showAddOrEditReminderDialog({
   required BuildContext context,
@@ -60,16 +57,7 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
   late ReminderPriority _priority;
   late String _assignedStaff;
   bool _isSaving = false;
-
-  final ReminderAudioService _audioService = ReminderAudioService();
-  String _voiceUrl = '';
-  int _voiceDurationSeconds = 0;
-  Uint8List? _voiceBytes;
-  bool _isRecording = false;
-  int _recordingSeconds = 0;
-  bool _isPlaying = false;
-  StreamSubscription? _recSub;
-  StreamSubscription? _playerSub;
+  List<OrderVoiceNote> _voiceNotes = [];
 
   @override
   void initState() {
@@ -105,24 +93,11 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     _priority = rem?.priority ?? ReminderPriority.medium;
     _assignedStaff = rem?.assignedStaff ?? (AuthService.isAdmin ? 'Admin' : 'Workshop Staff');
 
-    _voiceUrl = rem?.voiceUrl ?? '';
-    _voiceDurationSeconds = rem?.voiceDurationSeconds ?? 0;
-    _voiceBytes = rem?.voiceBytes;
-
-    _recSub = _audioService.onRecordSecondsChanged.listen((sec) {
-      if (mounted) setState(() => _recordingSeconds = sec);
-    });
-
-    _playerSub = _audioService.onPlayerStateChanged.listen((state) {
-      if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
-    });
+    _voiceNotes = rem != null ? List<OrderVoiceNote>.of(rem.effectiveVoiceNotes) : [];
   }
 
   @override
   void dispose() {
-    _recSub?.cancel();
-    _playerSub?.cancel();
-    _audioService.dispose();
     _titleCtrl.dispose();
     _customerNameCtrl.dispose();
     _customerIdCtrl.dispose();
@@ -131,76 +106,6 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     _regionCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _startRecording() async {
-    final ok = await _audioService.startRecording();
-    if (ok) {
-      setState(() => _isRecording = true);
-    } else {
-      if (mounted) {
-        AppSnackBar.error(context, 'Microphone permission denied or recording unavailable.');
-      }
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    final result = await _audioService.stopRecording();
-    setState(() {
-      _isRecording = false;
-      if (result != null) {
-        _voiceBytes = result.bytes;
-        _voiceDurationSeconds = result.durationSeconds;
-        _voiceUrl = '';
-      }
-    });
-  }
-
-  Future<void> _cancelRecording() async {
-    await _audioService.cancelRecording();
-    setState(() => _isRecording = false);
-  }
-
-  Future<void> _pickAudioFile() async {
-    try {
-      final res = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'webm'],
-      );
-      if (res.isNotEmpty) {
-        final bytes = await res.first.readAsBytes();
-        setState(() {
-          _voiceBytes = bytes;
-          _voiceDurationSeconds = 10;
-          _voiceUrl = '';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackBar.error(context, 'Failed to pick audio file: $e');
-      }
-    }
-  }
-
-  Future<void> _toggleAudioPlayback() async {
-    if (_isPlaying) {
-      await _audioService.pause();
-    } else {
-      if (_voiceBytes != null && _voiceBytes!.isNotEmpty) {
-        await _audioService.playBytes(_voiceBytes!);
-      } else if (_voiceUrl.isNotEmpty) {
-        await _audioService.playUrl(_voiceUrl);
-      }
-    }
-  }
-
-  void _clearVoice() {
-    _audioService.stop();
-    setState(() {
-      _voiceBytes = null;
-      _voiceUrl = '';
-      _voiceDurationSeconds = 0;
-    });
   }
 
   Future<void> _pickDate() async {
@@ -275,18 +180,29 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final isEdit = widget.existingReminder != null;
     final timeStr = _selectedTime.format(context);
 
-    // If audio bytes are present but not yet uploaded, upload to storage
-    if (_voiceBytes != null && _voiceBytes!.isNotEmpty && _voiceUrl.isEmpty) {
-      try {
-        final fileName = 'voice_rem_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        final uploaded = await StorageService().uploadFile(_voiceBytes!, fileName);
-        if (uploaded.fileUrl.isNotEmpty) {
-          _voiceUrl = uploaded.fileUrl;
+    // If any voice notes have local bytes but no URL, upload to storage
+    final updatedVoiceNotes = <OrderVoiceNote>[];
+    for (var i = 0; i < _voiceNotes.length; i++) {
+      final vn = _voiceNotes[i];
+      if (vn.url.isEmpty && vn.localBytes != null && vn.localBytes!.isNotEmpty) {
+        try {
+          final fileName =
+              'voice_rem_${DateTime.now().millisecondsSinceEpoch}_${i + 1}.m4a';
+          final uploaded =
+              await StorageService().uploadFile(vn.localBytes!, fileName);
+          if (uploaded.fileUrl.isNotEmpty) {
+            updatedVoiceNotes.add(vn.copyWith(url: uploaded.fileUrl));
+            continue;
+          }
+        } catch (e) {
+          debugPrint('[AddReminder] Storage voice upload notice: $e (stored locally)');
         }
-      } catch (e) {
-        debugPrint('[AddReminder] Storage voice upload notice: $e (stored locally)');
       }
+      updatedVoiceNotes.add(vn);
     }
+
+    final primaryUrl = updatedVoiceNotes.isNotEmpty ? updatedVoiceNotes.first.url : '';
+    final primaryDuration = updatedVoiceNotes.isNotEmpty ? updatedVoiceNotes.first.durationSeconds : 0;
 
     try {
       if (isEdit) {
@@ -302,9 +218,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
           priority: _priority,
           phone: _phoneCtrl.text.trim(),
           region: _regionCtrl.text.trim(),
-          voiceUrl: _voiceUrl,
-          voiceDurationSeconds: _voiceDurationSeconds,
-          voiceBytes: _voiceBytes,
+          voiceUrl: primaryUrl,
+          voiceDurationSeconds: primaryDuration,
+          voiceNotes: updatedVoiceNotes,
         );
         await provider.updateReminder(updated);
         if (mounted) {
@@ -325,9 +241,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
           createdBy: AuthService.isAdmin ? 'Admin' : 'Workshop Staff',
           phone: _phoneCtrl.text.trim(),
           region: _regionCtrl.text.trim(),
-          voiceUrl: _voiceUrl,
-          voiceDurationSeconds: _voiceDurationSeconds,
-          voiceBytes: _voiceBytes,
+          voiceUrl: primaryUrl,
+          voiceDurationSeconds: primaryDuration,
+          voiceNotes: updatedVoiceNotes,
         );
         if (mounted) {
           Navigator.of(context).pop();
@@ -354,8 +270,6 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final dateFormatted =
         '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}';
     final timeFormatted = _selectedTime.format(context);
-
-    final hasVoice = _voiceUrl.isNotEmpty || (_voiceBytes != null && _voiceBytes!.isNotEmpty);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -690,153 +604,14 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // VOICE MESSAGE SUPPORT
-                _buildLabel(p, 'VOICE REMINDER (AUDIO MESSAGE)'),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: p.chipFill.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: hasVoice ? AppColors.gold.withValues(alpha: 0.6) : p.border,
-                      width: hasVoice ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_isRecording) ...[
-                        // Live recording indicator
-                        Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Recording... ${_formatDuration(_recordingSeconds)}',
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: _stopRecording,
-                              icon: const Icon(Icons.stop_circle_rounded, color: Colors.red),
-                              label: const Text('Stop & Attach', style: TextStyle(color: Colors.red)),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              onPressed: _cancelRecording,
-                              tooltip: 'Cancel recording',
-                            ),
-                          ],
-                        ),
-                      ] else if (hasVoice) ...[
-                        // Audio preview & playback
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: AppColors.gold.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                  color: AppColors.gold,
-                                  size: 20,
-                                ),
-                                onPressed: _toggleAudioPlayback,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.mic, size: 14, color: AppColors.gold),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Voice Message Attached',
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: p.textPrimary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _voiceDurationSeconds > 0
-                                        ? 'Duration: ${_formatDuration(_voiceDurationSeconds)}'
-                                        : 'Audio ready for playback',
-                                    style: TextStyle(fontSize: 11, color: p.textMuted),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: _clearVoice,
-                              icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
-                              label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        // Action buttons to record or upload
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _startRecording,
-                                icon: const Icon(Icons.mic_rounded, size: 16),
-                                label: const Text('Record Voice'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.gold.withValues(alpha: 0.15),
-                                  foregroundColor: AppColors.gold,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    side: const BorderSide(color: AppColors.gold, width: 1),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _pickAudioFile,
-                                icon: const Icon(Icons.upload_file_rounded, size: 16),
-                                label: const Text('Upload Audio'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: p.textPrimary,
-                                  side: BorderSide(color: p.border),
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
+                // VOICE REMINDER (AUDIO MESSAGES)
+                OrderVoiceNotesSection(
+                  voiceNotes: _voiceNotes,
+                  onChanged: (notes) {
+                    setState(() => _voiceNotes = notes);
+                  },
+                  isEditable: true,
+                  title: 'Voice Reminders (Audio Instructions)',
                 ),
                 const SizedBox(height: 24),
 
@@ -939,11 +714,5 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
         borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
       ),
     );
-  }
-
-  String _formatDuration(int seconds) {
-    final m = (seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 }

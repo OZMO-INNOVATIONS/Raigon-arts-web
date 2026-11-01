@@ -394,10 +394,14 @@ class RestCustomerRepository implements CustomerRepository {
     try {
       await _api.patch(
         ApiConstants.customerStatus(id),
-        body: {'status': status.name},
+        body: {
+          'status': status.apiValue,
+          'stage': status.name,
+          'detailedStatus': status.name,
+        },
       );
       debugPrint(
-        '[RestCustomerRepository] Updated status for $id to ${status.name}.',
+        '[RestCustomerRepository] Updated status for $id to ${status.name} (API: ${status.apiValue}).',
       );
     } catch (e) {
       debugPrint('[RestCustomerRepository] updateStatus failed ($id): $e');

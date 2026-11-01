@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 
 class OrderProgressTimeline extends StatefulWidget {
   const OrderProgressTimeline({
     super.key,
     required this.status,
+    this.customer,
+    this.statusHistory = const [],
     this.onStatusSelected,
     this.onResumeOrder,
     this.showStatusDropdown = true,
@@ -14,6 +17,8 @@ class OrderProgressTimeline extends StatefulWidget {
   });
 
   final Status status;
+  final Customer? customer;
+  final List<OrderStatusHistoryItem> statusHistory;
   final ValueChanged<Status>? onStatusSelected;
   final VoidCallback? onResumeOrder;
   final bool showStatusDropdown;
@@ -25,13 +30,15 @@ class OrderProgressTimeline extends StatefulWidget {
 
 class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     with TickerProviderStateMixin {
-  final ScrollController _scrollController = ScrollController();
-
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  static bool get _isTesting =>
+      const bool.fromEnvironment('flutter.test') ||
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   static const List<Status> _productionStages = [
     Status.pending,
@@ -44,13 +51,13 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
   ];
 
   static const Map<Status, IconData> _stageIcons = {
-    Status.pending: Icons.hourglass_top_rounded,
-    Status.confirmed: Icons.verified_outlined,
-    Status.editingProgress: Icons.brush_outlined,
-    Status.dispatchForPrinting: Icons.local_shipping_outlined,
-    Status.printReceived: Icons.inventory_2_outlined,
-    Status.framingProcess: Icons.crop_square_outlined,
-    Status.completed: Icons.check_circle_outline,
+    Status.pending: Icons.hourglass_empty_rounded,
+    Status.confirmed: Icons.verified_rounded,
+    Status.editingProgress: Icons.brush_rounded,
+    Status.dispatchForPrinting: Icons.local_shipping_rounded,
+    Status.printReceived: Icons.inventory_2_rounded,
+    Status.framingProcess: Icons.crop_square_rounded,
+    Status.completed: Icons.check_circle_rounded,
   };
 
   static int _productionIndexFor(Status s) {
@@ -80,13 +87,9 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
 
   double _progressFractionFor(Status s) {
     final idx = _productionIndexFor(s);
-    if (idx <= 0) return 0.0;
+    if (idx < 0) return 0.0;
     return (idx / (_productionStages.length - 1)).clamp(0.0, 1.0);
   }
-
-  static bool get _isTesting =>
-      const bool.fromEnvironment('flutter.test') ||
-      WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
   void initState() {
@@ -96,6 +99,9 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
+    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
     if (!_isTesting) {
       _pulseController.repeat(reverse: true);
@@ -103,14 +109,9 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       _pulseController.value = 1.0;
     }
 
-    _pulseAnimation = CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    );
-
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 750),
+      duration: const Duration(milliseconds: 700),
     );
 
     final initialProgress = _progressFractionFor(widget.status);
@@ -123,8 +124,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     ));
 
     _progressController.forward();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoScrollToCurrent());
   }
 
   @override
@@ -143,23 +142,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       ));
 
       _progressController.forward(from: 0.0);
-
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _autoScrollToCurrent(),
-      );
-    }
-  }
-
-  void _autoScrollToCurrent() {
-    if (!_scrollController.hasClients) return;
-    final idx = _currentProductionIndex;
-    if (idx > 1) {
-      final target = (idx - 1) * 105.0;
-      _scrollController.animateTo(
-        target.clamp(0.0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutCubic,
-      );
     }
   }
 
@@ -167,7 +149,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
   void dispose() {
     _progressController.dispose();
     _pulseController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -178,699 +159,250 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     final isOnHold = widget.status == Status.onHold;
     final isCancelled = widget.status == Status.cancelled;
     final currentIdx = _currentProductionIndex;
+    final activeStage = currentIdx >= 0 && currentIdx < _productionStages.length
+        ? _productionStages[currentIdx]
+        : widget.status;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Top Workflow Header Bar
-        _buildHeaderBar(context, p, currentIdx),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. Top Section Header (Web horizontal layout)
+            _buildTopHeader(context, p, isDark, currentIdx),
 
-        const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-        // 1. Prominent alert banner if ON HOLD
-        if (isOnHold) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0x33EA580C) : const Color(0xFFFFEDD5),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark
-                    ? const Color(0x66EA580C)
-                    : const Color(0xFFFED7AA),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.pause_circle_filled_rounded,
-                  color: Color(0xFFEA580C),
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order is On Hold',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF9A3412),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Workshop production is paused. Resume to continue the workflow.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFC2410C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (widget.onStatusSelected != null ||
-                    widget.onResumeOrder != null)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      if (widget.onResumeOrder != null) {
-                        widget.onResumeOrder!();
-                      } else {
-                        widget.onStatusSelected?.call(Status.confirmed);
-                      }
-                    },
-                    icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                    label: const Text('Resume Order'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA580C),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-        ],
-
-        // 2. Alert banner if CANCELLED
-        if (isCancelled) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0x33DC2626) : const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark
-                    ? const Color(0x66DC2626)
-                    : const Color(0xFFFCA5A5),
-              ),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 22),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order Cancelled',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF7F1D1D),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'This order was cancelled and is excluded from active production.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFB91C1C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-        ],
-
-        // 3. Ultra-Smooth Animated Production Timeline Track
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      const Color(0xFF221E1A),
-                      const Color(0xFF1B1815),
-                    ]
-                  : [
-                      const Color(0xFFFAFAFB),
-                      const Color(0xFFF1F5F9),
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? const Color(0xFF3B352D)
-                  : const Color(0xFFE2E8F0),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.35)
-                    : const Color(0xFF94A3B8).withValues(alpha: 0.12),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
+            // 2. Prominent Alert Banner if ON HOLD
+            if (isOnHold) ...[
+              _buildOnHoldBanner(isDark),
+              const SizedBox(height: 12),
             ],
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              const nodeSize = 38.0;
-              final isWide = constraints.maxWidth >= 680 && !widget.compact;
 
-              if (isWide) {
-                // Wide flex layout with mathematical alignment
-                final totalWidth = constraints.maxWidth;
-                final stepWidth = totalWidth / _productionStages.length;
-                final trackLeft = stepWidth * 0.5;
-                final trackWidth = stepWidth * (_productionStages.length - 1);
+            // 3. Alert Banner if CANCELLED
+            if (isCancelled) ...[
+              _buildCancelledBanner(isDark),
+              const SizedBox(height: 12),
+            ],
 
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Continuous Connecting Animated Line behind nodes
-                    _buildContinuousTrack(
-                      trackLeft: trackLeft,
-                      trackWidth: trackWidth,
-                      nodeSize: nodeSize,
-                      isDark: isDark,
-                    ),
+            // 4. Current Status Banner (iOS HIG / Material Design 3 Card)
+            _buildCurrentStatusBanner(context, p, isDark, currentIdx),
 
-                    // Stage Nodes in Front
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (int i = 0; i < _productionStages.length; i++)
-                          Expanded(
-                            child: _buildStageNode(
-                              stage: _productionStages[i],
-                              index: i,
-                              p: p,
-                              isDark: isDark,
-                              nodeSize: nodeSize,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                );
-              } else {
-                // Scrollable horizontal timeline for compact & mobile devices
-                const stepWidth = 105.0;
-                final totalWidth = stepWidth * _productionStages.length;
-                const trackLeft = stepWidth * 0.5;
-                final trackWidth = stepWidth * (_productionStages.length - 1);
+            const SizedBox(height: 20),
 
-                return SingleChildScrollView(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: SizedBox(
-                    width: totalWidth,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Continuous Connecting Animated Line behind nodes
-                        _buildContinuousTrack(
-                          trackLeft: trackLeft,
-                          trackWidth: trackWidth,
-                          nodeSize: nodeSize,
-                          isDark: isDark,
-                        ),
+            // 5. Horizontal Timeline with Connected Animated Fill Line
+            _buildHorizontalTimeline(p, isDark, currentIdx),
 
-                        // Stage Nodes in Front
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (int i = 0; i < _productionStages.length; i++)
-                              SizedBox(
-                                width: stepWidth,
-                                child: _buildStageNode(
-                                  stage: _productionStages[i],
-                                  index: i,
-                                  p: p,
-                                  isDark: isDark,
-                                  nodeSize: nodeSize,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-      ],
+            const SizedBox(height: 18),
+
+            // 6. Active Spotlight Card
+            _buildActiveSpotlightCard(p, isDark, activeStage, currentIdx),
+          ],
+        );
+
+        if (constraints.hasBoundedHeight) {
+          return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: content,
+          );
+        }
+
+        return content;
+      },
     );
   }
 
-  Widget _buildHeaderBar(BuildContext context, AppPalette p, int currentIdx) {
-    final statusColor = widget.status.color;
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOP SECTION HEADER (WEB HORIZONTAL)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildTopHeader(
+    BuildContext context,
+    AppPalette p,
+    bool isDark,
+    int currentIdx,
+  ) {
+    final stepText = currentIdx >= 0
+        ? 'Step ${currentIdx + 1} of ${_productionStages.length} Active'
+        : widget.status.label;
 
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.15),
+            color: isDark
+                ? const Color(0xFF064E3B).withValues(alpha: 0.4)
+                : const Color(0xFFECFDF5),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: statusColor.withValues(alpha: 0.3),
-              width: 1,
+              color: isDark
+                  ? const Color(0xFF059669).withValues(alpha: 0.3)
+                  : const Color(0xFFA7F3D0),
             ),
           ),
-          child: Icon(
-            _getOverallStatusIcon(widget.status),
+          child: const Icon(
+            Icons.tune_rounded,
             size: 18,
-            color: statusColor,
+            color: Color(0xFF059669),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'CURRENT STATUS: ${widget.status.label.toUpperCase()}',
+                'ORDER PROGRESS',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: statusColor,
+                  color: isDark ? Colors.white : const Color(0xFF064E3B),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
-                _getStatusSubtitle(widget.status),
+                stepText,
                 style: TextStyle(
                   fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
                   color: p.textMuted,
-                  height: 1.2,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        if (widget.showStatusDropdown && widget.onStatusSelected != null) ...[
-          const SizedBox(width: 8),
-          _buildStatusMenu(context, p),
-        ],
       ],
     );
   }
 
-  Widget _buildContinuousTrack({
-    required double trackLeft,
-    required double trackWidth,
-    required double nodeSize,
-    required bool isDark,
-  }) {
-    const trackHeight = 6.0;
-    final topOffset = (nodeSize - trackHeight) / 2;
+  // ─────────────────────────────────────────────────────────────────────────
+  // CURRENT STATUS BANNER
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildCurrentStatusBanner(
+    BuildContext context,
+    AppPalette p,
+    bool isDark,
+    int currentIdx,
+  ) {
+    final isCompletedOverall = widget.status == Status.completed;
 
-    return Positioned(
-      left: trackLeft,
-      top: topOffset,
-      width: trackWidth,
-      height: trackHeight,
-      child: AnimatedBuilder(
-        animation: _progressAnimation,
-        builder: (context, _) {
-          final progress = _progressAnimation.value.clamp(0.0, 1.0);
-          final filledWidth = trackWidth * progress;
+    final Color bg = isCompletedOverall
+        ? (isDark
+            ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+            : const Color(0xFFECFDF5))
+        : (isDark
+            ? const Color(0xFF064E3B).withValues(alpha: 0.22)
+            : const Color(0xFFF0FDF4));
+    final Color border = isCompletedOverall
+        ? (isDark
+            ? const Color(0xFF059669).withValues(alpha: 0.4)
+            : const Color(0xFFA7F3D0))
+        : (isDark
+            ? const Color(0xFF047857).withValues(alpha: 0.35)
+            : const Color(0xFFBBF7D0));
 
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 1. Sleek Background Track
-              Container(
-                width: trackWidth,
-                height: trackHeight,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF332D26)
-                      : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(trackHeight / 2),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border, width: 1.2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: Color(0xFF059669),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 19,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CURRENT STATUS: ${widget.status.label.toUpperCase()}',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: isDark ? Colors.white : const Color(0xFF064E3B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-
-              // 2. Continuous Animated Gradient Progress Fill
-              if (filledWidth > 0)
-                Container(
-                  width: filledWidth,
-                  height: trackHeight,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(trackHeight / 2),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF10B981), // Emerald Green
-                        Color(0xFF059669), // Deep Green
-                        Color(0xFFF59E0B), // Radiant Amber / Gold tip
-                      ],
-                      stops: [0.0, 0.75, 1.0],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.45),
-                        blurRadius: 6,
-                        spreadRadius: 0.5,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  _getStatusSubtitle(widget.status),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? const Color(0xFF6EE7B7)
+                        : const Color(0xFF047857),
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _formatLastUpdated(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white54 : const Color(0xFF059669),
                   ),
                 ),
-
-              // 3. Glowing Pulse Bead at the Leading Tip
-              if (filledWidth > 0 && progress < 1.0)
-                Positioned(
-                  left: (filledWidth - 5).clamp(0.0, trackWidth - 10),
-                  top: -2.5,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const RadialGradient(
-                        colors: [
-                          Color(0xFFFEF08A),
-                          Color(0xFFF59E0B),
-                        ],
-                      ),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.9),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+          if (widget.showStatusDropdown && widget.onStatusSelected != null) ...[
+            const SizedBox(width: 10),
+            _buildUpdateDropdownPill(context, p, isDark),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildStageNode({
-    required Status stage,
-    required int index,
-    required AppPalette p,
-    required bool isDark,
-    required double nodeSize,
-  }) {
-    final currentIdx = _currentProductionIndex;
-    final isCompleted = currentIdx >= 0 && index < currentIdx;
-    final isCurrent = currentIdx == index;
-
-    Color textColor;
-    FontWeight textWeight;
-
-    if (isCompleted) {
-      textColor = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857);
-      textWeight = FontWeight.w600;
-    } else if (isCurrent) {
-      textColor = isDark ? AppColors.gold : const Color(0xFFB45309);
-      textWeight = FontWeight.w800;
-    } else {
-      textColor = p.textMuted;
-      textWeight = FontWeight.w500;
-    }
-
-    final isInteractive = widget.onStatusSelected != null;
-
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Node circle container with consistent height
-        SizedBox(
-          height: nodeSize,
-          child: Center(
-            child: _buildCircle(
-              stage: stage,
-              index: index,
-              isCompleted: isCompleted,
-              isCurrent: isCurrent,
-              isDark: isDark,
-              p: p,
-              nodeSize: nodeSize,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 9),
-
-        // Step indicator tag: "STEP 1", "STEP 2", etc.
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-          decoration: BoxDecoration(
-            color: isCurrent
-                ? AppColors.gold.withValues(alpha: 0.2)
-                : (isCompleted
-                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                    : (isDark
-                        ? const Color(0xFF2C2824)
-                        : const Color(0xFFE2E8F0))),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            'STEP ${index + 1}',
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-              color: isCurrent
-                  ? AppColors.gold
-                  : (isCompleted
-                      ? const Color(0xFF10B981)
-                      : p.textMuted),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 4),
-
-        // Stage Name Label
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Text(
-            stage.label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: textWeight,
-              color: textColor,
-              height: 1.15,
-            ),
-          ),
-        ),
-
-        // ACTIVE Badge indicator
-        if (isCurrent) ...[
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-              ),
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: const Text(
-              'ACTIVE',
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-
-    if (isInteractive) {
-      return Tooltip(
-        message: '${stage.label} (Step ${index + 1} of 7) • Tap to set status',
-        child: InkWell(
-          onTap: () => widget.onStatusSelected!(stage),
-          borderRadius: BorderRadius.circular(10),
-          hoverColor: AppColors.gold.withValues(alpha: 0.08),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: content,
-          ),
-        ),
-      );
-    }
-
-    return content;
-  }
-
-  Widget _buildCircle({
-    required Status stage,
-    required int index,
-    required bool isCompleted,
-    required bool isCurrent,
-    required bool isDark,
-    required AppPalette p,
-    required double nodeSize,
-  }) {
-    if (isCompleted) {
-      // 1. Completed Stage Node
-      return Container(
-        width: nodeSize,
-        height: nodeSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF34D399), Color(0xFF059669)],
-          ),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.95),
-            width: 2.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.45),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.check_rounded,
-            size: 20,
-            color: Colors.white,
-          ),
-        ),
-      );
-    } else if (isCurrent) {
-      // 2. Active Pulsing Stage Node
-      return AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, _) {
-          final pulse = _pulseAnimation.value;
-
-          return Container(
-            width: nodeSize,
-            height: nodeSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
-              ),
-              border: Border.all(
-                color: Colors.white,
-                width: 2.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(
-                    alpha: 0.35 + 0.35 * pulse,
-                  ),
-                  blurRadius: 8 + 8 * pulse,
-                  spreadRadius: 1 + 2.5 * pulse,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Icon(
-                _stageIcons[stage] ?? Icons.circle,
-                size: 19,
-                color: Colors.white,
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // 3. Upcoming Stage Node
-      return Container(
-        width: nodeSize - 4,
-        height: nodeSize - 4,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDark ? const Color(0xFF221E1B) : const Color(0xFFF8FAFC),
-          border: Border.all(
-            color: isDark ? const Color(0xFF453F36) : const Color(0xFFCBD5E1),
-            width: 1.6,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            _stageIcons[stage] ?? Icons.circle,
-            size: 16,
-            color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildStatusMenu(BuildContext context, AppPalette p) {
+  Widget _buildUpdateDropdownPill(
+    BuildContext context,
+    AppPalette p,
+    bool isDark,
+  ) {
     return PopupMenuButton<Status>(
       onSelected: (newStatus) => widget.onStatusSelected?.call(newStatus),
       offset: const Offset(0, 36),
       color: p.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: p.border),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF38322A) : const Color(0xFFE2E8F0),
+        ),
       ),
-      itemBuilder: (_) => [
-        for (final s in Status.standardStatuses)
+      itemBuilder: (context) => [
+        for (final s in Status.values)
           PopupMenuItem<Status>(
             value: s,
             child: Row(
               children: [
                 Container(
-                  width: 9,
-                  height: 9,
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
                     color: s.color,
                     shape: BoxShape.circle,
@@ -883,66 +415,712 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: s == widget.status
-                          ? FontWeight.bold
+                          ? FontWeight.w700
                           : FontWeight.w500,
                       color: s == widget.status ? s.color : p.textPrimary,
                     ),
                   ),
                 ),
                 if (s == widget.status)
-                  Icon(Icons.check, size: 16, color: s.color),
+                  Icon(Icons.check_rounded, size: 16, color: s.color),
               ],
             ),
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: p.chipFill,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: p.border),
+          color: isDark
+              ? const Color(0xFF064E3B).withValues(alpha: 0.5)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF059669).withValues(alpha: 0.45),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Update Status',
+              'Update',
               style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: p.textPrimary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF059669),
               ),
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.arrow_drop_down, size: 16, color: p.textPrimary),
+            SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 17,
+              color: Color(0xFF059669),
+            ),
           ],
         ),
       ),
     );
   }
 
-  static IconData _getOverallStatusIcon(Status s) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // HORIZONTAL TIMELINE WITH CONNECTED ANIMATED FILL LINE
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildHorizontalTimeline(AppPalette p, bool isDark, int currentIdx) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final timelineWidth = availableWidth < 720.0 ? 720.0 : availableWidth;
+
+        final timelineWidget = SizedBox(
+          width: timelineWidth,
+          child: AnimatedBuilder(
+            animation: _progressAnimation,
+            builder: (context, _) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 1. Precise Custom-Painted Connecting Line with Animated Fill
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _HorizontalTimelineLinePainter(
+                        stageCount: _productionStages.length,
+                        progress: _progressAnimation.value,
+                        isDark: isDark,
+                        nodeSize: 38.0,
+                      ),
+                    ),
+                  ),
+
+                  // 2. The 7 Stage Node Columns
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (int i = 0; i < _productionStages.length; i++)
+                        Expanded(
+                          child: _buildHorizontalStageColumn(
+                            stage: _productionStages[i],
+                            index: i,
+                            currentIdx: currentIdx,
+                            p: p,
+                            isDark: isDark,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+
+        if (availableWidth < 720.0) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: timelineWidget,
+          );
+        }
+
+        return timelineWidget;
+      },
+    );
+  }
+
+  Widget _buildHorizontalStageColumn({
+    required Status stage,
+    required int index,
+    required int currentIdx,
+    required AppPalette p,
+    required bool isDark,
+  }) {
+    final isCompleted = currentIdx >= 0 && index < currentIdx;
+    final isCurrent = currentIdx == index;
+    final timestamp = _timestampForStage(stage, index, currentIdx);
+
+    return InkWell(
+      onTap: widget.onStatusSelected != null
+          ? () => widget.onStatusSelected?.call(stage)
+          : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Circular Node
+            _buildNodeCircle(
+              stage: stage,
+              isCompleted: isCompleted,
+              isCurrent: isCurrent,
+              isDark: isDark,
+            ),
+
+            const SizedBox(height: 10),
+
+            // Step Badge + Active Badge
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? const Color(0xFFFEF3C7)
+                        : (isCompleted
+                            ? const Color(0xFFECFDF5)
+                            : (isDark
+                                ? const Color(0xFF26221E)
+                                : const Color(0xFFF1F5F9))),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    'STEP ${index + 1}',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: isCurrent
+                          ? const Color(0xFFD97706)
+                          : (isCompleted
+                              ? const Color(0xFF059669)
+                              : (isDark
+                                  ? Colors.white38
+                                  : const Color(0xFF64748B))),
+                    ),
+                  ),
+                ),
+                if (isCurrent)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Color(0xFFD97706),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 6),
+
+            // Stage Title
+            Text(
+              stage.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isCurrent
+                    ? FontWeight.w800
+                    : (isCompleted ? FontWeight.w700 : FontWeight.w600),
+                color: isCurrent
+                    ? (isDark ? AppColors.gold : const Color(0xFF92400E))
+                    : (isCompleted
+                        ? (isDark
+                            ? const Color(0xFF34D399)
+                            : const Color(0xFF065F46))
+                        : (isDark ? Colors.white70 : const Color(0xFF475569))),
+                height: 1.25,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // Timestamp
+            Text(
+              timestamp,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                color: isCurrent
+                    ? const Color(0xFFD97706)
+                    : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNodeCircle({
+    required Status stage,
+    required bool isCompleted,
+    required bool isCurrent,
+    required bool isDark,
+  }) {
+    const double size = 38.0;
+
+    if (isCompleted) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF1E1B16) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF059669).withValues(alpha: 0.25),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF10B981), Color(0xFF059669)],
+              ),
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 19,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    } else if (isCurrent) {
+      return AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, _) {
+          final pulse = _pulseAnimation.value;
+
+          return Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? const Color(0xFF1E1B16) : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(
+                    alpha: 0.25 + 0.3 * pulse,
+                  ),
+                  blurRadius: 6 + 6 * pulse,
+                  spreadRadius: 1 + 2 * pulse,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+                  ),
+                ),
+                child: Icon(
+                  _stageIcons[stage] ?? Icons.autorenew_rounded,
+                  size: 17,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Upcoming stage node
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDark ? const Color(0xFF1E1B16) : Colors.white,
+        border: Border.all(
+          color: isDark ? const Color(0xFF3B352D) : const Color(0xFFCBD5E1),
+          width: 2.0,
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark ? const Color(0xFF474036) : const Color(0xFFCBD5E1),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ACTIVE SPOTLIGHT CARD (WEB)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildActiveSpotlightCard(
+    AppPalette p,
+    bool isDark,
+    Status activeStage,
+    int currentIdx,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF241D12) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(
+              _stageIcons[activeStage] ?? Icons.circle,
+              size: 22,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        currentIdx >= 0
+                            ? 'STEP ${currentIdx + 1} OF ${_productionStages.length} IN PRODUCTION'
+                            : 'STAGE IN PRODUCTION',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: Color(0xFFD97706),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Current Stage: ${activeStage.label}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF1E1B16),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _getDetailedStageDescription(activeStage),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ON HOLD & CANCELLED BANNERS
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildOnHoldBanner(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0x33EA580C) : const Color(0xFFFFEDD5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0x66EA580C) : const Color(0xFFFED7AA),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.pause_circle_filled_rounded,
+            color: Color(0xFFEA580C),
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Order is On Hold',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Workshop production is paused. Resume to continue the workflow.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFC2410C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.onStatusSelected != null || widget.onResumeOrder != null)
+            ElevatedButton.icon(
+              onPressed: () {
+                if (widget.onResumeOrder != null) {
+                  widget.onResumeOrder!();
+                } else {
+                  widget.onStatusSelected?.call(Status.confirmed);
+                }
+              },
+              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+              label: const Text('Resume Order'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancelledBanner(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0x33DC2626) : const Color(0xFFFEE2E2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0x66DC2626) : const Color(0xFFFCA5A5),
+        ),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 22),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Order Cancelled',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF7F1D1D),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'This order was cancelled and is excluded from active production.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFB91C1C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TIMESTAMPS & DESCRIPTIONS HELPERS
+  // ─────────────────────────────────────────────────────────────────────────
+  String _timestampForStage(Status stage, int index, int currentIdx) {
+    for (final h in widget.statusHistory) {
+      if (h.newStatus == stage) {
+        return _formatTimelineTime(h.updatedAt);
+      }
+    }
+
+    if (index == currentIdx) {
+      return 'In Progress';
+    }
+
+    if (index < currentIdx) {
+      if (index == 0 && widget.customer?.orderDate != null) {
+        return _formatTimelineTime(widget.customer!.orderDate);
+      }
+      if (widget.customer?.createdAt != null) {
+        final approx =
+            widget.customer!.createdAt!.add(Duration(hours: index * 6));
+        return _formatTimelineTime(approx);
+      }
+      return 'Done';
+    }
+
+    return 'Upcoming';
+  }
+
+  String _formatTimelineTime(DateTime dt) {
+    final month = const [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ][dt.month - 1];
+    final day = dt.day.toString().padLeft(2, '0');
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$month $day, $hour:$minute $ampm';
+  }
+
+  String _formatLastUpdated() {
+    final DateTime lastDt;
+    if (widget.statusHistory.isNotEmpty) {
+      lastDt = widget.statusHistory.last.updatedAt;
+    } else if (widget.customer?.createdAt != null) {
+      lastDt = widget.customer!.createdAt!;
+    } else {
+      lastDt = DateTime.now();
+    }
+
+    final now = DateTime.now();
+    final isToday = lastDt.year == now.year &&
+        lastDt.month == now.month &&
+        lastDt.day == now.day;
+    final hour = lastDt.hour % 12 == 0 ? 12 : lastDt.hour % 12;
+    final minute = lastDt.minute.toString().padLeft(2, '0');
+    final ampm = lastDt.hour >= 12 ? 'PM' : 'AM';
+
+    if (isToday) {
+      return 'Last updated today at $hour:$minute $ampm';
+    }
+    final month = const [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ][lastDt.month - 1];
+    return 'Last updated $month ${lastDt.day} at $hour:$minute $ampm';
+  }
+
+  static String _getDetailedStageDescription(Status s) {
     switch (s) {
       case Status.pending:
-        return Icons.hourglass_empty_rounded;
+        return 'Order received. Awaiting confirmation & review.';
       case Status.confirmed:
-        return Icons.verified_rounded;
-      case Status.onHold:
-        return Icons.pause_circle_rounded;
-      case Status.cancelled:
-        return Icons.cancel_rounded;
+        return 'Customer order verified. Ready for editing pipeline.';
       case Status.editingProgress:
-        return Icons.brush_rounded;
-      case Status.dispatchForPrinting:
-        return Icons.local_shipping_rounded;
-      case Status.printReceived:
-        return Icons.inventory_2_rounded;
-      case Status.framingProcess:
-        return Icons.crop_square_rounded;
-      case Status.completed:
-        return Icons.check_circle_rounded;
       case Status.inProgress:
-        return Icons.autorenew_rounded;
+        return 'Digital artisan photo retouching & layout refinement.';
+      case Status.dispatchForPrinting:
+        return 'Artwork dispatched to high-resolution print studio.';
+      case Status.printReceived:
+        return 'Prints received at workshop. Prepping frame mounts.';
+      case Status.framingProcess:
+        return 'Custom wooden moulding cut, mounted, and glazing fitted.';
+      case Status.completed:
+        return 'Framing completed, QA passed & delivered.';
+      case Status.onHold:
+        return 'Workshop operations paused. Awaiting resumption.';
+      case Status.cancelled:
+        return 'Order is cancelled and archived from production.';
     }
   }
 
@@ -957,17 +1135,111 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       case Status.cancelled:
         return 'Order has been cancelled.';
       case Status.editingProgress:
+      case Status.inProgress:
         return 'Artwork & photo retouching in progress.';
       case Status.dispatchForPrinting:
         return 'Artwork dispatched to high-resolution print studio.';
       case Status.printReceived:
         return 'Prints received at workshop. Prepping frame mounts.';
       case Status.framingProcess:
-        return 'Custom artisan framing, matting & glass fitting.';
+        return 'Custom wooden moulding cut, mounted, and glazing fitted.';
       case Status.completed:
         return 'Framing completed, QA passed & delivered.';
-      case Status.inProgress:
-        return 'Order is currently in workshop production.';
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CUSTOM PAINTER FOR CONTINUOUS CONNECTING LINE WITH ANIMATED PROGRESS FILL
+// ─────────────────────────────────────────────────────────────────────────
+class _HorizontalTimelineLinePainter extends CustomPainter {
+  final int stageCount;
+  final double progress; // 0.0 to 1.0
+  final bool isDark;
+  final double nodeSize;
+
+  _HorizontalTimelineLinePainter({
+    required this.stageCount,
+    required this.progress,
+    required this.isDark,
+    this.nodeSize = 38.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (stageCount <= 1) return;
+
+    final itemWidth = size.width / stageCount;
+    final startX = itemWidth / 2;
+    final totalTrackLength = itemWidth * (stageCount - 1);
+    final endX = startX + totalTrackLength;
+    final centerY = nodeSize / 2;
+
+    // 1. Inactive background track line
+    final trackPaint = Paint()
+      ..color = isDark ? const Color(0xFF332D26) : const Color(0xFFE2E8F0)
+      ..strokeWidth = 5.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      Offset(startX, centerY),
+      Offset(endX, centerY),
+      trackPaint,
+    );
+
+    // 2. Animated Progress fill line
+    if (progress > 0.0) {
+      final fillLength = totalTrackLength * progress.clamp(0.0, 1.0);
+      final fillEndX = startX + fillLength;
+
+      // Gradient shader for the filled line
+      final gradient = LinearGradient(
+        colors: [
+          const Color(0xFF10B981), // Emerald green at start
+          const Color(0xFF059669),
+          if (progress > 0.4) const Color(0xFFF59E0B), // Warm amber near active node
+        ],
+      );
+
+      final fillRect = Rect.fromPoints(
+        Offset(startX, centerY - 2.5),
+        Offset(fillEndX, centerY + 2.5),
+      );
+
+      final fillPaint = Paint()
+        ..shader = gradient.createShader(fillRect)
+        ..strokeWidth = 5.0
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+
+      // Draw subtle glow shadow under filled line
+      final glowPaint = Paint()
+        ..color = const Color(0xFF10B981).withValues(alpha: isDark ? 0.25 : 0.2)
+        ..strokeWidth = 9.0
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(
+        Offset(startX, centerY),
+        Offset(fillEndX, centerY),
+        glowPaint,
+      );
+
+      // Draw the actual filled line
+      canvas.drawLine(
+        Offset(startX, centerY),
+        Offset(fillEndX, centerY),
+        fillPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HorizontalTimelineLinePainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.stageCount != stageCount;
   }
 }

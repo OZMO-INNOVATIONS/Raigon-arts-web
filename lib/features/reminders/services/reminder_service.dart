@@ -1,9 +1,11 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:raigon_art/core/network/api_client.dart';
 import 'package:raigon_art/core/network/api_constants.dart';
+import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 
 class ReminderService {
@@ -24,10 +26,9 @@ class ReminderService {
   /// Loads all reminders from local storage and syncs with Supabase (priority) and REST API.
   Future<List<CustomerReminder>> getReminders() async {
     final localList = await _loadLocalReminders();
+    final localMap = <String, CustomerReminder>{for (final r in localList) r.id: r};
     final mergedMap = <String, CustomerReminder>{};
-    for (final r in localList) {
-      mergedMap[r.id] = r;
-    }
+    bool remoteSucceeded = false;
 
     // 1. Remote fetch from Supabase (shared cloud PostgreSQL database for mobile & web)
     try {
@@ -36,25 +37,32 @@ class ReminderService {
         final res = await client
             .from('reminders')
             .select()
+            .neq('is_deleted', true)
             .order('reminder_date', ascending: true);
 
         final remoteList = (res as List)
-            .map((row) => CustomerReminder.fromJson(Map<String, dynamic>.from(row as Map)))
+            .map(
+              (row) => CustomerReminder.fromJson(
+                Map<String, dynamic>.from(row as Map),
+              ),
+            )
             .toList();
 
         for (final r in remoteList) {
-          mergedMap[r.id] = r;
+          final existing = localMap[r.id];
+          mergedMap[r.id] = existing != null ? _merge(existing, r) : r;
         }
+        remoteSucceeded = true;
       }
     } catch (e) {
       debugPrint('[ReminderService] Supabase remote fetch notice: $e');
     }
 
-    // 2. Remote fetch from REST API (with short timeout so cold starts never block UI)
+    // 2. Remote fetch from REST API (with resilient timeout for cold starts)
     try {
       final res = await ApiClient()
           .get(ApiConstants.reminders)
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 15));
 
       List<dynamic>? rawList;
       if (res is List) {
@@ -65,20 +73,41 @@ class ReminderService {
 
       if (rawList != null) {
         final apiList = rawList
-            .map((item) => CustomerReminder.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map(
+              (item) => CustomerReminder.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ),
+            )
             .toList();
 
         for (final r in apiList) {
-          mergedMap[r.id] = r;
+          final existing = localMap[r.id] ?? mergedMap[r.id];
+          mergedMap[r.id] = existing != null ? _merge(existing, r) : r;
         }
+        remoteSucceeded = true;
       }
     } catch (e) {
       debugPrint('[ReminderService] REST API fetch notice: $e');
     }
 
-    final merged = mergedMap.values.toList();
-    await _saveLocalReminders(merged);
-    return merged;
+    List<CustomerReminder> result;
+    if (remoteSucceeded) {
+      // Also keep any local-only pending reminders that haven't been synced or deleted
+      for (final r in localList) {
+        if (!mergedMap.containsKey(r.id)) {
+          final age = DateTime.now().difference(r.createdAt);
+          if (age.inMinutes < 2) {
+            mergedMap[r.id] = r;
+          }
+        }
+      }
+      result = mergedMap.values.toList();
+    } else {
+      result = localList;
+    }
+
+    await _saveLocalReminders(result);
+    return result;
   }
 
   /// Saves or updates a reminder.
@@ -99,15 +128,14 @@ class ReminderService {
         await client.from('reminders').upsert(reminder.toSupabaseMap());
       }
     } catch (e) {
-      debugPrint('[ReminderService] Supabase upsert notice: $e (stored locally)');
+      debugPrint(
+        '[ReminderService] Supabase upsert notice: $e (stored locally)',
+      );
     }
 
     // Sync to REST API
     try {
-      await ApiClient().post(
-        ApiConstants.reminders,
-        body: reminder.toJson(),
-      );
+      await ApiClient().post(ApiConstants.reminders, body: reminder.toJson());
     } catch (e) {
       debugPrint('[ReminderService] REST API save notice: $e');
     }
@@ -135,12 +163,15 @@ class ReminderService {
     try {
       final client = _supabase;
       if (client != null) {
-        await client.from('reminders').update({
-          'is_completed': true,
-          'status': 'completed',
-          'completed_at': updated.completedAt!.toIso8601String(),
-          'completed_by': completedBy,
-        }).eq('id', id);
+        await client
+            .from('reminders')
+            .update({
+              'is_completed': true,
+              'status': 'completed',
+              'completed_at': updated.completedAt!.toIso8601String(),
+              'completed_by': completedBy,
+            })
+            .eq('id', id);
       }
     } catch (e) {
       debugPrint('[ReminderService] Supabase complete update notice: $e');
@@ -172,24 +203,10 @@ class ReminderService {
       throw StateError('Reminder not found: $id');
     }
 
-    final updated = CustomerReminder(
-      id: list[index].id,
-      title: list[index].title,
-      customerName: list[index].customerName,
-      customerId: list[index].customerId,
-      orderId: list[index].orderId,
-      description: list[index].description,
-      reminderDate: list[index].reminderDate,
-      reminderTime: list[index].reminderTime,
-      assignedStaff: list[index].assignedStaff,
-      priority: list[index].priority,
+    final updated = list[index].copyWith(
       isCompleted: false,
       completedAt: null,
       completedBy: null,
-      createdBy: list[index].createdBy,
-      createdAt: list[index].createdAt,
-      phone: list[index].phone,
-      region: list[index].region,
     );
 
     list[index] = updated;
@@ -198,12 +215,15 @@ class ReminderService {
     try {
       final client = _supabase;
       if (client != null) {
-        await client.from('reminders').update({
-          'is_completed': false,
-          'status': 'pending',
-          'completed_at': null,
-          'completed_by': null,
-        }).eq('id', id);
+        await client
+            .from('reminders')
+            .update({
+              'is_completed': false,
+              'status': 'pending',
+              'completed_at': null,
+              'completed_by': null,
+            })
+            .eq('id', id);
       }
     } catch (e) {
       debugPrint('[ReminderService] Supabase reopen notice: $e');
@@ -236,7 +256,10 @@ class ReminderService {
     try {
       final client = _supabase;
       if (client != null) {
-        await client.from('reminders').delete().eq('id', id);
+        await client.from('reminders').update({
+          'is_deleted': true,
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', id);
       }
     } catch (e) {
       debugPrint('[ReminderService] Supabase delete notice: $e');
@@ -260,7 +283,11 @@ class ReminderService {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         return decoded
-            .map((e) => CustomerReminder.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map(
+              (e) => CustomerReminder.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
             .toList();
       }
     } catch (e) {
@@ -291,5 +318,43 @@ class ReminderService {
     } catch (_) {
       return true;
     }
+  }
+
+  static CustomerReminder _merge(
+    CustomerReminder local,
+    CustomerReminder remote,
+  ) {
+    final mergedNotes = <OrderVoiceNote>[];
+    if (remote.effectiveVoiceNotes.isNotEmpty) {
+      for (final rNote in remote.effectiveVoiceNotes) {
+        final match = local.effectiveVoiceNotes.where(
+          (l) => l.id == rNote.id || (l.url.isNotEmpty && l.url == rNote.url),
+        );
+        final localMatch = match.isNotEmpty ? match.first : null;
+        mergedNotes.add(
+          rNote.copyWith(
+            localBytes: rNote.localBytes ?? localMatch?.localBytes,
+          ),
+        );
+      }
+    } else {
+      mergedNotes.addAll(local.effectiveVoiceNotes);
+    }
+
+    final voiceUrl = remote.voiceUrl.isNotEmpty
+        ? remote.voiceUrl
+        : (mergedNotes.isNotEmpty ? mergedNotes.first.url : local.voiceUrl);
+    final voiceDur = remote.voiceDurationSeconds > 0
+        ? remote.voiceDurationSeconds
+        : (mergedNotes.isNotEmpty
+            ? mergedNotes.first.durationSeconds
+            : local.voiceDurationSeconds);
+
+    return remote.copyWith(
+      voiceUrl: voiceUrl,
+      voiceDurationSeconds: voiceDur,
+      voiceBytes: remote.voiceBytes ?? local.voiceBytes,
+      voiceNotes: mergedNotes,
+    );
   }
 }

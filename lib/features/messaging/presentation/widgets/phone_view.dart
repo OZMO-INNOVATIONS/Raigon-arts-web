@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
-import 'package:raigon_art/core/theme/mx_theme.dart';
-import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/models/chat.dart';
 
 import 'channel_style.dart';
@@ -9,14 +7,12 @@ import 'channel_style.dart';
 class PhoneView extends StatefulWidget {
   const PhoneView({
     super.key,
-    required this.channel,
     required this.handle,
     required this.msgs,
     this.onSend,
     this.typing = false,
     this.height = 600,
   });
-  final Channel channel;
   final String handle;
   final List<ChatMsg> msgs;
   final ValueChanged<String>? onSend;
@@ -60,18 +56,14 @@ class _PhoneViewState extends State<PhoneView> {
     _c.clear();
   }
 
-  bool get ig => widget.channel.isIg;
-  Color get _bg => ig ? const Color(0xFF121212) : const Color(0xFFEFE7DD);
-  Color get _fg => ig ? Colors.white : const Color(0xFF111B21);
+  static const Color _bg = Color(0xFF121212);
+  static const Color _fg = Colors.white;
 
   Widget _bubble(ChatMsg m) {
     final mine = !m.fromBot;
     final empty = m.text.trim().isEmpty;
-    final igMine = ig && mine;
-    final bubbleColor = ig
-        ? (mine ? null : const Color(0xFF262626))
-        : (mine ? const Color(0xFFD9FDD3) : Colors.white);
-    final textColor = ig ? Colors.white : _fg;
+    final bubbleColor = mine ? null : const Color(0xFF262626);
+    const textColor = Colors.white;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Align(
@@ -86,8 +78,8 @@ class _PhoneViewState extends State<PhoneView> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: bubbleColor,
-                gradient: igMine ? ChannelColors.igBubble : null,
-                borderRadius: BorderRadius.circular(ig ? 18 : 10),
+                gradient: mine ? ChannelColors.igBubble : null,
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
                 empty ? 'Write a message' : m.text,
@@ -107,17 +99,13 @@ class _PhoneViewState extends State<PhoneView> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: ig ? const Color(0xFF363636) : Colors.white,
-                  borderRadius: BorderRadius.circular(ig ? 18 : 10),
+                  color: const Color(0xFF363636),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.link_rounded,
-                      size: 15,
-                      color: ig ? Colors.white : const Color(0xFF027EB5),
-                    ),
+                    Icon(Icons.link_rounded, size: 15, color: Colors.white),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -126,7 +114,7 @@ class _PhoneViewState extends State<PhoneView> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: ig ? Colors.white : const Color(0xFF027EB5),
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -144,7 +132,7 @@ class _PhoneViewState extends State<PhoneView> {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: ig ? const Color(0xFF262626) : Colors.white,
+        color: const Color(0xFF262626),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
@@ -156,9 +144,8 @@ class _PhoneViewState extends State<PhoneView> {
 
   @override
   Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
     final enabled = widget.onSend != null;
-    final headBg = ig ? const Color(0xFF121212) : p.waDark;
+    const headBg = Color(0xFF121212);
     return Container(
       width: 290,
       height: widget.height,
@@ -228,7 +215,7 @@ class _PhoneViewState extends State<PhoneView> {
                     const SizedBox(width: 6),
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: ig ? Colors.black : Colors.white,
+                      backgroundColor: Colors.black,
                       child: Text(
                         widget.handle.isEmpty
                             ? 'R'
@@ -239,7 +226,7 @@ class _PhoneViewState extends State<PhoneView> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: ig ? Colors.white : p.waDark,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -258,14 +245,13 @@ class _PhoneViewState extends State<PhoneView> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (!ig)
-                            Text(
-                              'online',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: .7),
-                                fontSize: 10,
-                              ),
+                          const Text(
+                            'Instagram',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
                             ),
+                          ),
                         ],
                       ),
                     ),
@@ -304,7 +290,7 @@ class _PhoneViewState extends State<PhoneView> {
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: ig ? const Color(0xFF262626) : Colors.white,
+                          color: const Color(0xFF262626),
                           borderRadius: BorderRadius.circular(22),
                         ),
                         child: TextField(
@@ -339,8 +325,7 @@ class _PhoneViewState extends State<PhoneView> {
                         height: 40,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: ig ? ChannelColors.igBubble : null,
-                          color: ig ? null : p.wa,
+                          gradient: ChannelColors.igBubble,
                         ),
                         child: const Icon(
                           Icons.send_rounded,

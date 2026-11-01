@@ -9,7 +9,6 @@ import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
 import '../widgets/channel_badge.dart';
-import '../widgets/channel_style.dart';
 import '../widgets/connect_dialog.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/phone_sim.dart';
@@ -243,7 +242,7 @@ class _BuilderPageState extends State<BuilderPage> {
 
   Future<void> _pickChannel(Channel c) async {
     if (s.accounts[c] == null) {
-      final ok = await showConnectDialog(context, s, c);
+      final ok = await showConnectDialog(context, s);
       if (!ok || !mounted) return;
     }
     setState(() {
@@ -282,7 +281,7 @@ class _BuilderPageState extends State<BuilderPage> {
             selected: channel == c,
             onTap: () => _pickChannel(c),
             padding: const EdgeInsets.all(16),
-            leading: ChannelBadge(c, size: 50),
+            leading: ChannelBadge(size: 50),
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -839,7 +838,7 @@ class _BuilderPageState extends State<BuilderPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (c != null) ...[
-            ChannelBadge(c, size: 22),
+            ChannelBadge(size: 22),
             const SizedBox(width: 8),
           ] else ...[
             const SizedBox(width: 8),
@@ -872,12 +871,11 @@ class _BuilderPageState extends State<BuilderPage> {
         ? d.keywords.first
         : switch (d.trigger) {
             TriggerType.postComment => 'Link please',
-            TriggerType.storyReply => '🔥🔥',
+            TriggerType.storyReply => 'Wow',
             TriggerType.anyMessage => 'Hi',
             TriggerType.keyword => '',
           };
     return PhoneView(
-      channel: c,
       handle: handle,
       height: height,
       msgs: [
@@ -891,7 +889,7 @@ class _BuilderPageState extends State<BuilderPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // Panel tint follows the chosen channel; falls back to the app gold.
-    final tint = channel?.brandColor ?? p.accent;
+    final tint = p.accent;
     return Theme(
       // Focus rings, selection and outlined buttons follow the app accent.
       data: theme.copyWith(

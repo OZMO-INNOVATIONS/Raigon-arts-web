@@ -122,13 +122,12 @@ class AvatarWithBadge extends StatelessWidget {
   const AvatarWithBadge({
     super.key,
     required this.label,
-    required this.channel,
+    required Channel channel,
     this.size = 44,
     this.imageUrl,
   });
 
   final String label;
-  final Channel channel;
   final double size;
   final String? imageUrl;
 
@@ -138,12 +137,9 @@ class AvatarWithBadge extends StatelessWidget {
     final avatar = ChatAvatar(
       label,
       size: size,
-      gradient: channel.isIg
-          ? ChannelColors.igGradient
-          : ChannelColors.waGradient,
+      gradient: ChannelColors.igGradient,
       imageUrl: imageUrl,
     );
-    if (!channel.isIg) return avatar;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -158,7 +154,7 @@ class AvatarWithBadge extends StatelessWidget {
               color: p.surface,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: ChannelBadge(channel, size: size >= 44 ? 18 : 16),
+            child: ChannelBadge(size: size >= 44 ? 18 : 16),
           ),
         ),
       ],
@@ -202,7 +198,7 @@ class MessagesPanelHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Instagram & WhatsApp conversations',
+                  'Instagram conversations',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: p.textMuted, fontSize: 12.5),
@@ -260,6 +256,8 @@ class ChannelTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final selected = active == Channel.instagram;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -268,43 +266,21 @@ class ChannelTabs extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: p.border),
       ),
-      child: Row(
-        children: [Expanded(child: _tab(context, p, Channel.instagram))],
-      ),
-    );
-  }
-
-  Widget _tab(BuildContext context, AppPalette p, Channel channel) {
-    final selected = channel == active;
-    final isInstagram = channel.isIg;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final brandColor = isInstagram ? ChannelColors.ig : ChannelColors.waDeep;
-
-    final brandGradient = channel.brandGradient;
-    final label = isInstagram ? 'Instagram' : 'WhatsApp';
-
-    final lightSelectedColor = isInstagram
-        ? const Color(0xFFFCE7F3)
-        : const Color(0xFFDCFCE7);
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => onChanged(channel),
+        onTap: () => onChanged(Channel.instagram),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: selected
-                ? (isDark ? null : lightSelectedColor)
+            color: selected && !isDark
+                ? const Color(0xFFFCE7F3)
                 : Colors.transparent,
-            gradient: selected && isDark ? brandGradient : null,
+            gradient: selected && isDark ? ChannelColors.igBubble : null,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? brandColor.withValues(alpha: 0.35)
+                  ? ChannelColors.ig.withValues(alpha: 0.35)
                   : Colors.transparent,
             ),
           ),
@@ -312,20 +288,16 @@ class ChannelTabs extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              ChannelBadge(channel, size: 22),
+              const ChannelBadge(size: 22),
               const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    color: selected
-                        ? (isDark ? Colors.white : brandColor)
-                        : brandColor,
-                  ),
+              Text(
+                'Instagram',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected
+                      ? (isDark ? Colors.white : ChannelColors.ig)
+                      : ChannelColors.ig,
                 ),
               ),
               if (selected && badge > 0) ...[
@@ -336,7 +308,7 @@ class ChannelTabs extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    gradient: isDark ? null : brandGradient,
+                    gradient: isDark ? null : ChannelColors.igBubble,
                     color: isDark ? Colors.white.withValues(alpha: 0.22) : null,
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -551,48 +523,24 @@ class ConversationTile extends StatelessWidget {
                             ),
                           ),
                           if (unread)
-                            isInstagram
-                                ? Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFFFEDA75),
-                                          Color(0xFFFA7E1E),
-                                          Color(0xFFD62976),
-                                          Color(0xFF962FBF),
-                                          Color(0xFF4F5BD5),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    constraints: const BoxConstraints(
-                                      minWidth: 20,
-                                      minHeight: 20,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF25D366),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      unreadCount > 99 ? '99+' : '$unreadCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFFFEDA75),
+                                    Color(0xFFFA7E1E),
+                                    Color(0xFFD62976),
+                                    Color(0xFF962FBF),
+                                    Color(0xFF4F5BD5),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],

@@ -32,7 +32,6 @@ void _log(String message, {Object? error, StackTrace? stackTrace}) {
   }
 }
 
-// Opens builder screen for creating or editing an automation.
 void openBuilder(
   BuildContext context,
   MessagingAutomationProvider s, {
@@ -50,7 +49,6 @@ void openBuilder(
   );
 }
 
-// Displays interactive phone simulator dialog to test an automation.
 void showTest(
   BuildContext context,
   MessagingAutomationProvider s,
@@ -155,279 +153,331 @@ class _AutomationsPageState extends State<AutomationsPage> {
     final shown = _filtered();
 
     return PageShell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (s.automationError != null)
-            _Banner(
-              text: 'Couldn’t sync with the server. Showing saved data.',
-              onRetry: s.loadAutomations,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Page heading
+            Text(
+              'Messaging Automation',
+              style: TextStyle(
+                fontSize: 27,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.6,
+                color: p.textPrimary,
+              ),
             ),
-          if (s.loadingAutomations)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  minHeight: 3,
-                  color: p.accent,
-                  backgroundColor: p.accentSoft,
+            const SizedBox(height: 5),
+            Text(
+              'Manage your Instagram conversations and automate customer interactions.',
+              style: TextStyle(fontSize: 13.5, height: 1.4, color: p.textMuted),
+            ),
+            const SizedBox(height: 22),
+
+            if (s.automationError != null)
+              _Banner(
+                text: 'Couldn’t sync with the server. Showing saved data.',
+                onRetry: s.loadAutomations,
+              ),
+
+            if (s.loadingAutomations)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    color: p.accent,
+                    backgroundColor: p.accentSoft,
+                  ),
                 ),
               ),
-            ),
-          _ConnectPanel(s: s),
-          const SizedBox(height: 22),
-          if (!firstLoad)
-            if (empty)
-              _EmptyState(s: s)
-            else ...[
-              _FilterBar(
-                status: _status,
-                channel: _channel,
-                controller: _search,
-                onStatus: (v) => setState(() => _status = v),
-                onChannel: (v) => setState(() => _channel = v),
-                onQuery: (v) => setState(() => _query = v),
-              ),
-              const SizedBox(height: 16),
-              if (shown.isEmpty)
-                _NoMatches(onClear: _clearFilters)
-              else
-                for (final a in shown) _AutoCard(s: s, a: a),
-            ],
-        ],
+
+            _ConnectPanel(s: s),
+            const SizedBox(height: 22),
+
+            if (!firstLoad)
+              if (empty)
+                _EmptyState(s: s)
+              else ...[
+                _FilterBar(
+                  status: _status,
+                  channel: _channel,
+                  controller: _search,
+                  onStatus: (v) => setState(() => _status = v),
+                  onChannel: (v) => setState(() => _channel = v),
+                  onQuery: (v) => setState(() => _query = v),
+                ),
+                const SizedBox(height: 16),
+                if (shown.isEmpty)
+                  _NoMatches(onClear: _clearFilters)
+                else
+                  for (final a in shown) _AutoCard(s: s, a: a),
+              ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// Connect channels panel
-
 class _ConnectPanel extends StatelessWidget {
   const _ConnectPanel({required this.s});
+
   final MessagingAutomationProvider s;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Connect Instagram',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
-            color: p.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Connect your Instagram account to start automating conversations.',
-          style: TextStyle(color: p.textMuted, fontSize: 13.5),
-        ),
-        const SizedBox(height: 18),
-        LayoutBuilder(
-          builder: (context, c) {
-            Widget card(Channel ch) => _ChannelCard(
-              channel: ch,
-              account: s.accounts[ch],
-              onConnect: () async {
-                _log(
-                  'Connecting Instagram (switchAccount: ${s.accounts[ch] != null})',
-                );
-                try {
-                  await s.connectChannel(
-                    context,
-                    ch,
-                    switchAccount: s.accounts[ch] != null,
-                  );
-                } catch (e, stack) {
-                  _log(
-                    'Failed to connect ${ch.name}',
-                    error: e,
-                    stackTrace: stack,
-                  );
-                  if (context.mounted) {
-                    AppSnackBar.error(context, 'Could not connect channel: $e');
-                  }
-                }
-              },
-            );
-
-            final ig = card(Channel.instagram);
-            const why = _WhyConnect();
-
-            if (c.maxWidth >= 980) {
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(flex: 5, child: ig),
-                    const SizedBox(width: 14),
-                    const Expanded(flex: 4, child: why),
-                  ],
-                ),
-              );
-            }
-
-            if (c.maxWidth >= 700) {
-              return Column(
-                children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [Expanded(child: ig)],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  why,
-                ],
-              );
-            }
-
-            return Column(children: [ig, const SizedBox(height: 14), why]);
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _ChannelCard extends StatelessWidget {
-  const _ChannelCard({
-    required this.channel,
-    required this.account,
-    required this.onConnect,
-  });
-
-  final Channel channel;
-  final String? account;
-  final VoidCallback onConnect;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    final c = channel;
+    final account = s.accounts[Channel.instagram];
     final connected = account != null;
-    const title = 'Instagram';
-    final accountText = connected
-        ? (!account!.startsWith('@') ? '@$account' : account!)
-        : 'Not connected';
+
+    final accountText = account == null
+        ? 'Instagram account not connected'
+        : (account.startsWith('@') ? account : '@$account');
+
+    Future<void> connect() async {
+      _log('Connecting Instagram (switchAccount: false)');
+
+      try {
+        await s.connectChannel(
+          context,
+          Channel.instagram,
+          switchAccount: false,
+        );
+      } catch (e, stack) {
+        _log('Failed to connect Instagram', error: e, stackTrace: stack);
+
+        if (context.mounted) {
+          AppSnackBar.error(context, 'Could not connect Instagram: $e');
+        }
+      }
+    }
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: p.border),
         boxShadow: p.softShadow,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ChannelBadge(c, size: 60),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 650;
+
+          final accountIdentity = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: p.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: p.textPrimary,
+                const ChannelBadge(size: 48),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          accountText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: p.textPrimary,
+                          ),
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    connected
-                        ? Pill('Connected', color: p.mint, soft: p.mintSoft)
-                        : Pill(
-                            'Not connected',
-                            color: p.textMuted,
-                            soft: p.chipFill,
-                          ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  c.blurb,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: p.textMuted,
-                    fontSize: 12.5,
-                    height: 1.45,
+                      if (connected) ...[
+                        const SizedBox(width: 7),
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 15,
+                          color: Color(0xFF55C878),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Icon(
-                      connected
-                          ? Icons.check_circle_rounded
-                          : Icons.circle_outlined,
-                      size: 15,
-                      color: connected ? p.mint : p.textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        accountText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: connected ? p.textPrimary : p.textMuted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Spacer(),
-                    connected
-                        ? _PillButton(
-                            label: 'Switch account',
-                            icon: Icons.swap_horiz_rounded,
-                            foreground: p.onBrand,
-                            gradient: p.brand,
-                            onPressed: onConnect,
-                          )
-                        : _PillButton(
-                            label: 'Connect',
-                            icon: Icons.link_rounded,
-                            foreground: p.onBrand,
-                            gradient: p.brand,
-                            onPressed: onConnect,
-                          ),
-                  ],
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 6),
-          Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: connected ? null : onConnect,
-              child: Tooltip(
-                message: 'Check connection',
-                child: Icon(Icons.chevron_right_rounded, color: p.textMuted),
+          );
+
+          final status = connected
+              ? Pill(
+                  'Connected',
+                  color: p.mint,
+                  soft: p.mintSoft,
+                  icon: Icons.check_circle_rounded,
+                )
+              : _PillButton(
+                  label: 'Connect Instagram',
+                  icon: Icons.link_rounded,
+                  foreground: p.onBrand,
+                  gradient: p.brand,
+                  onPressed: connect,
+                );
+
+          final benefits = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 17, color: p.accent),
+                  const SizedBox(width: 10),
+                  Text(
+                    'What you can do',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 16),
+              _InstagramBenefit(
+                text: 'Auto-reply to messages',
+                color: p.mint,
+                textColor: p.textMuted,
+              ),
+              const SizedBox(height: 10),
+              _InstagramBenefit(
+                text: 'Trigger workflows & automations',
+                color: p.mint,
+                textColor: p.textMuted,
+              ),
+              const SizedBox(height: 10),
+              _InstagramBenefit(
+                text: 'Collect customer data',
+                color: p.mint,
+                textColor: p.textMuted,
+              ),
+              const SizedBox(height: 10),
+              _InstagramBenefit(
+                text: 'Track performance & analytics',
+                color: p.mint,
+                textColor: p.textMuted,
+              ),
+            ],
+          );
+
+          final identity = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'Instagram',
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                            status,
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          connected
+                              ? 'Your Instagram account is connected and ready to automate conversations.'
+                              : 'Connect your Instagram account to start automating conversations.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: p.textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Padding(
+                padding: const EdgeInsets.only(left: 54),
+                child: accountIdentity,
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                identity,
+                const SizedBox(height: 22),
+                Divider(color: p.border, height: 1),
+                const SizedBox(height: 20),
+                benefits,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(flex: 6, child: identity),
+              const SizedBox(width: 28),
+              Container(width: 1, height: 145, color: p.border),
+              const SizedBox(width: 28),
+              Expanded(flex: 4, child: benefits),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _InstagramBenefit extends StatelessWidget {
+  const _InstagramBenefit({
+    required this.text,
+    required this.color,
+    required this.textColor,
+  });
+
+  final String text;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.check_circle_rounded, size: 16, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: textColor,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -480,76 +530,6 @@ class _PillButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _WhyConnect extends StatelessWidget {
-  const _WhyConnect();
-
-  static const List<String> _items = [
-    'Auto-reply to messages',
-    'Trigger workflows & automations',
-    'Collect customer data',
-    'Track performance & analytics',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: p.surface.withValues(alpha: p.isDark ? .6 : .7),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: p.mint.withValues(alpha: .25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: p.chipFill,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: p.border),
-                ),
-                child: Icon(Icons.link_rounded, size: 19, color: p.textPrimary),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Why Connect?',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15.5,
-                  color: p.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          for (final t in _items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, size: 16, color: p.mint),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      t,
-                      style: TextStyle(fontSize: 12.5, color: p.textMuted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -1291,7 +1271,7 @@ class _AutoCard extends StatelessWidget {
     final tile = SizedBox(
       width: 60,
       height: 60,
-      child: Center(child: ChannelBadge(a.channel, size: 60)),
+      child: Center(child: ChannelBadge(size: 60)),
     );
 
     final info = _buildInfo(context, p, connected, isLive);

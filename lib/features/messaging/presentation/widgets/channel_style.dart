@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:raigon_art/features/messaging/models/channel.dart';
 
-/// Instagram + WhatsApp brand colors, used to make each channel instantly
-/// recognisable (builder, channels, inbox).
 class ChannelColors {
   ChannelColors._();
 
   static const ig = Color(0xFFDD2A7B);
   static const igDeep = Color(0xFF8134AF);
-  static const wa = Color(0xFF25D366);
-  static const waDeep = Color(0xFF128C52);
-  static const waDark = Color(0xFF075E54);
 
   static const igGradient = LinearGradient(
     begin: Alignment.bottomLeft,
@@ -24,22 +18,9 @@ class ChannelColors {
     end: Alignment.centerRight,
     colors: [ig, igDeep],
   );
-
-  static const waGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [wa, waDeep],
-  );
 }
 
-extension ChannelStyle on Channel {
-  /// Solid color that reads well as text / border on light and dark.
-  Color get brandColor => isIg ? ChannelColors.ig : ChannelColors.waDeep;
-  LinearGradient get brandGradient =>
-      isIg ? ChannelColors.igBubble : ChannelColors.waGradient;
-}
-
-/// Gradient button that takes its colors from the channel being edited.
+/// Gradient button using the Instagram brand colors.
 class TintedButton extends StatelessWidget {
   const TintedButton({
     super.key,
@@ -64,6 +45,7 @@ class TintedButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
     final ic = icon == null ? null : Icon(icon, size: 19, color: onColor);
+
     return Opacity(
       opacity: enabled ? 1 : .45,
       child: DecoratedBox(

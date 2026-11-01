@@ -5,15 +5,16 @@ import 'package:raigon_art/core/theme/mx_theme.dart';
 class PageShell extends StatelessWidget {
   const PageShell({
     super.key,
-    // required this.title,
-    // required this.subtitle,
     required this.child,
+    this.title,
+    this.subtitle,
     this.action,
     this.onRefresh,
   });
 
-  // final String title, subtitle;
   final Widget child;
+  final String? title;
+  final String? subtitle;
   final Widget? action;
   final Future<void> Function()? onRefresh;
 
@@ -25,40 +26,47 @@ class PageShell extends StatelessWidget {
 
     final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [],
-    );
-
-    // Header stays fixed above the scrollable content.
-    final header = Padding(
-      padding: EdgeInsets.fromLTRB(gutter, narrow ? 18 : 26, gutter, 0),
-      child: narrow
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                heading,
-                if (action != null) ...[const SizedBox(height: 16), action!],
-              ],
-            )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(child: heading),
-                ?action,
-              ],
+      children: [
+        if (title != null)
+          Text(
+            title!,
+            style: TextStyle(
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              color: p.textPrimary,
             ),
+          ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 5),
+          Text(subtitle!, style: TextStyle(fontSize: 13.5, color: p.textMuted)),
+        ],
+      ],
     );
 
     final content = Expanded(
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(gutter, narrow ? 22 : 26, gutter, 36),
-        child: SizedBox(width: double.infinity, child: child),
+        padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 36),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title != null || subtitle != null) ...[
+                heading,
+                const SizedBox(height: 16),
+              ],
+              child,
+            ],
+          ),
+        ),
       ),
     );
 
     Widget layout = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [header, content],
+      children: [content],
     );
 
     if (onRefresh != null) {
@@ -69,7 +77,6 @@ class PageShell extends StatelessWidget {
       );
     }
 
-    // On very wide screens keep the content in a readable column.
     return SizedBox(width: double.infinity, child: layout);
   }
 }

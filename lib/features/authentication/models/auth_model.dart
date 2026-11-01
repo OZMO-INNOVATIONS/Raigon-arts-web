@@ -14,7 +14,7 @@ class AuthModel {
     this.successMessage,
   });
 
-  static const String registeredPhone = '8137922114';
+  static const String registeredPhone = '9747099559';
   static const String adminEmail = 'admin@gmail.com';
   static const String adminDefaultPassword = 'admin123';
   static const String staffEmail = 'staff@gmail.com';

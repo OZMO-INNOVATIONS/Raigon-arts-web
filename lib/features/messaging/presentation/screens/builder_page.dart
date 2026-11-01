@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
-import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/features/messaging/models/automation.dart';
 import 'package:raigon_art/features/messaging/models/channel.dart';
 import 'package:raigon_art/features/messaging/models/chat.dart';
@@ -70,7 +70,7 @@ class _BuilderPageState extends State<BuilderPage> {
     super.initState();
     final e = widget.existing;
     if (e != null) {
-      channel = e.channel;
+      channel = Channel.instagram;
       trigger = e.trigger;
       kw.text = e.keywords.join(', ');
       msg.text = e.message;
@@ -82,10 +82,9 @@ class _BuilderPageState extends State<BuilderPage> {
       trigger = widget.preset ?? TriggerType.keyword;
       if (trigger == TriggerType.postComment) channel = Channel.instagram;
       if (channel == null) {
-        final connected = Channel.values
-            .where((c) => s.accounts[c] != null)
-            .toList();
-        if (connected.length == 1) channel = connected.first;
+        if (s.accounts[Channel.instagram] != null) {
+          channel = Channel.instagram;
+        }
       }
     }
   }
@@ -276,7 +275,7 @@ class _BuilderPageState extends State<BuilderPage> {
 
   Widget _stepChannel() => Column(
     children: [
-      for (final c in Channel.values)
+      for (final c in [Channel.instagram])
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: _OptionTile(
@@ -860,7 +859,7 @@ class _BuilderPageState extends State<BuilderPage> {
 
   Widget _preview({double height = 600}) {
     final c = channel ?? Channel.instagram;
-    final handle = s.accounts[c] ?? (c.isIg ? 'yourbrand' : 'Your business');
+    final handle = s.accounts[c] ?? 'yourbrand';
     if (step == 3) {
       return PhoneSim(
         key: ValueKey('sim-${c.name}'),

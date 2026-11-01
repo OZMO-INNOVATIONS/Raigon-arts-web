@@ -474,26 +474,20 @@ class _AppAudioActionSelectorState extends State<AppAudioActionSelector> {
             curve: Curves.easeOut,
             decoration: BoxDecoration(
               color: _uploadHovered
-                  ? (p.isDark
-                        ? const Color(0xFF2C2F48)
-                        : const Color(0xFFF7F5EE))
+                  ? AppColors.gold.withValues(alpha: p.isDark ? 0.16 : 0.12)
                   : (p.isDark
                         ? const Color(0xFF222438)
                         : const Color(0xFFFFFFFF)),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _uploadHovered
-                    ? p.textPrimary.withValues(alpha: 0.5)
-                    : p.border,
+                color: _uploadHovered ? AppColors.gold : p.border,
                 width: _uploadHovered ? 1.5 : 1.2,
               ),
               boxShadow: _uploadHovered
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: p.isDark ? 0.2 : 0.05,
-                        ),
-                        blurRadius: 8,
+                        color: AppColors.gold.withValues(alpha: 0.18),
+                        blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
                     ]
@@ -511,7 +505,6 @@ class _AppAudioActionSelectorState extends State<AppAudioActionSelector> {
                   ),
                   child: Row(
                     children: [
-                      // Upload Cloud Icon
                       Container(
                         width: 38,
                         height: 38,
@@ -590,7 +583,7 @@ class _AppAudioActionSelectorState extends State<AppAudioActionSelector> {
                       Icon(
                         RemixIcons.arrow_right_s_line,
                         size: 18,
-                        color: _uploadHovered ? p.textPrimary : p.textMuted,
+                        color: _uploadHovered ? AppColors.gold : p.textMuted,
                       ),
                     ],
                   ),

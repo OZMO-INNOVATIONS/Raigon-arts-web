@@ -132,17 +132,15 @@ class _TopBar extends StatelessWidget {
 
               // Show New automation only on Automations tab
               // Show New automation only on Automations tab
-              if (s.tab == 0) ...[
-                SizedBox(width: compact ? 8 : 16),
-                Tooltip(
-                  message: 'New automation',
-                  child: AppPrimaryButton(
-                    label: compact ? '' : 'New automation',
-                    icon: Icons.add_rounded,
-                    onPressed: () => openBuilder(context, s),
-                  ),
+              SizedBox(width: compact ? 8 : 16),
+              Tooltip(
+                message: 'New automation',
+                child: AppPrimaryButton(
+                  label: compact ? '' : 'New automation',
+                  icon: Icons.add_rounded,
+                  onPressed: () => openBuilder(context, s),
                 ),
-              ],
+              ),
             ],
           );
         },

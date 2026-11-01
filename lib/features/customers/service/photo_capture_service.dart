@@ -145,46 +145,59 @@ class PhotoCaptureService {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE0E7FF),
-                  child: Icon(
-                    Icons.camera_alt_rounded,
-                    color: Color(0xFF4338CA),
+
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFE0E7FF),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: Color(0xFF4338CA),
+                    ),
                   ),
+                  title: const Text(
+                    'Capture with Camera',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('Take a new photo using device camera'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop('camera'),
                 ),
-                title: const Text(
-                  'Capture with Camera',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: const Text('Take a new photo using device camera'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onTap: () => Navigator.of(ctx).pop('camera'),
               ),
+
               const SizedBox(height: 8),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFFEF3C7),
-                  child: Icon(
-                    Icons.photo_library_rounded,
-                    color: Color(0xFFB45309),
+
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFFEF3C7),
+                    child: Icon(
+                      Icons.photo_library_rounded,
+                      color: Color(0xFFB45309),
+                    ),
                   ),
+                  title: const Text(
+                    'Choose from Gallery / Files',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    multiple
+                        ? 'Select one or more photos from files or gallery'
+                        : 'Select a photo from files or gallery',
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop('gallery'),
                 ),
-                title: const Text(
-                  'Choose from Gallery / Files',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  multiple
-                      ? 'Select one or more photos from files or gallery'
-                      : 'Select a photo from files or gallery',
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onTap: () => Navigator.of(ctx).pop('gallery'),
               ),
             ],
           ),

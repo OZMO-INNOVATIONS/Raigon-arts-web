@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 
 enum FrameUnit {
@@ -9,19 +10,23 @@ enum FrameUnit {
 
   final String label;
   final String symbol;
+
   const FrameUnit(this.label, this.symbol);
 
   static FrameUnit fromString(String? raw) {
     final s = raw?.trim().toLowerCase() ?? '';
+
     if (s == 'ft' || s == 'feet' || s == 'foot' || s.contains('ft')) {
       return FrameUnit.feet;
     }
+
     if (s == 'cm' ||
         s.contains('centi') ||
         s == 'centimetres' ||
         s == 'centimeters') {
       return FrameUnit.centimetres;
     }
+
     return FrameUnit.inches;
   }
 }
@@ -38,9 +43,11 @@ class FrameMeasurementHelper {
 
   static String formatDimension(double value) {
     if (value <= 0) return '0';
+
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
+
     final str = value.toStringAsFixed(2);
     return str.replaceAll(RegExp(r'\.?0+$'), '');
   }
@@ -51,8 +58,10 @@ class FrameMeasurementHelper {
     required FrameUnit to,
   }) {
     if (from == to) return value;
-    // Step 1: Convert from source to inches
+
+    // Step 1: Convert source unit to inches.
     double inches;
+
     switch (from) {
       case FrameUnit.inches:
         inches = value;
@@ -65,7 +74,7 @@ class FrameMeasurementHelper {
         break;
     }
 
-    // Step 2: Convert from inches to target
+    // Step 2: Convert inches to target unit.
     switch (to) {
       case FrameUnit.inches:
         return inches;
@@ -83,7 +92,9 @@ class FrameMeasurementHelper {
   }) {
     final val = parseDimension(valueStr);
     if (val == null) return valueStr;
+
     final converted = convert(value: val, from: from, to: to);
+
     return formatDimension(converted);
   }
 }
@@ -100,6 +111,7 @@ class FrameSpec {
     required this.orientation,
     required this.qty,
     this.notes = '',
+    this.customerNote = '',
     this.photoName,
     this.photoBytes,
     this.photoUrl,
@@ -109,12 +121,19 @@ class FrameSpec {
   final String unit;
   final String customWidth;
   final String customHeight;
+
+  // Retained for existing saved orders.
   final String frameType;
   final String material;
   final String finish;
+
   final String orientation;
   final int qty;
+
+  // Independent note fields.
   final String notes;
+  final String customerNote;
+
   final String? photoName;
   final Uint8List? photoBytes;
   final String? photoUrl;
@@ -125,8 +144,11 @@ class FrameSpec {
       ? '$customWidth × $customHeight ${frameUnit.symbol}'
       : size;
 
-  String get formattedDimensions => (customWidth.isNotEmpty && customHeight.isNotEmpty)
-      ? 'Width: $customWidth ${frameUnit.symbol}, Height: $customHeight ${frameUnit.symbol} (Unit: ${frameUnit.label})'
+  String get formattedDimensions =>
+      (customWidth.isNotEmpty && customHeight.isNotEmpty)
+      ? 'Width: $customWidth ${frameUnit.symbol}, '
+            'Height: $customHeight ${frameUnit.symbol} '
+            '(Unit: ${frameUnit.label})'
       : size;
 
   FrameSpec copyWith({
@@ -140,6 +162,7 @@ class FrameSpec {
     String? orientation,
     int? qty,
     String? notes,
+    String? customerNote,
     String? photoName,
     Uint8List? photoBytes,
     String? photoUrl,
@@ -154,6 +177,7 @@ class FrameSpec {
     orientation: orientation ?? this.orientation,
     qty: qty ?? this.qty,
     notes: notes ?? this.notes,
+    customerNote: customerNote ?? this.customerNote,
     photoName: photoName ?? this.photoName,
     photoBytes: photoBytes ?? this.photoBytes,
     photoUrl: photoUrl ?? this.photoUrl,
@@ -170,6 +194,7 @@ class FrameSpec {
     'orientation': orientation,
     'qty': qty,
     'notes': notes,
+    'customerNote': customerNote,
     'photoName': photoName,
     'photoUrl': photoUrl,
   };
@@ -187,6 +212,7 @@ class FrameSpec {
     final pBytes = j['photoBytes'] ?? j['photo_bytes'];
 
     Uint8List? decodedBytes;
+
     if (pBytes != null) {
       if (pBytes is Uint8List) {
         decodedBytes = pBytes;
@@ -198,16 +224,17 @@ class FrameSpec {
     }
 
     return FrameSpec(
-      size: (j['size'] ?? '')?.toString() ?? '',
-      unit: (j['unit'] ?? 'Inches')?.toString() ?? 'Inches',
-      customWidth: (j['customWidth'] ?? j['custom_width'] ?? '')?.toString() ?? '',
-      customHeight: (j['customHeight'] ?? j['custom_height'] ?? '')?.toString() ?? '',
-      frameType: (j['frameType'] ?? j['frame_type'] ?? '')?.toString() ?? '',
-      material: (j['material'] ?? '')?.toString() ?? '',
-      finish: (j['finish'] ?? '')?.toString() ?? '',
-      orientation: (j['orientation'] ?? '')?.toString() ?? '',
+      size: (j['size'] ?? '').toString(),
+      unit: (j['unit'] ?? 'Inches').toString(),
+      customWidth: (j['customWidth'] ?? j['custom_width'] ?? '').toString(),
+      customHeight: (j['customHeight'] ?? j['custom_height'] ?? '').toString(),
+      frameType: (j['frameType'] ?? j['frame_type'] ?? '').toString(),
+      material: (j['material'] ?? '').toString(),
+      finish: (j['finish'] ?? '').toString(),
+      orientation: (j['orientation'] ?? '').toString(),
       qty: parseQty(j['qty']),
-      notes: (j['notes'] ?? '')?.toString() ?? '',
+      notes: (j['notes'] ?? '').toString(),
+      customerNote: (j['customerNote'] ?? j['customer_note'] ?? '').toString(),
       photoName: pName?.toString(),
       photoUrl: (pUrl != null && pUrl.toString().trim().isNotEmpty)
           ? ImageUrlHelper.resolve(pUrl.toString().trim())
@@ -218,12 +245,7 @@ class FrameSpec {
 }
 
 class PickedPhoto {
-  const PickedPhoto({
-    required this.name,
-    this.bytes,
-    this.url,
-    this.size = 0,
-  });
+  const PickedPhoto({required this.name, this.bytes, this.url, this.size = 0});
 
   final String name;
   final Uint8List? bytes;
@@ -231,13 +253,16 @@ class PickedPhoto {
   final int size;
 
   bool get hasBytes => bytes != null && bytes!.isNotEmpty;
+
   bool get hasUrl => url != null && url!.isNotEmpty;
+
   bool get isNetwork => hasUrl && !hasBytes;
 
   String get sizeLabel {
     if (size <= 0) {
       return hasUrl ? 'Saved photo' : '';
     }
+
     return size >= 1048576
         ? '${(size / 1048576).toStringAsFixed(1)} MB'
         : '${(size / 1024).toStringAsFixed(0)} KB';

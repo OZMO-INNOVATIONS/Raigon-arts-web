@@ -215,7 +215,7 @@ class _ConnectPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Connect Your Channels',
+          'Connect Instagram',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
@@ -225,7 +225,7 @@ class _ConnectPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Link your Instagram and WhatsApp to start automating conversations.',
+          'Connect your Instagram account to start automating conversations.',
           style: TextStyle(color: p.textMuted, fontSize: 13.5),
         ),
         const SizedBox(height: 18),
@@ -236,13 +236,13 @@ class _ConnectPanel extends StatelessWidget {
               account: s.accounts[ch],
               onConnect: () async {
                 _log(
-                  'Connecting channel ${ch.name} (switchAccount: ${ch.isIg && s.accounts[ch] != null})',
+                  'Connecting Instagram (switchAccount: ${s.accounts[ch] != null})',
                 );
                 try {
                   await s.connectChannel(
                     context,
                     ch,
-                    switchAccount: ch.isIg && s.accounts[ch] != null,
+                    switchAccount: s.accounts[ch] != null,
                   );
                 } catch (e, stack) {
                   _log(
@@ -255,33 +255,8 @@ class _ConnectPanel extends StatelessWidget {
                   }
                 }
               },
-              onDisconnect: () {
-                _log('Disconnecting channel ${ch.name}');
-                try {
-                  s.disconnect(ch);
-                  if (context.mounted) {
-                    AppSnackBar.success(
-                      context,
-                      '${ch.isIg ? 'Instagram' : 'WhatsApp'} disconnected.',
-                    );
-                  }
-                } catch (e, stack) {
-                  _log(
-                    'Failed to disconnect ${ch.name}',
-                    error: e,
-                    stackTrace: stack,
-                  );
-                  if (context.mounted) {
-                    AppSnackBar.error(
-                      context,
-                      'Could not disconnect channel: $e',
-                    );
-                  }
-                }
-              },
             );
 
-            final wa = card(Channel.whatsapp);
             final ig = card(Channel.instagram);
             const why = _WhyConnect();
 
@@ -290,8 +265,6 @@ class _ConnectPanel extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(flex: 5, child: wa),
-                    const SizedBox(width: 14),
                     Expanded(flex: 5, child: ig),
                     const SizedBox(width: 14),
                     const Expanded(flex: 4, child: why),
@@ -306,11 +279,7 @@ class _ConnectPanel extends StatelessWidget {
                   IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: wa),
-                        const SizedBox(width: 14),
-                        Expanded(child: ig),
-                      ],
+                      children: [Expanded(child: ig)],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -319,15 +288,7 @@ class _ConnectPanel extends StatelessWidget {
               );
             }
 
-            return Column(
-              children: [
-                wa,
-                const SizedBox(height: 14),
-                ig,
-                const SizedBox(height: 14),
-                why,
-              ],
-            );
+            return Column(children: [ig, const SizedBox(height: 14), why]);
           },
         ),
       ],
@@ -340,22 +301,20 @@ class _ChannelCard extends StatelessWidget {
     required this.channel,
     required this.account,
     required this.onConnect,
-    required this.onDisconnect,
   });
 
   final Channel channel;
   final String? account;
   final VoidCallback onConnect;
-  final VoidCallback onDisconnect;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final c = channel;
     final connected = account != null;
-    final title = c.isIg ? 'Instagram' : 'WhatsApp Business';
+    const title = 'Instagram';
     final accountText = connected
-        ? (c.isIg && !account!.startsWith('@') ? '@$account' : account!)
+        ? (!account!.startsWith('@') ? '@$account' : account!)
         : 'Not connected';
 
     return Container(
@@ -437,18 +396,11 @@ class _ChannelCard extends StatelessWidget {
                     const Spacer(),
                     connected
                         ? _PillButton(
-                            label: c.isIg ? 'Switch account' : 'Disconnect',
-                            icon: c.isIg
-                                ? Icons.swap_horiz_rounded
-                                : Icons.link_off_rounded,
-                            foreground: c.isIg
-                                ? p.onBrand
-                                : AppPalette.statusRed,
-                            background: c.isIg
-                                ? null
-                                : AppPalette.statusRed.withValues(alpha: .10),
-                            gradient: c.isIg ? p.brand : null,
-                            onPressed: c.isIg ? onConnect : onDisconnect,
+                            label: 'Switch account',
+                            icon: Icons.swap_horiz_rounded,
+                            foreground: p.onBrand,
+                            gradient: p.brand,
+                            onPressed: onConnect,
                           )
                         : _PillButton(
                             label: 'Connect',
@@ -486,9 +438,8 @@ class _PillButton extends StatelessWidget {
     required this.icon,
     required this.foreground,
     required this.onPressed,
-    this.background,
     this.gradient,
-  });
+  }) : background = null;
 
   final String label;
   final IconData icon;
@@ -684,14 +635,11 @@ class _FilterBar extends StatelessWidget {
       tooltip: 'Filter by channel',
       onSelected: (v) {
         _log('Filtering channel by value: $v');
-        onChannel(
-          v == 0 ? null : (v == 1 ? Channel.instagram : Channel.whatsapp),
-        );
+        onChannel(v == 0 ? null : Channel.instagram);
       },
       itemBuilder: (_) => const <PopupMenuEntry<int>>[
-        PopupMenuItem<int>(value: 0, child: Text('All channels')),
+        PopupMenuItem<int>(value: 0, child: Text('All')),
         PopupMenuItem<int>(value: 1, child: Text('Instagram')),
-        PopupMenuItem<int>(value: 2, child: Text('WhatsApp')),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -708,9 +656,7 @@ class _FilterBar extends StatelessWidget {
             Icon(Icons.filter_alt_outlined, size: 18, color: p.textPrimary),
             const SizedBox(width: 8),
             Text(
-              channel == null
-                  ? 'Filter'
-                  : (channel == Channel.instagram ? 'Instagram' : 'WhatsApp'),
+              channel == null ? 'Filter' : 'Instagram',
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
@@ -1037,9 +983,9 @@ class _EmptyState extends StatelessWidget {
                 _StartCard(
                   width: w,
                   tag: 'Boosts engagement',
-                  tagColor: ChannelColors.waDeep,
-                  gradient: ChannelColors.waGradient,
-                  icon: AssetConstants.whatsApp,
+                  tagColor: ChannelColors.ig,
+                  gradient: ChannelColors.igBubble,
+                  icon: AssetConstants.instagram,
                   title: 'Send customized replies when people DM you specific keywords',
                   cta: 'Respond to your DMs',
                   user: 'INFO',
@@ -1284,7 +1230,7 @@ class _AutoCard extends StatelessWidget {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            _Tag(a.channel.isIg ? 'Instagram' : 'WhatsApp'),
+            _Tag('Instagram'),
             _Tag(_triggerLabel(a.trigger)),
             for (final k in a.keywords.take(2)) _Tag(k),
             if (!connected)

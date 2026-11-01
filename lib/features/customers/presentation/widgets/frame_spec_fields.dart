@@ -8,13 +8,7 @@ import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
 const kUnits = ['Inches', 'Centimetres', 'Feet'];
-const kFrameTypes = [
-  'Wooden Frame',
-  'Premium Frame',
-  'Classic Frame',
-  'Canvas Float',
-  'Box Frame',
-];
+
 const kOrientations = [
   'Landscape (Horizontal)',
   'Portrait (Vertical)',
@@ -25,35 +19,43 @@ class FrameSpecData {
   FrameSpecData()
     : width = TextEditingController(),
       height = TextEditingController(),
-      material = TextEditingController(text: 'Teak Wood Moulding'),
-      finish = TextEditingController(text: 'Walnut Brown'),
       qty = TextEditingController(text: '1'),
-      notes = TextEditingController();
+      notes = TextEditingController(),
+      customerNote = TextEditingController();
 
   String size = '';
   String unit = 'Inches';
+
+  // Retained for compatibility with existing FrameSpec data.
   String type = 'Wooden Frame';
+  String material = 'Teak Wood Moulding';
+  String finish = 'Walnut Brown';
+
   String orientation = 'Landscape (Horizontal)';
+
   String? existingPhotoUrl;
   String? existingPhotoName;
+
   final TextEditingController width;
   final TextEditingController height;
-  final TextEditingController material;
-  final TextEditingController finish;
   final TextEditingController qty;
   final TextEditingController notes;
+  final TextEditingController customerNote;
 
   FrameSpec toSpec([PickedPhoto? photo]) => FrameSpec(
     size: size,
     unit: unit,
+
     customWidth: width.text.trim(),
     customHeight: height.text.trim(),
+
     frameType: type,
-    material: material.text.trim(),
-    finish: finish.text.trim(),
+    material: material,
+    finish: finish,
     orientation: orientation,
     qty: math.max(1, int.tryParse(qty.text) ?? 1),
     notes: notes.text.trim(),
+    customerNote: customerNote.text.trim(),
     photoName: photo?.name ?? existingPhotoName,
     photoBytes: photo?.bytes,
     photoUrl: photo?.url ?? (photo != null ? null : existingPhotoUrl),
@@ -62,24 +64,30 @@ class FrameSpecData {
   void dispose() {
     width.dispose();
     height.dispose();
-    material.dispose();
-    finish.dispose();
     qty.dispose();
     notes.dispose();
+    customerNote.dispose();
   }
 
   void loadSpec(FrameSpec s) {
     size = s.size;
+
     final parsed = FrameUnit.fromString(s.unit);
     unit = parsed.label;
+
     type = s.frameType;
+    material = s.material;
+    finish = s.finish;
+
     orientation = s.orientation;
+
     width.text = s.customWidth;
     height.text = s.customHeight;
-    material.text = s.material;
-    finish.text = s.finish;
     qty.text = '${s.qty}';
+
     notes.text = s.notes;
+    customerNote.text = s.customerNote;
+
     existingPhotoUrl = s.photoUrl;
     existingPhotoName = s.photoName;
   }
@@ -98,6 +106,7 @@ class FrameSpecFields extends StatelessWidget {
   void _onUnitChanged(String newUnit) {
     final from = FrameUnit.fromString(data.unit);
     final to = FrameUnit.fromString(newUnit);
+
     if (from != to) {
       if (data.width.text.trim().isNotEmpty) {
         data.width.text = FrameMeasurementHelper.convertString(
@@ -106,6 +115,7 @@ class FrameSpecFields extends StatelessWidget {
           to: to,
         );
       }
+
       if (data.height.text.trim().isNotEmpty) {
         data.height.text = FrameMeasurementHelper.convertString(
           valueStr: data.height.text,
@@ -114,6 +124,7 @@ class FrameSpecFields extends StatelessWidget {
         );
       }
     }
+
     data.unit = newUnit;
     onChanged();
   }
@@ -139,12 +150,15 @@ class FrameSpecFields extends StatelessWidget {
     }
 
     final sizeNames = availableSizes.map((frame) => frame.name).toList();
+
     final selectedSize = sizeNames.contains(data.size) ? data.size : null;
+
     final currentUnitObj = FrameUnit.fromString(data.unit);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Frame Size and Measurement Unit
         FormRow(
           children: [
             LabeledField(
@@ -167,9 +181,20 @@ class FrameSpecFields extends StatelessWidget {
                           (frame) => frame.name == value,
                         );
 
-                        final frameUnit = FrameUnit.fromString(selectedFrame.unit);
-                        data.width.text = FrameMeasurementHelper.formatDimension(selectedFrame.width);
-                        data.height.text = FrameMeasurementHelper.formatDimension(selectedFrame.height);
+                        final frameUnit = FrameUnit.fromString(
+                          selectedFrame.unit,
+                        );
+
+                        data.width.text =
+                            FrameMeasurementHelper.formatDimension(
+                              selectedFrame.width,
+                            );
+
+                        data.height.text =
+                            FrameMeasurementHelper.formatDimension(
+                              selectedFrame.height,
+                            );
+
                         data.unit = frameUnit.label;
 
                         onChanged();
@@ -179,25 +204,31 @@ class FrameSpecFields extends StatelessWidget {
             LabeledField(
               label: 'Measurement Unit',
               child: FormDropdown<String>(
-                value: kUnits.contains(data.unit) ? data.unit : currentUnitObj.label,
+                value: kUnits.contains(data.unit)
+                    ? data.unit
+                    : currentUnitObj.label,
                 items: kUnits,
                 labelOf: (unit) {
                   final u = FrameUnit.fromString(unit);
                   return '${u.label} (${u.symbol})';
                 },
-                onChanged: (value) => _onUnitChanged(value),
+                onChanged: _onUnitChanged,
               ),
             ),
           ],
         ),
+
         gap,
+
+        // Width and Height
         FormRow(
           children: [
             LabeledField(
               label: 'Width (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.width,
-                hint: 'Width in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '2' : (currentUnitObj == FrameUnit.centimetres ? '60' : '24')})',
+                hint:
+                    'Width in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '2' : (currentUnitObj == FrameUnit.centimetres ? '60' : '24')})',
                 allowDecimal: true,
                 dim: true,
                 onChanged: (_) => onChanged(),
@@ -207,61 +238,39 @@ class FrameSpecFields extends StatelessWidget {
               label: 'Height (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.height,
-                hint: 'Height in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '3' : (currentUnitObj == FrameUnit.centimetres ? '90' : '36')})',
+                hint:
+                    'Height in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '3' : (currentUnitObj == FrameUnit.centimetres ? '90' : '36')})',
                 allowDecimal: true,
                 dim: true,
                 onChanged: (_) => onChanged(),
               ),
             ),
-          ],
-        ),
-        gap,
-        FormRow(
-          children: [
-            LabeledField(
-              label: 'Frame Type',
-              child: FormDropdown<String>(
-                value: data.type,
-                items: kFrameTypes,
-                labelOf: (value) => value,
-                onChanged: (value) {
-                  data.type = value;
-                  onChanged();
-                },
-              ),
-            ),
-            LabeledField(
-              label: 'Frame Material',
-              child: AppTextBox(controller: data.material),
-            ),
-            LabeledField(
-              label: 'Frame Color Finish',
-              child: AppTextBox(controller: data.finish),
+            // Photo Orientation and Quantity
+            FormRow(
+              children: [
+                LabeledField(
+                  label: 'Quantity',
+                  child: NumberBox(controller: data.qty, min: 1),
+                ),
+              ],
             ),
           ],
         ),
+
         gap,
-        FormRow(
-          children: [
-            LabeledField(
-              label: 'Photo Orientation',
-              child: FormDropdown<String>(
-                value: data.orientation,
-                items: kOrientations,
-                labelOf: (value) => value,
-                onChanged: (value) {
-                  data.orientation = value;
-                  onChanged();
-                },
-              ),
-            ),
-            LabeledField(
-              label: 'Quantity',
-              child: NumberBox(controller: data.qty, min: 1),
-            ),
-          ],
+
+        // Customer Note
+        LabeledField(
+          label: 'Customer Note',
+          child: AppTextBox(
+            controller: data.customerNote,
+            maxLines: 3,
+            hint: 'Enter additional notes from the customer...',
+          ),
         ),
         gap,
+
+        // Special Instructions
         LabeledField(
           label: 'Special Instructions / Mounting Notes',
           child: AppTextBox(

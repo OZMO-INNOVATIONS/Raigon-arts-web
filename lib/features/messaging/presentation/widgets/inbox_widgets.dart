@@ -269,11 +269,7 @@ class ChannelTabs extends StatelessWidget {
         border: Border.all(color: p.border),
       ),
       child: Row(
-        children: [
-          Expanded(child: _tab(context, p, Channel.instagram)),
-          const SizedBox(width: 4),
-          Expanded(child: _tab(context, p, Channel.whatsapp)),
-        ],
+        children: [Expanded(child: _tab(context, p, Channel.instagram))],
       ),
     );
   }

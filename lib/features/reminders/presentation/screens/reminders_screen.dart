@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
+import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
@@ -13,6 +14,7 @@ import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/presentation/widgets/add_reminder_dialog.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
+import 'package:remixicon/remixicon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RemindersScreen extends StatefulWidget {
@@ -49,16 +51,26 @@ class _RemindersScreenState extends State<RemindersScreen> {
     super.dispose();
   }
 
-  Future<void> _togglePlayReminderVoice(CustomerReminder r, [OrderVoiceNote? note]) async {
-    final targetNote = note ?? (r.effectiveVoiceNotes.isNotEmpty ? r.effectiveVoiceNotes.first : null);
+  Future<void> _togglePlayReminderVoice(
+    CustomerReminder r, [
+    OrderVoiceNote? note,
+  ]) async {
+    final targetNote =
+        note ??
+        (r.effectiveVoiceNotes.isNotEmpty ? r.effectiveVoiceNotes.first : null);
     final mediaId = targetNote != null ? '${r.id}_${targetNote.id}' : r.id;
 
-    if (_audioService.currentlyPlayingId == mediaId && _audioService.isPlaying) {
+    if (_audioService.currentlyPlayingId == mediaId &&
+        _audioService.isPlaying) {
       await _audioService.stop();
     } else {
       if (targetNote != null) {
-        if (targetNote.localBytes != null && targetNote.localBytes!.isNotEmpty) {
-          await _audioService.playBytes(targetNote.localBytes!, mediaId: mediaId);
+        if (targetNote.localBytes != null &&
+            targetNote.localBytes!.isNotEmpty) {
+          await _audioService.playBytes(
+            targetNote.localBytes!,
+            mediaId: mediaId,
+          );
         } else if (targetNote.url.isNotEmpty) {
           await _audioService.playUrl(targetNote.url, mediaId: mediaId);
         }
@@ -145,59 +157,51 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final mediaQuery = MediaQuery.of(context);
     final isWide = mediaQuery.size.width >= 768;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1040),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isWide ? 24 : 16,
-            8,
-            isWide ? 24 : 16,
-            16,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top Action Row
-              _buildTopHeader(p, provider, isWide),
-              const SizedBox(height: 14),
+    return SizedBox(
+      width: double.infinity,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Action Row
+            _buildTopHeader(p, provider, isWide),
+            const SizedBox(height: 14),
 
-              // Filter Tabs (All, Today, Upcoming, Overdue, Completed)
-              _buildFilterTabs(p, provider),
-              const SizedBox(height: 12),
+            // Filter Tabs (All, Today, Upcoming, Overdue, Completed)
+            _buildFilterTabs(p, provider),
+            const SizedBox(height: 12),
 
-              // Search Field
-              _buildSearchBar(p, provider),
-              const SizedBox(height: 14),
+            // Search Field
+            _buildSearchBar(p, provider),
+            const SizedBox(height: 14),
 
-              // Main List Feed
-              Expanded(
-                child: provider.isLoading && !provider.initialized
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.gold,
-                          ),
-                        ),
-                      )
-                    : reminders.isEmpty
-                    ? _buildEmptyState(p, provider)
-                    : RefreshIndicator(
-                        color: AppColors.gold,
-                        onRefresh: () => provider.refresh(),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          itemCount: reminders.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) {
-                            return _buildReminderCard(p, reminders[i], isWide);
-                          },
+            // Main List Feed
+            Expanded(
+              child: provider.isLoading && !provider.initialized
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.gold,
                         ),
                       ),
-              ),
-            ],
-          ),
+                    )
+                  : reminders.isEmpty
+                  ? _buildEmptyState(p, provider)
+                  : RefreshIndicator(
+                      color: AppColors.gold,
+                      onRefresh: () => provider.refresh(),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        itemCount: reminders.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) {
+                          return _buildReminderCard(p, reminders[i], isWide);
+                        },
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -205,6 +209,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Widget _buildTopHeader(AppPalette p, ReminderProvider provider, bool isWide) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
@@ -215,10 +220,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   Text(
                     'Reminders',
                     style: TextStyle(
-                      fontSize: isWide ? 26 : 22,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
                       color: p.textPrimary,
-                      letterSpacing: -0.4,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -246,45 +250,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 'Schedule, track and follow up on customer orders and dates',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: p.textMuted,
-                ),
+                style: TextStyle(fontSize: 15.5, color: p.textMuted),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
-        // Add Reminder Button
-        ElevatedButton.icon(
+        AppPrimaryButton(
+          label: 'Add Reminder',
+          icon: RemixIcons.alarm_add_line,
           onPressed: () => showAddOrEditReminderDialog(context: context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.gold,
-            foregroundColor: AppColors.black,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 18 : 14,
-              vertical: isWide ? 12 : 10,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          icon: const Icon(Icons.alarm_add_rounded, size: 19),
-          label: Text(
-            isWide ? 'Add Reminder' : 'New',
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13.5,
-              letterSpacing: 0.2,
-            ),
-          ),
         ),
       ],
     );
@@ -586,7 +565,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var idx = 0; idx < r.effectiveVoiceNotes.length; idx++) ...[
+                for (
+                  var idx = 0;
+                  idx < r.effectiveVoiceNotes.length;
+                  idx++
+                ) ...[
                   if (idx > 0) const SizedBox(height: 6),
                   _buildVoiceTile(
                     p,
@@ -848,23 +831,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 : 'No reminders in ${provider.currentFilter.label}.',
             style: TextStyle(fontSize: 13, color: p.textMuted),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => showAddOrEditReminderDialog(context: context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gold,
-              foregroundColor: AppColors.black,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            icon: const Icon(Icons.alarm_add_rounded, size: 18),
-            label: const Text(
-              'Create Reminder',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
         ],
       ),
     );
@@ -880,13 +846,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final mediaId = '${r.id}_${note.id}';
     final isThisPlaying =
         _audioService.currentlyPlayingId == mediaId && _audioService.isPlaying;
-    final title =
-        totalCount > 1 ? 'Voice Note #${index + 1}' : 'Voice Reminder';
+    final title = totalCount > 1
+        ? 'Voice Note #${index + 1}'
+        : 'Voice Reminder';
     final durText = note.durationSeconds > 0
         ? '${note.durationSeconds}s audio recording'
         : (r.voiceDurationSeconds > 0
-            ? '${r.voiceDurationSeconds}s audio recording'
-            : 'Audio recording');
+              ? '${r.voiceDurationSeconds}s audio recording'
+              : 'Audio recording');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -924,7 +891,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.mic_rounded, size: 14, color: AppColors.gold),
+                    const Icon(
+                      Icons.mic_rounded,
+                      size: 14,
+                      color: AppColors.gold,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       title,

@@ -1,12 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
@@ -156,197 +152,6 @@ class InstagramInboxService {
 }
 
 // ─────────────────────────────────────────────────────────────
-// WhatsApp data layer (unchanged)
-// ─────────────────────────────────────────────────────────────
-
-class WhatsAppInboxMessage {
-  const WhatsAppInboxMessage({
-    required this.id,
-    required this.phone,
-    required this.direction,
-    required this.text,
-    required this.createdAt,
-    this.messageId,
-    this.customerName,
-    this.status,
-    this.messageType = 'text',
-    this.audioMediaId,
-    this.audioMimeType,
-    this.audioVoice = false,
-    this.unreadCount = 0,
-  });
-
-  final int id;
-  final String phone;
-  final String direction;
-  final String text;
-  final DateTime createdAt;
-  final String? messageId;
-  final String? customerName;
-  final String? status;
-  final String messageType;
-  final String? audioMediaId;
-  final String? audioMimeType;
-  final bool audioVoice;
-  final int unreadCount;
-
-  bool get isOutgoing => direction == 'outgoing';
-  bool get isAudio =>
-      messageType == 'audio' || (audioMediaId?.isNotEmpty ?? false);
-
-  factory WhatsAppInboxMessage.fromJson(Map<String, dynamic> json) {
-    return WhatsAppInboxMessage(
-      id: int.tryParse('${json['id']}') ?? 0,
-      phone: '${json['customer_phone'] ?? ''}',
-      direction: '${json['direction'] ?? 'incoming'}',
-      text: '${json['message_text'] ?? ''}',
-      messageId: json['wa_message_id']?.toString(),
-      customerName: json['customer_name']?.toString(),
-      status: json['message_status']?.toString(),
-      messageType: '${json['message_type'] ?? 'text'}',
-      audioMediaId: json['audio_media_id']?.toString(),
-      audioMimeType: json['audio_mime_type']?.toString(),
-      audioVoice: json['audio_voice'] == true,
-      unreadCount: int.tryParse('${json['unread_count'] ?? 0}') ?? 0,
-      createdAt:
-          DateTime.tryParse('${json['created_at'] ?? ''}')?.toLocal() ??
-          DateTime.now(),
-    );
-  }
-}
-
-class WhatsAppInboxService {
-  static const String endpoint =
-      'https://nhqewkbztfmlophtzqmk.supabase.co/functions/v1/whatsapp_inbox';
-
-  Future<Map<String, dynamic>> _request({
-    required String method,
-    Map<String, String>? queryParameters,
-    Map<String, dynamic>? body,
-  }) async {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) {
-      throw Exception('Please sign in to access WhatsApp Inbox.');
-    }
-
-    final uri = Uri.parse(endpoint).replace(queryParameters: queryParameters);
-    final headers = <String, String>{
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${session.accessToken}',
-    };
-
-    late http.Response response;
-    if (method == 'POST') {
-      response = await http
-          .post(uri, headers: headers, body: jsonEncode(body ?? {}))
-          .timeout(const Duration(seconds: 30));
-    } else {
-      response = await http
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 20));
-    }
-
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } catch (_) {
-      throw Exception(
-        'Invalid WhatsApp server response (${response.statusCode}).',
-      );
-    }
-
-    if (decoded is! Map) {
-      throw Exception('Unexpected WhatsApp server response.');
-    }
-    final data = Map<String, dynamic>.from(decoded);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        data['error']?.toString() ??
-            'WhatsApp request failed (${response.statusCode}).',
-      );
-    }
-    return data;
-  }
-
-  Future<List<WhatsAppInboxMessage>> fetchConversations() async {
-    final data = await _request(
-      method: 'GET',
-      queryParameters: const {'limit': '500'},
-    );
-    if (data['success'] != true || data['conversations'] is! List) {
-      throw Exception('Unexpected WhatsApp conversations response.');
-    }
-
-    final items = (data['conversations'] as List)
-        .whereType<Map>()
-        .map((e) => WhatsAppInboxMessage.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return items;
-  }
-
-  Future<List<WhatsAppInboxMessage>> fetchMessages(String phone) async {
-    final data = await _request(
-      method: 'GET',
-      queryParameters: {'phone': phone, 'limit': '500'},
-    );
-    if (data['success'] != true || data['messages'] is! List) {
-      throw Exception('Unexpected WhatsApp message history response.');
-    }
-
-    final items = (data['messages'] as List)
-        .whereType<Map>()
-        .map((e) => WhatsAppInboxMessage.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-    items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    return items;
-  }
-
-  Future<Uint8List> fetchAudioBytes(String messageId) async {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) throw Exception('Please sign in to play audio.');
-    final uri = Uri.parse(endpoint)
-        .replace(queryParameters: {'audio_message_id': messageId});
-    final response = await http
-        .get(
-          uri,
-          headers: {
-            'Accept': '*/*',
-            'Authorization': 'Bearer ${session.accessToken}',
-          },
-        )
-        .timeout(const Duration(seconds: 30));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Could not load voice message (${response.statusCode}).');
-    }
-    return response.bodyBytes;
-  }
-
-  Future<void> sendMessage({
-    required String phone,
-    required String message,
-  }) async {
-    final data = await _request(
-      method: 'POST',
-      body: {'action': 'send', 'to': phone, 'message': message},
-    );
-    if (data['success'] != true) {
-      throw Exception(
-        data['error']?.toString() ?? 'Failed to send WhatsApp message.',
-      );
-    }
-    if (data['saved'] == false) {
-      throw Exception(
-        'Meta accepted the message, but saving it to the inbox failed. '
-        'Refresh the conversation before sending again.',
-      );
-    }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
 // Inbox page
 // ─────────────────────────────────────────────────────────────
 
@@ -371,7 +176,7 @@ class InboxPage extends StatelessWidget {
   }
 }
 
-/// One row of the left conversation list (either channel).x
+/// One row in the Instagram conversation list.
 class _Convo {
   const _Convo({
     required this.channel,
@@ -384,14 +189,14 @@ class _Convo {
   });
 
   final Channel channel;
-  final String key; // Instagram sender id / WhatsApp phone
+  final String key; // Instagram sender ID
   final String name;
   final String preview;
   final DateTime time;
   final bool incoming; // latest message came from the customer
   final String? avatarUrl;
 
-  String get id => '${channel.name}:$key';
+  String get id => 'instagram:$key';
 }
 
 class _InboxWorkspace extends StatefulWidget {
@@ -405,15 +210,12 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   static const _pollEvery = Duration(seconds: 3);
 
   final InstagramInboxService _igService = InstagramInboxService();
-  final WhatsAppInboxService _waService = WhatsAppInboxService();
   final InboxReadStateService _readStateService = InboxReadStateService();
 
   final Map<String, DateTime> _readAt = {};
   bool _readStatesLoaded = false;
 
   // ── shared UI state
-  Channel _tab = Channel.instagram; // which list is the primary one
-  Channel _open = Channel.instagram; // which thread is on screen
   bool _unreadOnly = false;
   bool _latestFirst = true;
   bool _mobileThread = false; // narrow layout: showing thread instead of list
@@ -435,29 +237,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   dynamic _igChannel;
   Timer? _igDebounce;
 
-  // ── WhatsApp
-  List<WhatsAppInboxMessage> _waConvos = [];
-  List<WhatsAppInboxMessage> _waMessages = [];
-  String? _waSelected;
-  String? _waError;
-  bool _waLoading = false;
-  bool _waLoadingMessages = false;
-  bool _waSending = false;
-  int _waVersion = 0;
-  final TextEditingController _waText = TextEditingController();
-  dynamic _waChannel;
-  Timer? _waDebounce;
-  Timer? _waPoll;
-  bool _waPolling = false;
-  final Map<String, String> _audioObjectUrls = {};
-  final Map<String, html.AudioElement> _audioPlayers = {};
-  final Map<String, double> _audioPositions = {};
-  final Map<String, double> _audioDurations = {};
-  final Set<String> _playingAudio = {};
-  final Set<String> _loadingAudio = {};
-  final Map<String, double> _audioSpeeds = {};
-  Timer? _audioProgressTimer;
-
   AppPalette get p => AppPalette.of(context);
 
   // ───────────────────────── lifecycle ─────────────────────────
@@ -467,9 +246,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     super.initState();
 
     _loadReadStates();
-    _refreshWa();
     _subscribeIg();
-    _subscribeWa();
     _refreshIg();
 
     // Polling is a fallback in case Supabase Realtime is unavailable.
@@ -482,46 +259,16 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
         _igPolling = false;
       }
     });
-
-    _waPoll = Timer.periodic(_pollEvery, (_) async {
-      if (!mounted ||
-          _waPolling ||
-          _waLoading ||
-          _waLoadingMessages ||
-          _waSending) {
-        return;
-      }
-      _waPolling = true;
-      try {
-        await _refreshWa(silent: true);
-      } finally {
-        _waPolling = false;
-      }
-    });
   }
 
   @override
   void dispose() {
     _igDebounce?.cancel();
-    _waDebounce?.cancel();
     _igPoll?.cancel();
-    _waPoll?.cancel();
     if (_igChannel != null) {
       Supabase.instance.client.removeChannel(_igChannel);
     }
-    if (_waChannel != null) {
-      Supabase.instance.client.removeChannel(_waChannel);
-    }
-    _audioProgressTimer?.cancel();
-    for (final audio in _audioPlayers.values) {
-      audio.pause();
-      audio.src = '';
-    }
-    for (final url in _audioObjectUrls.values) {
-      html.Url.revokeObjectUrl(url);
-    }
     _igText.dispose();
-    _waText.dispose();
     super.dispose();
   }
 
@@ -558,24 +305,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     } catch (e) {
       debugPrint('Could not load inbox read states: $e');
     }
-  }
-
-  void _subscribeWa() {
-    // Realtime must be enabled for public.whatsapp_inbox_messages.
-    _waChannel = Supabase.instance.client
-        .channel('whatsapp-inbox-live-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'whatsapp_inbox_messages',
-          callback: (payload) {
-            _waDebounce?.cancel();
-            _waDebounce = Timer(const Duration(milliseconds: 250), () {
-              if (mounted) _refreshWa(silent: true);
-            });
-          },
-        )
-        .subscribe();
   }
 
   Future<void> _markConversationRead(_Convo c) async {
@@ -737,282 +466,20 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     return items;
   }
 
-  // ───────────────────────── WhatsApp logic ─────────────────────────
-
-  String _waName(WhatsAppInboxMessage m) {
-    final name = m.customerName?.trim();
-    return name != null && name.isNotEmpty ? name : '+${m.phone}';
-  }
-
-  List<_Convo> _waItems() {
-    return [
-      for (final m in _waConvos)
-        _Convo(
-          channel: Channel.whatsapp,
-          key: m.phone,
-          name: _waName(m),
-          preview: m.isAudio
-              ? '🎤 Voice message'
-              : (m.text.isEmpty ? 'No text preview' : m.text),
-          time: m.createdAt,
-          incoming: !m.isOutgoing,
-        ),
-    ];
-  }
-
-  Future<void> _refreshWa({bool silent = false}) async {
-    final version = ++_waVersion;
-    if (!mounted) return;
-    if (!silent) {
-      setState(() {
-        _waLoading = true;
-        _waError = null;
-      });
-    }
-
-    try {
-      final rows = await _waService.fetchConversations();
-      if (!mounted || version != _waVersion) return;
-
-      final oldPhone = _waSelected;
-      final phones = rows.map((e) => e.phone).toSet();
-      final nextPhone = oldPhone != null && phones.contains(oldPhone)
-          ? oldPhone
-          : (rows.isEmpty ? null : rows.first.phone);
-
-      setState(() {
-        _waConvos = rows;
-        _waSelected = nextPhone;
-        _waLoading = false;
-      });
-
-      if (nextPhone != null) {
-        await _loadWaMessages(nextPhone, silent: silent);
-      } else if (mounted) {
-        setState(() => _waMessages = []);
-      }
-    } catch (e) {
-      if (!mounted || version != _waVersion) return;
-      setState(() {
-        _waLoading = false;
-        _waError = e.toString();
-      });
-    }
-  }
-
-  Future<void> _loadWaMessages(String phone, {bool silent = false}) async {
-    if (!mounted) return;
-    if (!silent) setState(() => _waLoadingMessages = true);
-    try {
-      final rows = await _waService.fetchMessages(phone);
-      if (!mounted || _waSelected != phone) return;
-      setState(() {
-        _waMessages = rows;
-        _waLoadingMessages = false;
-        _waError = null;
-      });
-    } catch (e) {
-      if (!mounted || _waSelected != phone) return;
-      setState(() {
-        _waLoadingMessages = false;
-        _waError = e.toString();
-      });
-    }
-  }
-
-  Future<void> _sendWa() async {
-    final phone = _waSelected;
-    final text = _waText.text.trim();
-    if (phone == null || text.isEmpty || _waSending) return;
-
-    setState(() => _waSending = true);
-    try {
-      await _waService.sendMessage(phone: phone, message: text);
-      if (!mounted) return;
-      _waText.clear();
-      _snack('WhatsApp message sent successfully.');
-      await _refreshWa();
-    } catch (e) {
-      _snack('Could not send WhatsApp message: $e', error: true);
-    } finally {
-      if (mounted) setState(() => _waSending = false);
-    }
-  }
-
-  // ── Incoming WhatsApp audio playback (web)
-
-  String _audioTimeLabel(double seconds) {
-    if (!seconds.isFinite || seconds < 0) seconds = 0;
-    final total = seconds.floor();
-    final minutes = (total ~/ 60).toString();
-    final secs = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$secs';
-  }
-
-  Future<void> _playAudio(WhatsAppInboxMessage message) async {
-    final id = message.messageId;
-    if (id == null || id.isEmpty) {
-      _snack('This audio message has no WhatsApp message ID.');
-      return;
-    }
-
-    final existing = _audioPlayers[id];
-    if (existing != null) {
-      if (_playingAudio.contains(id)) {
-        existing.pause();
-        if (mounted) setState(() => _playingAudio.remove(id));
-      } else {
-        try {
-          await existing.play();
-          if (mounted) setState(() => _playingAudio.add(id));
-        } catch (e) {
-          _snack('Could not play voice message: $e');
-        }
-      }
-      return;
-    }
-
-    if (_loadingAudio.contains(id)) return;
-    setState(() => _loadingAudio.add(id));
-
-    try {
-      String? objectUrl = _audioObjectUrls[id];
-      if (objectUrl == null) {
-        final bytes = await _waService.fetchAudioBytes(id);
-        final blob = html.Blob([bytes], message.audioMimeType ?? 'audio/ogg');
-        objectUrl = html.Url.createObjectUrlFromBlob(blob);
-        _audioObjectUrls[id] = objectUrl;
-      }
-
-      // Pause any other message before starting this one.
-      for (final entry in _audioPlayers.entries) {
-        if (entry.key != id) {
-          entry.value.pause();
-        }
-      }
-
-      final audio = html.AudioElement(objectUrl)
-        ..preload = 'metadata'
-        ..controls = false;
-      _audioPlayers[id] = audio;
-      _audioSpeeds[id] = 1.0;
-
-      audio.onLoadedMetadata.listen((_) {
-        if (!mounted) return;
-        final duration = audio.duration.toDouble();
-        if (duration.isFinite && duration > 0) {
-          setState(() => _audioDurations[id] = duration);
-        }
-      });
-
-      audio.onEnded.listen((_) {
-        if (!mounted) return;
-        setState(() {
-          _playingAudio.remove(id);
-          _audioPositions[id] = 0;
-        });
-        audio.currentTime = 0;
-      });
-
-      await audio.play();
-      if (!mounted) return;
-      setState(() {
-        _loadingAudio.remove(id);
-        _playingAudio
-          ..clear()
-          ..add(id);
-        final duration = audio.duration.toDouble();
-        if (duration.isFinite && duration > 0) {
-          _audioDurations[id] = duration;
-        }
-      });
-
-      _audioProgressTimer ??= Timer.periodic(
-        const Duration(milliseconds: 180),
-        (_) {
-          if (!mounted) return;
-          var changed = false;
-          for (final playingId in _playingAudio.toList()) {
-            final player = _audioPlayers[playingId];
-            if (player == null) continue;
-            final position = player.currentTime.toDouble();
-            if (position.isFinite) {
-              _audioPositions[playingId] = position;
-              changed = true;
-            }
-            final duration = player.duration.toDouble();
-            if (duration.isFinite && duration > 0) {
-              _audioDurations[playingId] = duration;
-            }
-          }
-          if (changed) setState(() {});
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loadingAudio.remove(id));
-      }
-      _snack('Could not play voice message: $e');
-    }
-  }
-
-  void _seekAudio(String id, double fraction) {
-    final audio = _audioPlayers[id];
-    if (audio == null) return;
-    final duration = audio.duration.toDouble();
-    if (!duration.isFinite || duration <= 0) return;
-    final next = (duration * fraction.clamp(0.0, 1.0)).toDouble();
-    audio.currentTime = next;
-    setState(() => _audioPositions[id] = next);
-  }
-
-  void _changeAudioSpeed(String id) {
-    final audio = _audioPlayers[id];
-    if (audio == null) return;
-    final current = _audioSpeeds[id] ?? 1.0;
-    final next = current == 1.0 ? 1.5 : (current == 1.5 ? 2.0 : 1.0);
-    audio.playbackRate = next;
-    setState(() => _audioSpeeds[id] = next);
-  }
-
   // ───────────────────────── list state helpers ─────────────────────────
 
   DateTime? _latestIncomingAt(_Convo c) {
-    if (c.channel == Channel.instagram) {
-      final messages =
-          _igGroups(_igMessages)[c.key] ?? const <InstagramInboxMessage>[];
+    final messages =
+        _igGroups(_igMessages)[c.key] ?? const <InstagramInboxMessage>[];
 
-      DateTime? latest;
-
-      for (final message in messages) {
-        if (message.fromBot) continue;
-
-        if (latest == null || message.createdAt.isAfter(latest)) {
-          latest = message.createdAt;
-        }
+    DateTime? latest;
+    for (final message in messages) {
+      if (message.fromBot) continue;
+      if (latest == null || message.createdAt.isAfter(latest)) {
+        latest = message.createdAt;
       }
-
-      return latest;
     }
-
-    // WhatsApp's full message history is available for the open conversation.
-    if (_waSelected == c.key) {
-      DateTime? latest;
-
-      for (final message in _waMessages) {
-        if (message.isOutgoing) continue;
-
-        if (latest == null || message.createdAt.isAfter(latest)) {
-          latest = message.createdAt;
-        }
-      }
-
-      return latest;
-    }
-
-    // For other WhatsApp conversations, the list endpoint only provides
-    // the conversation row, so use it when its latest message is incoming.
-    return c.incoming ? c.time : null;
+    return latest;
   }
 
   bool _isUnread(_Convo c) => _unreadMessageCount(c) > 0;
@@ -1034,72 +501,28 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
 
   void _select(_Convo c) {
     _keepVisible.add(c.id);
-
-    if (c.channel == Channel.instagram) {
-      setState(() {
-        _open = Channel.instagram;
-        _igSelected = c.key;
-        _mobileThread = true;
-      });
-
-      // Save the incoming-message timestamp for this conversation.
-      _markConversationRead(c);
-      return;
-    }
-
-    final changed = _waSelected != c.key;
-
     setState(() {
-      _open = Channel.whatsapp;
-      _waSelected = c.key;
+      _igSelected = c.key;
       _mobileThread = true;
-
-      if (changed) {
-        _waMessages = [];
-        _waError = null;
-      }
     });
-
-    // Load the actual WhatsApp history before marking messages as read.
-    _loadWaMessages(c.key).then((_) {
-      if (!mounted || _waSelected != c.key || _open != Channel.whatsapp) {
-        return;
-      }
-
-      for (final conversation in _waItems()) {
-        if (conversation.key == c.key) {
-          _markConversationRead(conversation);
-          break;
-        }
-      }
-    });
-  }
-
-  void _setTab(Channel channel) {
-    setState(() {
-      _tab = channel;
-      _open = channel;
-    });
+    _markConversationRead(c);
   }
 
   // ───────────────────────── left panel ─────────────────────────
 
   Widget _tile(_Convo c) {
-    final selectedKey = c.channel == Channel.instagram
-        ? _igSelected
-        : _waSelected;
-    final selected = c.channel == _open && c.key == selectedKey;
+    final selected = c.key == _igSelected;
     final unreadCount = _unreadMessageCount(c);
 
     return ConversationTile(
       selected: selected,
       unread: unreadCount > 0,
       unreadCount: unreadCount,
-      isInstagram: c.channel == Channel.instagram,
+      isInstagram: true,
       name: c.name,
       time: formatInboxListTime(c.time),
       preview: c.preview,
-      indicatorColor: c.channel.isIg ? p.accent : ChannelColors.wa,
+      indicatorColor: p.accent,
       onTap: () => _select(c),
       avatar: AvatarWithBadge(
         label: c.name,
@@ -1111,77 +534,29 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
 
   int _unreadMessageCount(_Convo c) {
     if (!_readStatesLoaded) return 0;
-
     final lastRead = _readAt[c.id];
 
-    // Instagram: show an unread dot if any incoming message
-    // arrived after the conversation was last read.
-    if (c.channel == Channel.instagram) {
-      return _igMessages.where((message) {
-        if (message.senderId != c.key || message.fromBot) {
-          return false;
-        }
-
-        return lastRead == null || message.createdAt.isAfter(lastRead);
-      }).length;
-    }
-
-    // WhatsApp: count incoming messages only.
-    // Automatic replies and other outgoing messages must not
-    // clear or increase the unread count.
-
-    if (c.channel == Channel.whatsapp) {
-      final lastRead = _readAt[c.id];
-
-      // Use loaded history for the selected conversation so the
-      // badge clears immediately when its read state is saved.
-      if (_waSelected == c.key && _waMessages.isNotEmpty) {
-        return _waMessages.where((message) {
-          if (message.isOutgoing) return false;
-
-          return lastRead == null || message.createdAt.isAfter(lastRead);
-        }).length;
-      }
-
-      // Other conversations use the accurate backend count.
-      final conversation = _waConvos.where((message) => message.phone == c.key);
-
-      if (conversation.isNotEmpty) {
-        return conversation.first.unreadCount;
-      }
-
-      return 0;
-    }
-
-    return 0;
+    return _igMessages.where((message) {
+      if (message.senderId != c.key || message.fromBot) return false;
+      return lastRead == null || message.createdAt.isAfter(lastRead);
+    }).length;
   }
 
-  Widget _channelHint(Channel channel, List<_Convo> all) {
-    final isIg = channel == Channel.instagram;
-    final loading = isIg ? _igLoading : _waLoading;
-    final error = isIg ? _igError : _waError;
-
-    if (all.isEmpty && loading) {
+  Widget _channelHint(List<_Convo> all) {
+    if (all.isEmpty && _igLoading) {
       return const InboxListHint(message: '', loading: true);
     }
-    if (all.isEmpty && error != null) {
-      return InboxListHint(
-        message: error,
-        onRetry: isIg ? _refreshIg : _refreshWa,
-      );
+    if (all.isEmpty && _igError != null) {
+      return InboxListHint(message: _igError!, onRetry: _refreshIg);
     }
     if (all.isEmpty) {
-      return InboxListHint(
-        message: isIg
-            ? 'No Instagram messages yet.'
-            : 'No WhatsApp conversations yet.',
-      );
+      return const InboxListHint(message: 'No Instagram messages yet.');
     }
     return const InboxListHint(message: 'No unread conversations.');
   }
 
   Widget _listPanel() {
-    final activeAll = _tab == Channel.instagram ? _igItems() : _waItems();
+    final activeAll = _igItems();
     final active = _view(activeAll);
 
     return ColoredBox(
@@ -1198,8 +573,8 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ChannelTabs(
-              active: _tab,
-              onChanged: _setTab,
+              active: Channel.instagram,
+              onChanged: (_) {},
               badge: _unreadCount(activeAll),
             ),
           ),
@@ -1218,7 +593,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
               padding: const EdgeInsets.fromLTRB(10, 4, 10, 18),
               children: [
                 if (active.isEmpty)
-                  _channelHint(_tab, activeAll)
+                  _channelHint(activeAll)
                 else
                   for (final c in active) _tile(c),
               ],
@@ -1230,12 +605,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   }
 
   // ───────────────────────── thread ─────────────────────────
-
-  // WhatsApp-style outgoing bubble: soft green (deep green in dark mode).
-  Color get _outBubble =>
-      p.isDark ? const Color(0xFF005C4B) : const Color(0xFFDCF8C6);
-  Color get _outText => p.isDark ? Colors.white : const Color(0xFF17212B);
-  Color get _outMeta => p.isDark ? Colors.white70 : const Color(0xFF607078);
 
   List<Widget> _dayList<T>(
     List<T> items,
@@ -1275,229 +644,6 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
     );
   }
 
-  Widget _audioBody(WhatsAppInboxMessage m, {required bool outgoing}) {
-    final id = m.messageId;
-    final isPlaying = id != null && _playingAudio.contains(id);
-    final isLoading = id != null && _loadingAudio.contains(id);
-    final position = id == null ? 0.0 : (_audioPositions[id] ?? 0.0);
-    final duration = id == null ? 0.0 : (_audioDurations[id] ?? 0.0);
-    final progress = duration > 0
-        ? (position / duration).clamp(0.0, 1.0).toDouble()
-        : 0.0;
-    final speed = id == null ? 1.0 : (_audioSpeeds[id] ?? 1.0);
-
-    // Match the surrounding WhatsApp message bubble in both theme modes.
-    // Incoming uses the normal surface; outgoing uses the WhatsApp green bubble.
-    final foreground = outgoing ? _outText : p.textPrimary;
-    final secondary = outgoing ? _outMeta : p.textMuted;
-    final playedWave = outgoing
-        ? (p.isDark ? const Color(0xFF8DE2D0) : const Color(0xFF168A70))
-        : const Color(0xFF20A8A0);
-    final unplayedWave = foreground.withValues(alpha: p.isDark ? .32 : .24);
-    final playButtonFill = foreground.withValues(alpha: p.isDark ? .13 : .09);
-    final speedFill = foreground.withValues(alpha: p.isDark ? .14 : .08);
-
-    const barHeights = <double>[
-      12,
-      20,
-      15,
-      28,
-      18,
-      24,
-      13,
-      31,
-      20,
-      15,
-      26,
-      34,
-      18,
-      23,
-      14,
-      29,
-      19,
-      32,
-      14,
-      22,
-      27,
-      16,
-      34,
-      20,
-      13,
-      25,
-      18,
-      30,
-      15,
-      22,
-      34,
-      17,
-      26,
-      13,
-      21,
-      29,
-      16,
-      24,
-      32,
-      18,
-      27,
-      14,
-      22,
-      30,
-      17,
-      25,
-    ];
-
-    return SizedBox(
-      width: 300,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Material(
-                color: playButtonFill,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: id == null || isLoading ? null : () => _playAudio(m),
-                  child: SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: Center(
-                      child: isLoading
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: foreground,
-                              ),
-                            )
-                          : Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              size: 30,
-                              color: foreground,
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapDown: (details) {
-                        if (id == null || duration <= 0) return;
-                        _seekAudio(
-                          id,
-                          (details.localPosition.dx / constraints.maxWidth)
-                              .clamp(0.0, 1.0)
-                              .toDouble(),
-                        );
-                      },
-                      child: SizedBox(
-                        height: 42,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            for (var i = 0; i < barHeights.length; i++)
-                              Container(
-                                width: 2.4,
-                                height: barHeights[i],
-                                decoration: BoxDecoration(
-                                  color: i / barHeights.length < progress
-                                      ? playedWave
-                                      : unplayedWave,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              InkWell(
-                onTap: id == null ? null : () => _changeAudioSpeed(id),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 48,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: speedFill,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${speed == speed.roundToDouble() ? speed.toInt() : speed}×',
-                    style: TextStyle(
-                      color: foreground,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              const SizedBox(width: 52),
-              Text(
-                duration > 0 ? _audioTimeLabel(duration) : '0:00',
-                style: TextStyle(
-                  color: secondary,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              if (isPlaying && position > 0)
-                Text(
-                  '-${_audioTimeLabel((duration - position).clamp(0.0, duration).toDouble())}',
-                  style: TextStyle(
-                    color: secondary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _waBubble(WhatsAppInboxMessage m, String display) {
-    final out = m.isOutgoing;
-    return InboxBubble(
-      outgoing: out,
-      sender: out ? null : display,
-      text: m.isAudio ? '' : m.text,
-      body: m.isAudio ? _audioBody(m, outgoing: out) : null,
-      time: formatInboxTime(m.createdAt),
-      status: m.status,
-      outgoingColor: _outBubble,
-      outgoingText: _outText,
-      outgoingMeta: _outMeta,
-      avatar: out
-          ? null
-          : AvatarWithBadge(
-              label: display,
-              channel: Channel.whatsapp,
-              size: 38,
-            ),
-    );
-  }
-
   Widget _backButton() => IconButton(
     tooltip: 'Back to messages',
     onPressed: () => setState(() => _mobileThread = false),
@@ -1505,12 +651,10 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
   );
 
   Widget _thread(bool narrow) {
-    final isIg = _open == Channel.instagram;
-    final key = isIg ? _igSelected : _waSelected;
-    final accent = isIg ? ChannelColors.ig : ChannelColors.waDeep;
+    final key = _igSelected;
+    const accent = ChannelColors.ig;
 
     if (key == null) {
-      final loading = isIg ? _igLoading : _waLoading;
       return ColoredBox(
         color: p.pageBg,
         child: Column(
@@ -1518,26 +662,20 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
             if (narrow)
               Align(alignment: Alignment.centerLeft, child: _backButton()),
             Expanded(
-              child: loading
+              child: _igLoading
                   ? Center(child: CircularProgressIndicator(color: p.accent))
                   : InboxEmptyState(
-                      icon: isIg
-                          ? Icons.forum_outlined
-                          : Icons.chat_bubble_outline,
+                      icon: Icons.forum_outlined,
                       title: 'No conversation selected',
-                      message: isIg
-                          ? 'New messages received by your connected Instagram '
-                                'account will appear here.'
-                          : 'When your WhatsApp webhook saves incoming messages '
-                                'to Supabase, customers will appear here.',
+                      message:
+                          'New messages received by your connected Instagram '
+                          'account will appear here.',
                       color: accent,
                       action: TintedButton(
-                        onPressed: isIg ? _refreshIg : _refreshWa,
+                        onPressed: _refreshIg,
                         icon: Icons.refresh,
                         label: 'Refresh',
-                        gradient: isIg
-                            ? ChannelColors.igBubble
-                            : ChannelColors.waGradient,
+                        gradient: ChannelColors.igBubble,
                         color: accent,
                       ),
                     ),
@@ -1547,59 +685,31 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
       );
     }
 
-    late final String display;
-    late final String? avatarUrl;
-    late final List<Widget> items;
-    late final String subtitle;
-    late final String? error;
-    var loadingMessages = false;
+    final messages =
+        _igGroups(_igMessages)[key] ?? const <InstagramInboxMessage>[];
+    final display = _igName(key, messages);
+    final avatarUrl = _igAvatar(messages);
+    final subtitle = 'Instagram DM';
+    final error = _igError == null ? null : 'Refresh failed: $_igError';
+    final items = _dayList<InstagramInboxMessage>(
+      messages,
+      (m) => m.createdAt,
+      (m) => _igBubble(m, display, avatarUrl),
+    );
 
-    if (isIg) {
-      final messages =
-          _igGroups(_igMessages)[key] ?? const <InstagramInboxMessage>[];
-      display = _igName(key, messages);
-      avatarUrl = _igAvatar(messages);
-      subtitle = 'Instagram DM';
-      error = _igError == null ? null : 'Refresh failed: $_igError';
-      items = _dayList<InstagramInboxMessage>(
-        messages,
-        (m) => m.createdAt,
-        (m) => _igBubble(m, display, avatarUrl),
-      );
-    } else {
-      final match = _waConvos.where((e) => e.phone == key);
-      display = match.isEmpty ? '+$key' : _waName(match.first);
-      avatarUrl = null;
-      subtitle = 'WhatsApp · +$key';
-      error = _waError;
-      loadingMessages = _waLoadingMessages;
-      items = _dayList<WhatsAppInboxMessage>(
-        _waMessages,
-        (m) => m.createdAt,
-        (m) => _waBubble(m, display),
-      );
-    }
-
-    Widget body;
-    if (loadingMessages && items.isEmpty) {
-      body = Center(child: CircularProgressIndicator(color: p.accent));
-    } else if (items.isEmpty) {
-      body = InboxEmptyState(
-        icon: Icons.chat_bubble_outline,
-        title: 'No messages yet',
-        message: isIg
-            ? 'Messages from this Instagram user will appear here.'
-            : 'Messages saved by your WhatsApp webhook will appear here.',
-        color: accent,
-      );
-    } else {
-      body = ListView(
-        key: ValueKey('${_open.name}:$key'),
-        reverse: true,
-        padding: const EdgeInsets.fromLTRB(28, 22, 28, 12),
-        children: items,
-      );
-    }
+    final Widget body = items.isEmpty
+        ? InboxEmptyState(
+            icon: Icons.chat_bubble_outline,
+            title: 'No messages yet',
+            message: 'Messages from this Instagram user will appear here.',
+            color: accent,
+          )
+        : ListView(
+            key: ValueKey('instagram:$key'),
+            reverse: true,
+            padding: const EdgeInsets.fromLTRB(28, 22, 28, 12),
+            children: items,
+          );
 
     return Column(
       children: [
@@ -1607,7 +717,7 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
           leading: narrow ? _backButton() : null,
           avatar: AvatarWithBadge(
             label: display,
-            channel: _open,
+            channel: Channel.instagram,
             size: 48,
             imageUrl: avatarUrl,
           ),
@@ -1619,103 +729,42 @@ class _InboxWorkspaceState extends State<_InboxWorkspace> {
             backgroundColor: p.amberSoft,
             content: Text(error),
             actions: [
-              TextButton(
-                onPressed: isIg ? _refreshIg : _refreshWa,
-                child: const Text('Retry'),
-              ),
+              TextButton(onPressed: _refreshIg, child: const Text('Retry')),
             ],
           ),
-
         Expanded(
-          child: isIg
-              ? ColoredBox(color: p.pageBg, child: body)
-              : Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ColoredBox(color: p.pageBg),
-                    Opacity(
-                      opacity: 0.50,
-                      child: Image.asset(
-                        Theme.of(context).brightness == Brightness.dark
-                            ? AssetConstants.whatsappChatbgDark
-                            : AssetConstants.whatsappChatbgLight,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ),
-                    body,
-                  ],
-                ),
+          child: ColoredBox(color: p.pageBg, child: body),
         ),
-
         _composer(),
       ],
     );
   }
 
   Widget _composer() {
-    if (_open == Channel.instagram) {
-      final ready = _igSelected != null;
-      return ComposerBar(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _igText,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 1000,
-                enabled: _igSelected != null && !_igSending,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.send,
-                keyboardType: TextInputType.text,
-                onSubmitted: (_) => _sendIg(),
-                decoration: inboxPillField(p, 'Message on Instagram…'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            SendButton(
-              tooltip: 'Send Instagram message',
-              busy: _igSending,
-              onPressed: !ready || _igSending ? null : _sendIg,
-            ),
-          ],
-        ),
-      );
-    }
-
-    final phone = _waSelected;
+    final ready = _igSelected != null;
     return ComposerBar(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: TextField(
-              controller: _waText,
+              controller: _igText,
               minLines: 1,
               maxLines: 4,
-              maxLength: 4096,
-              enabled: phone != null && !_waSending,
+              maxLength: 1000,
+              enabled: ready && !_igSending,
               textCapitalization: TextCapitalization.sentences,
               textInputAction: TextInputAction.send,
               keyboardType: TextInputType.text,
-              onSubmitted: (_) => _sendWa(),
-              decoration: inboxPillField(
-                p,
-                phone == null
-                    ? 'Select a conversation'
-                    : 'Message on WhatsApp…',
-              ),
+              onSubmitted: (_) => _sendIg(),
+              decoration: inboxPillField(p, 'Message on Instagram…'),
             ),
           ),
           const SizedBox(width: 10),
           SendButton(
-            tooltip: 'Send WhatsApp message',
-            busy: _waSending,
-            onPressed: phone == null || _waSending ? null : _sendWa,
+            tooltip: 'Send Instagram message',
+            busy: _igSending,
+            onPressed: !ready || _igSending ? null : _sendIg,
           ),
         ],
       ),

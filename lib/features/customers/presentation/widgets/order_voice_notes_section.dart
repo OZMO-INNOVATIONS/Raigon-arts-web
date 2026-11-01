@@ -7,6 +7,7 @@ import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_audio_recorder_section.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
+import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 
@@ -191,6 +192,8 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    final c = FormColors.of(context);
+
     final hasNotes = widget.voiceNotes.isNotEmpty;
 
     if (!widget.isEditable && !hasNotes) {
@@ -200,14 +203,11 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF22243A) : const Color(0xFFF9F9FA),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasNotes
-              ? AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25)
-              : p.border,
-        ),
+        color: AppColors.gold.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: c.textBorder, width: 1.2),
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -308,7 +308,7 @@ class _TrashScreenState extends State<TrashScreen>
                   ? const Color(0xFFEF4444).withValues(alpha: 0.18)
                   : const Color(0xFFFEE2E2),
               foregroundColor: const Color(0xFFEF4444),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
                 side: BorderSide(

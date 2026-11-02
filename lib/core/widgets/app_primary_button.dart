@@ -8,29 +8,36 @@ class AppPrimaryButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.padding,
+    this.backgroundColor,
   });
 
   final String label;
   final VoidCallback onPressed;
   final IconData? icon;
   final EdgeInsetsGeometry? padding;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final isCustomColor = backgroundColor != null;
+
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        padding:
+            padding ?? const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         decoration: BoxDecoration(
-          gradient: AppColors.darkGradient,
+          gradient: isCustomColor ? null : AppColors.darkGradient,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
-            BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
+            if (!isCustomColor)
+              BoxShadow(
+                color: AppColors.gold.withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
           ],
         ),
         child: Row(

@@ -4,7 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:raigon_art/core/widgets/app_action_dialog.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:remixicon/remixicon.dart';
 
@@ -79,22 +79,20 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
 
     if (result == null || !mounted) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AppActionDialog(
-        title: 'Add Material?',
-        message: 'Are you sure you want to add this material?',
-        cancelLabel: 'Cancel',
-        actionLabel: 'Add Material',
-        icon: RemixIcons.add_line,
-        iconColor: AppColors.green,
-        iconBg: AppColors.green.withValues(alpha: 0.10),
-        actionColor: AppColors.green,
-        onCancel: () => Navigator.pop(dialogContext, false),
-        onAction: () => Navigator.pop(dialogContext, true),
-      ),
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Add Material?',
+      message: 'Are you sure you want to add this material?',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Add Material',
+      icon: RemixIcons.add_line,
+      iconColor: AppColors.green,
+      iconBg: AppColors.green.withValues(alpha: 0.10),
+      confirmColor: AppColors.green,
+      isDestructive: false,
     );
+
+    if (!confirmed) return;
 
     if (confirmed != true || !mounted) return;
 
@@ -132,23 +130,20 @@ class _FrameSizesScreenState extends State<FrameSizesScreen> {
     );
 
     if (result == null || !mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AppActionDialog(
-        title: 'Update Material?',
-        message: 'Are you sure you want to save the changes to this material?',
-        cancelLabel: 'Cancel',
-        actionLabel: 'Save Changes',
-        icon: RemixIcons.edit_line,
-        iconColor: AppColors.gold,
-        iconBg: AppColors.gold.withValues(alpha: 0.10),
-        actionColor: AppColors.gold,
-        onCancel: () => Navigator.pop(dialogContext, false),
-        onAction: () => Navigator.pop(dialogContext, true),
-      ),
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Update Material?',
+      message: 'Are you sure you want to save the changes to this material?',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Save Changes',
+      icon: RemixIcons.edit_line,
+      iconColor: AppColors.gold,
+      iconBg: AppColors.gold.withValues(alpha: 0.10),
+      confirmColor: AppColors.gold,
+      isDestructive: false,
     );
+
+    if (!confirmed) return;
 
     if (confirmed != true || !mounted) return;
 

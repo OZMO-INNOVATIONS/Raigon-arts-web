@@ -6,13 +6,14 @@ import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/services/storage_service.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
-import 'package:raigon_art/core/widgets/app_action_dialog.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 Future<void> showAddOrEditReminderDialog({
   required BuildContext context,
@@ -187,27 +188,22 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final timeStr = _selectedTime.format(context);
 
     // Show confirmation before saving.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AppActionDialog(
-          title: isEdit ? 'Confirm Changes' : 'Schedule Reminder?',
-          message: isEdit
-              ? 'Do you want to save the changes made to the reminder for $customerName?'
-              : 'Are you sure you want to schedule a reminder for $customerName?',
-          cancelLabel: 'Cancel',
-          actionLabel: 'Save',
-          icon: Icons.event_available_rounded,
-          iconColor: AppColors.gold,
-          iconBg: AppColors.gold.withValues(alpha: 0.12),
-          actionColor: AppColors.gold,
-          isDestructive: false,
-          onCancel: () => Navigator.pop(dialogContext, false),
-          onAction: () => Navigator.pop(dialogContext, true),
-        );
-      },
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: isEdit ? 'Confirm Changes' : 'Schedule Reminder?',
+      message: isEdit
+          ? 'Do you want to save the changes made to the reminder for $customerName?'
+          : 'Are you sure you want to schedule a reminder for $customerName?',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Save',
+      icon: RemixIcons.calendar_check_line,
+      iconColor: AppColors.gold,
+      iconBg: AppColors.gold.withValues(alpha: 0.12),
+      confirmColor: AppColors.gold,
+      isDestructive: false,
     );
+
+    if (!confirmed) return;
 
     // Cancel: remain in the form with entered details.
     if (confirmed != true || !mounted) return;

@@ -79,7 +79,6 @@ Future<bool> showDeleteOrderConfirmationDialog(
   );
 }
 
-
 /// Confirmation dialog for deleting a reminder with high-end luxury styling.
 Future<bool> showDeleteReminderConfirmationDialog(
   BuildContext context,
@@ -181,7 +180,11 @@ class AppConfirmationDialog extends StatelessWidget {
                         color: p.chipFill,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(RemixIcons.close_line, size: 17, color: p.textPrimary),
+                      child: Icon(
+                        RemixIcons.close_line,
+                        size: 17,
+                        color: p.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -276,7 +279,8 @@ Future<bool> showPermanentDeleteConfirmationDialog(
   return showAppConfirmationDialog(
     context,
     title: 'Delete Permanently',
-    message: 'Are you sure you want to permanently delete $itemLabel? This action cannot be undone.',
+    message:
+        'Are you sure you want to permanently delete $itemLabel? This action cannot be undone.',
     confirmLabel: 'Delete Forever',
     cancelLabel: 'Keep',
     icon: RemixIcons.delete_bin_2_fill,
@@ -286,12 +290,16 @@ Future<bool> showPermanentDeleteConfirmationDialog(
 }
 
 /// Confirmation dialog for emptying the entire trash bin.
-Future<bool> showEmptyTrashConfirmationDialog(BuildContext context, {int count = 0}) {
+Future<bool> showEmptyTrashConfirmationDialog(
+  BuildContext context, {
+  int count = 0,
+}) {
   final countStr = count > 0 ? ' all $count items from' : '';
   return showAppConfirmationDialog(
     context,
     title: 'Empty Trash Bin',
-    message: 'Are you sure you want to permanently delete$countStr the bin? All data and uploaded files will be permanently erased.',
+    message:
+        'Are you sure you want to permanently delete$countStr the bin? All data and uploaded files will be permanently erased.',
     confirmLabel: 'Empty Trash',
     cancelLabel: 'Cancel',
     icon: RemixIcons.delete_bin_7_fill,
@@ -312,6 +320,36 @@ Future<bool> showRestoreConfirmationDialog(
     confirmLabel: 'Restore',
     cancelLabel: 'Cancel',
     icon: RemixIcons.restart_line,
+    iconColor: AppColors.gold,
+    confirmColor: AppColors.gold,
+    isDestructive: false,
+  );
+}
+
+/// Confirmation dialog for saving changes.
+Future<bool> showSaveConfirmationDialog(BuildContext context) {
+  return showAppConfirmationDialog(
+    context,
+    title: 'Save Changes',
+    message: 'Are you sure you want to save these changes?',
+    confirmLabel: 'Save',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.save_3_line,
+    iconColor: AppColors.gold,
+    confirmColor: AppColors.gold,
+    isDestructive: false,
+  );
+}
+
+/// Confirmation dialog for updating existing details.
+Future<bool> showUpdateConfirmationDialog(BuildContext context) {
+  return showAppConfirmationDialog(
+    context,
+    title: 'Confirm Update',
+    message: 'Are you sure you want to update these details?',
+    confirmLabel: 'Update',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.edit_line,
     iconColor: AppColors.gold,
     confirmColor: AppColors.gold,
     isDestructive: false,

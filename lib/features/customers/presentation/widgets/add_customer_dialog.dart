@@ -3,7 +3,7 @@ import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
-import 'package:raigon_art/core/widgets/app_action_dialog.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
@@ -573,28 +573,22 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     final isEdit = widget.existing != null;
 
     // Confirmation before creating or updating customer.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AppActionDialog(
-          title: isEdit ? 'Update Customer?' : 'Create Customer?',
-          message: isEdit
-              ? 'Are you sure you want to save the changes for $name?'
-              : 'Are you sure you want to create a customer profile for $name?',
-          cancelLabel: 'Cancel',
-          actionLabel: 'Save',
-          icon: Icons.person_outline_rounded,
-          iconColor: AppColors.gold,
-          iconBg: AppColors.gold.withValues(alpha: 0.12),
-          actionColor: AppColors.gold,
-          isDestructive: false,
-          onCancel: () => Navigator.pop(dialogContext, false),
-          onAction: () => Navigator.pop(dialogContext, true),
-        );
-      },
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: isEdit ? 'Update Customer?' : 'Create Customer?',
+      message: isEdit
+          ? 'Are you sure you want to save the changes for $name?'
+          : 'Are you sure you want to create a customer profile for $name?',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Save',
+      icon: RemixIcons.user_line,
+      iconColor: AppColors.gold,
+      iconBg: AppColors.gold.withValues(alpha: 0.12),
+      confirmColor: AppColors.gold,
+      isDestructive: false,
     );
 
+    if (!confirmed) return;
     // Cancel: stay on the form with all entered details.
     if (confirmed != true || !mounted) return;
 

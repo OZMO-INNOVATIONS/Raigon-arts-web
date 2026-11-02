@@ -26,55 +26,66 @@ class MessagingAutomationProvider extends ChangeNotifier {
   SupabaseClient get _supabase => Supabase.instance.client;
 
   Future<void> load() async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_key);
+    // Start loading immediately when the page initializes.
+    loadingAutomations = true;
+    automationError = null;
+    notifyListeners();
 
-    if (raw != null) {
-      try {
-        final data = jsonDecode(raw) as Map<String, dynamic>;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final raw = preferences.getString(_key);
 
-        final savedAccounts = data['accounts'];
-        if (savedAccounts is Map) {
-          savedAccounts.forEach((key, value) {
-            try {
-              accounts[Channel.values.byName(key.toString())] = value
-                  .toString();
-            } catch (_) {}
-          });
-        }
+      if (raw != null) {
+        try {
+          final data = jsonDecode(raw) as Map<String, dynamic>;
 
-        final savedAutomations = data['automations'];
-        if (savedAutomations is List) {
-          for (final item in savedAutomations) {
-            try {
-              final automation = Automation.fromJson(
-                Map<String, dynamic>.from(item),
-              );
-              if (automation.channel == Channel.instagram) {
-                automations.add(automation);
+          final savedAccounts = data['accounts'];
+          if (savedAccounts is Map) {
+            savedAccounts.forEach((key, value) {
+              try {
+                accounts[Channel.values.byName(key.toString())] = value
+                    .toString();
+              } catch (_) {}
+            });
+          }
+
+          final savedAutomations = data['automations'];
+          if (savedAutomations is List) {
+            for (final item in savedAutomations) {
+              try {
+                final automation = Automation.fromJson(
+                  Map<String, dynamic>.from(item),
+                );
+
+                if (automation.channel == Channel.instagram) {
+                  automations.add(automation);
+                }
+              } catch (error) {
+                debugPrint('Skipping unsupported saved automation: $error');
               }
-            } catch (error) {
-              // Ignore legacy entries for channels no longer supported.
-              debugPrint('Skipping unsupported saved automation: $error');
             }
           }
+        } catch (error) {
+          debugPrint('Local AppState load failed: $error');
         }
-      } catch (error) {
-        debugPrint('Local AppState load failed: $error');
       }
-    }
 
-    // Refresh the Instagram username from Supabase so a newly authorized
-    // account replaces any stale locally cached username after the app reloads.
-    try {
-      await refreshInstagramConnection();
+      // Refresh Instagram connection.
+      try {
+        await refreshInstagramConnection();
+      } catch (error) {
+        debugPrint('Instagram connection refresh during load failed: $error');
+      }
+
+      // Fetch automation rules.
+      await loadAutomations();
     } catch (error) {
-      // Keep the app usable if Instagram is not connected or the inbox is
-      // temporarily unavailable. The existing cached state is preserved.
-      debugPrint('Instagram connection refresh during load failed: $error');
+      automationError = error.toString();
+      debugPrint('Provider initialization failed: $error');
+    } finally {
+      loadingAutomations = false;
+      notifyListeners();
     }
-
-    await loadAutomations();
   }
 
   Future<void> _save() async {

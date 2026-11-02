@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
-import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
@@ -12,8 +10,6 @@ import 'package:raigon_art/features/messaging/models/trigger_type.dart';
 import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
 import '../widgets/channel_badge.dart';
-import '../widgets/channel_style.dart';
-import '../widgets/gradient_button.dart';
 import '../widgets/page_shell.dart';
 import '../widgets/phone_sim.dart';
 import '../widgets/section_card.dart';
@@ -135,84 +131,119 @@ class _AutomationsPageState extends State<AutomationsPage> {
     }).toList();
   }
 
-  void _clearFilters() {
-    _log('Clearing filters');
-    setState(() {
-      _status = 0;
-      // _channel = null;
-      _query = '';
-      _search.clear();
-    });
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) {
+        final p = AppPalette.of(context);
+
+        final firstLoad = s.automations.isEmpty && s.loadingAutomations;
+        final shown = _filtered();
+
+        return PageShell(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Messaging Automation',
+                  style: TextStyle(
+                    fontSize: 27,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.6,
+                    color: p.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Manage your Instagram conversations and automate customer interactions.',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    color: p.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                if (firstLoad)
+                  SizedBox(
+                    height: 260,
+                    child: Center(
+                      child: CircularProgressIndicator(color: p.accent),
+                    ),
+                  )
+                else ...[
+                  if (s.automationError != null)
+                    _Banner(
+                      text:
+                          'Couldn’t sync with the server. Showing saved data.',
+                      onRetry: s.loadAutomations,
+                    ),
+
+                  if (s.accounts[Channel.instagram] != null) ...[
+                    _ConnectPanel(s: s),
+                    const SizedBox(height: 22),
+
+                    _FilterBar(
+                      status: _status,
+                      controller: _search,
+                      onStatus: (v) => setState(() => _status = v),
+                      onQuery: (v) => setState(() => _query = v),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (shown.isNotEmpty)
+                      for (final a in shown) _AutoCard(s: s, a: a)
+                    else
+                      _NoMatches(
+                        onClear: () {
+                          setState(() {
+                            _status = 0;
+                            _query = '';
+                            _search.clear();
+                          });
+                        },
+                      ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
+}
+
+class _NoMatches extends StatelessWidget {
+  const _NoMatches({required this.onClear});
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final empty = s.automations.isEmpty;
-    final firstLoad = empty && s.loadingAutomations;
-    final shown = _filtered();
-
-    return PageShell(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 16),
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      child: Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Page heading
+            Icon(Icons.search_off_rounded, size: 32, color: p.textMuted),
+            const SizedBox(height: 10),
             Text(
-              'Messaging Automation',
+              'No automations match your filters',
               style: TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.6,
+                fontWeight: FontWeight.w700,
                 color: p.textPrimary,
               ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              'Manage your Instagram conversations and automate customer interactions.',
-              style: TextStyle(fontSize: 13.5, height: 1.4, color: p.textMuted),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: onClear,
+              style: TextButton.styleFrom(foregroundColor: p.accent),
+              child: const Text('Clear filters'),
             ),
-            const SizedBox(height: 22),
-
-            if (s.automationError != null)
-              _Banner(
-                text: 'Couldn’t sync with the server. Showing saved data.',
-                onRetry: s.loadAutomations,
-              ),
-
-            if (s.loadingAutomations)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    minHeight: 3,
-                    color: p.accent,
-                    backgroundColor: p.accentSoft,
-                  ),
-                ),
-              ),
-
-            _ConnectPanel(s: s),
-            const SizedBox(height: 22),
-
-            if (!firstLoad)
-              if (empty)
-                _EmptyState(s: s)
-              else ...[
-                _FilterBar(
-                  status: _status,
-                  controller: _search,
-                  onStatus: (v) => setState(() => _status = v),
-                  onQuery: (v) => setState(() => _query = v),
-                ),
-                const SizedBox(height: 16),
-                if (shown.isEmpty)
-                  _NoMatches(onClear: _clearFilters)
-                else
-                  for (final a in shown) _AutoCard(s: s, a: a),
-              ],
           ],
         ),
       ),
@@ -705,42 +736,6 @@ class _FilterSegment extends StatelessWidget {
   }
 }
 
-class _NoMatches extends StatelessWidget {
-  const _NoMatches({required this.onClear});
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.search_off_rounded, size: 32, color: p.textMuted),
-            const SizedBox(height: 10),
-            Text(
-              'No automations match your filters',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: p.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextButton(
-              onPressed: onClear,
-              style: TextButton.styleFrom(foregroundColor: p.accent),
-              child: const Text('Clear filters'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Sync error banner
-
 class _Banner extends StatelessWidget {
   const _Banner({required this.text, required this.onRetry});
   final String text;
@@ -783,314 +778,6 @@ class _Banner extends StatelessWidget {
             child: const Text('Retry'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// Empty state and starters
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.s});
-  final MessagingAutomationProvider s;
-
-  static const Color _gold = Color(0xFFCDBB88);
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(gradient: p.brandDeep, boxShadow: p.glow),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -50,
-                  top: -50,
-                  child: Container(
-                    width: 190,
-                    height: 190,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _gold.withValues(alpha: .10),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Reply to every DM, automatically',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.7,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Set a trigger, write the reply, test it in a phone preview, then go live.',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .78),
-                          fontSize: 14,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _StepBadge(number: 1, title: 'Channel'),
-                          _StepBadge(number: 2, title: 'Trigger'),
-                          _StepBadge(number: 3, title: 'Reply'),
-                          _StepBadge(number: 4, title: 'Go live'),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _gold,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 16,
-                          ),
-                        ),
-                        onPressed: () => openBuilder(context, s),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text(
-                          'Create automation',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 30),
-        Text(
-          'Or start from a popular idea',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: p.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, c) {
-            final w = c.maxWidth >= 640 ? (c.maxWidth - 18) / 2 : c.maxWidth;
-            return Wrap(
-              spacing: 18,
-              runSpacing: 18,
-              children: [
-                _StartCard(
-                  width: w,
-                  tag: 'Loved by creators',
-                  tagColor: ChannelColors.ig,
-                  gradient: ChannelColors.igBubble,
-                  icon: AssetConstants.instagram,
-                  title: 'Send a DM with your link every time someone comments on your post',
-                  cta: 'Send a link from comments',
-                  user: 'link pls!',
-                  bot: 'Here it is',
-                  onTap: () =>
-                      openBuilder(context, s, preset: TriggerType.postComment),
-                ),
-                _StartCard(
-                  width: w,
-                  tag: 'Boosts engagement',
-                  tagColor: ChannelColors.ig,
-                  gradient: ChannelColors.igBubble,
-                  icon: AssetConstants.instagram,
-                  title: 'Send customized replies when people DM you specific keywords',
-                  cta: 'Respond to your DMs',
-                  user: 'INFO',
-                  bot: 'Here you go',
-                  onTap: () =>
-                      openBuilder(context, s, preset: TriggerType.keyword),
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _StepBadge extends StatelessWidget {
-  const _StepBadge({required this.number, required this.title});
-  final int number;
-  final String title;
-
-  static const Color _gold = Color(0xFFCDBB88);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: _gold,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StartCard extends StatelessWidget {
-  const _StartCard({
-    required this.width,
-    required this.tag,
-    required this.tagColor,
-    required this.gradient,
-    required this.icon,
-    required this.title,
-    required this.cta,
-    required this.user,
-    required this.bot,
-    required this.onTap,
-  });
-
-  final double width;
-  final String tag, title, cta, user, bot;
-  final Color tagColor;
-  final LinearGradient gradient;
-  final String icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return SizedBox(
-      width: width,
-      child: SectionCard(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SvgPicture.asset(icon, width: 20, height: 20, fit: BoxFit.contain),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-                color: p.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: tagColor.withValues(alpha: .07),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  _ChatPreviewBubble(text: user, isSender: false),
-                  const SizedBox(height: 10),
-                  _ChatPreviewBubble(
-                    text: bot,
-                    isSender: true,
-                    gradient: gradient,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: GradientButton(label: cta, onPressed: onTap),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatPreviewBubble extends StatelessWidget {
-  const _ChatPreviewBubble({
-    required this.text,
-    required this.isSender,
-    this.gradient,
-  });
-
-  final String text;
-  final bool isSender;
-  final LinearGradient? gradient;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Align(
-      alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          gradient: isSender ? gradient : null,
-          color: isSender ? null : p.surface,
-          border: isSender ? null : Border.all(color: p.border),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            color: isSender ? Colors.white : p.textPrimary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
       ),
     );
   }

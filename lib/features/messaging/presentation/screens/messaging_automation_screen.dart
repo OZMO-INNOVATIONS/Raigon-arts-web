@@ -22,13 +22,21 @@ class MessagingAutomationScreen extends StatefulWidget {
 
 class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
   late final MessagingAutomationProvider _messagingAutomationProvider;
-  late final Future<void> _initialization;
 
   @override
   void initState() {
     super.initState();
+
     _messagingAutomationProvider = MessagingAutomationProvider();
-    _initialization = _messagingAutomationProvider.load();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await _messagingAutomationProvider.load();
+    } catch (error) {
+      debugPrint('Messaging automation initialization failed: $error');
+    }
   }
 
   @override
@@ -39,49 +47,39 @@ class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return FutureBuilder<void>(
-      future: _initialization,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Center(child: CircularProgressIndicator(color: p.accent));
-        }
+    final s = _messagingAutomationProvider;
 
-        final s = _messagingAutomationProvider;
+    return Material(
+      type: MaterialType.transparency,
+      child: ListenableBuilder(
+        listenable: s,
+        builder: (context, _) {
+          final pages = [AutomationsPage(s: s), InboxPage(s: s)];
 
-        return Material(
-          type: MaterialType.transparency,
-          child: ListenableBuilder(
-            listenable: s,
-            builder: (context, _) {
-              final pages = [AutomationsPage(s: s), InboxPage(s: s)];
+          return LayoutBuilder(
+            builder: (context, c) {
+              final narrow = c.maxWidth < 860;
 
-              return LayoutBuilder(
-                builder: (context, c) {
-                  final narrow = c.maxWidth < 860;
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _TopBar(s: s, narrow: narrow),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          switchInCurve: Curves.easeOut,
-                          child: KeyedSubtree(
-                            key: ValueKey(s.tab),
-                            child: pages[s.tab],
-                          ),
-                        ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TopBar(s: s, narrow: narrow),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOut,
+                      child: KeyedSubtree(
+                        key: ValueKey(s.tab),
+                        child: pages[s.tab],
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                ],
               );
             },
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -130,7 +128,6 @@ class _TopBar extends StatelessWidget {
               // Automations and Messages tabs
               Expanded(child: tabs),
 
-              // Show New automation only on Automations tab
               // Show New automation only on Automations tab
               SizedBox(width: compact ? 8 : 16),
               Tooltip(

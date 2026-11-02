@@ -21,7 +21,9 @@ class _TrashScreenState extends State<TrashScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  bool _initialLoading = true;
+  static bool _hasLoadedOnce = false;
+  bool _initialLoading = !_hasLoadedOnce;
+  @override
   @override
   @override
   void initState() {
@@ -30,11 +32,13 @@ class _TrashScreenState extends State<TrashScreen>
     _tabController = TabController(length: 2, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
+      if (!mounted || _hasLoadedOnce) return;
 
       try {
         await context.read<CustomerAndOrderProvider>().fetchTrash();
-      } catch (_) {
+        _hasLoadedOnce = true;
+      } catch (e) {
+        debugPrint('Trash loading error: $e');
       } finally {
         if (mounted) {
           setState(() => _initialLoading = false);
@@ -171,11 +175,7 @@ class _TrashScreenState extends State<TrashScreen>
       backgroundColor: p.pageBg,
       body: SafeArea(
         child: _initialLoading
-            ? Center(
-                child: CircularProgressIndicator(
-                  color: isDark ? AppColors.gold : const Color(0xFF1E1A14),
-                ),
-              )
+            ? Center(child: CircularProgressIndicator(color: AppColors.gold))
             : Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(

@@ -108,7 +108,7 @@ class AutomationsPage extends StatefulWidget {
 class _AutomationsPageState extends State<AutomationsPage> {
   final TextEditingController _search = TextEditingController();
   int _status = 0; // 0 = all, 1 = active, 2 = paused
-  Channel? _channel; // null = all channels
+  // Channel? _channel; // null = all channels
   String _query = '';
 
   MessagingAutomationProvider get s => widget.s;
@@ -127,7 +127,7 @@ class _AutomationsPageState extends State<AutomationsPage> {
       final live = _isLive(a);
       if (_status == 1 && !live) return false;
       if (_status == 2 && live) return false;
-      if (_channel != null && a.channel != _channel) return false;
+      // if (_channel != null && a.channel != _channel) return false;
       if (q.isEmpty) return true;
       return a.name.toLowerCase().contains(q) ||
           a.summary.toLowerCase().contains(q) ||
@@ -139,7 +139,7 @@ class _AutomationsPageState extends State<AutomationsPage> {
     _log('Clearing filters');
     setState(() {
       _status = 0;
-      _channel = null;
+      // _channel = null;
       _query = '';
       _search.clear();
     });
@@ -203,10 +203,8 @@ class _AutomationsPageState extends State<AutomationsPage> {
               else ...[
                 _FilterBar(
                   status: _status,
-                  channel: _channel,
                   controller: _search,
                   onStatus: (v) => setState(() => _status = v),
-                  onChannel: (v) => setState(() => _channel = v),
                   onQuery: (v) => setState(() => _query = v),
                 ),
                 const SizedBox(height: 16),
@@ -376,7 +374,6 @@ class _ConnectPanel extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,10 +411,7 @@ class _ConnectPanel extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
-              Padding(
-                padding: const EdgeInsets.only(left: 54),
-                child: accountIdentity,
-              ),
+              Align(alignment: Alignment.centerLeft, child: accountIdentity),
             ],
           );
 
@@ -536,67 +530,58 @@ class _PillButton extends StatelessWidget {
 }
 
 // Filter bar and controls
-
 class _FilterBar extends StatelessWidget {
   const _FilterBar({
     required this.status,
-    required this.channel,
     required this.controller,
     required this.onStatus,
-    required this.onChannel,
     required this.onQuery,
   });
 
   final int status;
-  final Channel? channel;
   final TextEditingController controller;
   final ValueChanged<int> onStatus;
-  final ValueChanged<Channel?> onChannel;
   final ValueChanged<String> onQuery;
 
-  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+  OutlineInputBorder _border(Color color) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(26),
-    borderSide: BorderSide(color: c),
+    borderSide: BorderSide(color: color),
   );
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
 
-    final segmented = Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: p.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _FilterSegment(
-            selected: status == 0,
-            label: 'All',
-            onTap: () => onStatus(0),
-          ),
-          _FilterSegment(
-            selected: status == 1,
-            label: 'Active',
-            dotColor: p.mint,
-            onTap: () => onStatus(1),
-          ),
-          _FilterSegment(
-            selected: status == 2,
-            label: 'Paused',
-            dotColor: p.textMuted,
-            onTap: () => onStatus(2),
-          ),
-        ],
-      ),
+    final segmented = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _FilterSegment(
+          selected: status == 0,
+          label: 'All',
+          onTap: () => onStatus(0),
+        ),
+        const SizedBox(width: 8),
+        _FilterSegment(
+          selected: status == 1,
+          label: 'Active',
+          dotColor: p.mint,
+          onTap: () => onStatus(1),
+        ),
+        const SizedBox(width: 8),
+        _FilterSegment(
+          selected: status == 2,
+          label: 'Paused',
+          dotColor: p.textMuted,
+          onTap: () => onStatus(2),
+        ),
+      ],
     );
 
     final search = TextField(
       controller: controller,
       onChanged: onQuery,
+      cursorColor: AppColors.gold,
+      style: TextStyle(fontSize: 13.5, color: p.textPrimary),
       decoration: InputDecoration(
         hintText: 'Search automations…',
         hintStyle: TextStyle(color: p.textMuted, fontSize: 13.5),
@@ -607,50 +592,7 @@ class _FilterBar extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
         border: _border(p.border),
         enabledBorder: _border(p.border),
-        focusedBorder: _border(p.accent),
-      ),
-    );
-
-    final filter = PopupMenuButton<int>(
-      tooltip: 'Filter by channel',
-      onSelected: (v) {
-        _log('Filtering channel by value: $v');
-        onChannel(v == 0 ? null : Channel.instagram);
-      },
-      itemBuilder: (_) => const <PopupMenuEntry<int>>[
-        PopupMenuItem<int>(value: 0, child: Text('All')),
-        PopupMenuItem<int>(value: 1, child: Text('Instagram')),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: channel == null ? p.surface : p.accentSoft,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: channel == null ? p.border : p.accent.withValues(alpha: .4),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.filter_alt_outlined, size: 18, color: p.textPrimary),
-            const SizedBox(width: 8),
-            Text(
-              channel == null ? 'Filter' : 'Instagram',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: p.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 18,
-              color: p.textMuted,
-            ),
-          ],
-        ),
+        focusedBorder: _border(AppColors.gold),
       ),
     );
 
@@ -662,23 +604,19 @@ class _FilterBar extends StatelessWidget {
               segmented,
               const Spacer(),
               SizedBox(width: 320, child: search),
-              const SizedBox(width: 12),
-              filter,
             ],
           );
         }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            segmented,
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: search),
-                const SizedBox(width: 10),
-                filter,
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: segmented,
             ),
+            const SizedBox(height: 12),
+            Row(children: [Expanded(child: search)]),
           ],
         );
       },
@@ -702,10 +640,6 @@ class _FilterSegment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final bg = p.isDark ? p.accent : AppColors.black;
-    final fg = selected
-        ? (p.isDark ? AppColors.black : Colors.white)
-        : p.textMuted;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -713,11 +647,33 @@ class _FilterSegment extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? bg : Colors.transparent,
+            gradient: selected
+                ? const LinearGradient(
+                    colors: [
+                      AppColors.black,
+                      Color(0xFF262319),
+                      Color(0xFF7A6A3A),
+                    ],
+                  )
+                : null,
+            color: selected ? null : p.surface,
             borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: selected ? AppColors.gold : p.border,
+              width: selected ? 1.5 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.gold.withValues(alpha: 0.22),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -728,9 +684,7 @@ class _FilterSegment extends StatelessWidget {
                   height: 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected
-                        ? dotColor
-                        : dotColor!.withValues(alpha: .8),
+                    color: dotColor,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -739,8 +693,8 @@ class _FilterSegment extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected ? AppColors.white : p.textPrimary,
                 ),
               ),
             ],
@@ -1436,6 +1390,7 @@ class _AutoCard extends StatelessWidget {
   Widget _buildMenu(BuildContext context, AppPalette p) {
     return PopupMenuButton<String>(
       tooltip: 'Automation options',
+      offset: const Offset(10, 50),
       color: p.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 8,

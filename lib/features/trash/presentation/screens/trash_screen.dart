@@ -21,13 +21,24 @@ class _TrashScreenState extends State<TrashScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  bool _initialLoading = true;
+  @override
   @override
   void initState() {
     super.initState();
+
     _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<CustomerAndOrderProvider>().fetchTrash();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      try {
+        await context.read<CustomerAndOrderProvider>().fetchTrash();
+      } catch (_) {
+      } finally {
+        if (mounted) {
+          setState(() => _initialLoading = false);
+        }
       }
     });
   }
@@ -118,10 +129,7 @@ class _TrashScreenState extends State<TrashScreen>
     if (mounted) {
       if (success) {
         context.read<ReminderProvider>().refresh().ignore();
-        AppSnackBar.success(
-          context,
-          'Reminder restored to active reminders.',
-        );
+        AppSnackBar.success(context, 'Reminder restored to active reminders.');
       } else {
         AppSnackBar.error(context, 'Could not restore reminder.');
       }
@@ -152,6 +160,7 @@ class _TrashScreenState extends State<TrashScreen>
     final p = AppPalette.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<CustomerAndOrderProvider>();
+
     final orders = provider.trashOrders;
     final reminders = provider.trashReminders;
     final totalCount = provider.totalTrashCount;
@@ -161,35 +170,53 @@ class _TrashScreenState extends State<TrashScreen>
     return Scaffold(
       backgroundColor: p.pageBg,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header Bar
-            _buildHeader(context, p, isDark, totalCount, isLoading),
+        child: _initialLoading
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: isDark ? AppColors.gold : const Color(0xFF1E1A14),
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    _buildHeader(context, p, isDark, totalCount, isLoading),
 
-            // 14-Day Retention Banner
-            _buildRetentionBanner(p, isDark, retentionDays),
+                    const SizedBox(height: 24),
 
-            // Tab Bar
-            _buildTabBar(p, isDark, orders.length, reminders.length),
+                    // 14-Day Retention Banner
+                    _buildRetentionBanner(p, isDark, retentionDays),
 
-            // Tab Views
-            Expanded(
-              child: isLoading && orders.isEmpty && reminders.isEmpty
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: isDark ? AppColors.gold : const Color(0xFF1E1A14),
-                      ),
-                    )
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildOrdersList(orders, p, isDark),
-                        _buildRemindersList(reminders, p, isDark),
-                      ],
+                    const SizedBox(height: 20),
+
+                    // Tab Bar
+                    _buildTabBar(p, isDark, orders.length, reminders.length),
+
+                    const SizedBox(height: 16),
+
+                    // Tab Views
+                    Expanded(
+                      child: isLoading && orders.isEmpty && reminders.isEmpty
+                          ? Center(
+                              child: CircularProgressIndicator(
+                                color: isDark
+                                    ? AppColors.gold
+                                    : const Color(0xFF1E1A14),
+                              ),
+                            )
+                          : TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildOrdersList(orders, p, isDark),
+                                _buildRemindersList(reminders, p, isDark),
+                              ],
+                            ),
                     ),
-            ),
-          ],
-        ),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -201,137 +228,109 @@ class _TrashScreenState extends State<TrashScreen>
     int totalCount,
     bool isLoading,
   ) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-      decoration: BoxDecoration(
-        color: p.surface,
-        border: Border(bottom: BorderSide(color: p.border, width: 1)),
-      ),
-      child: Row(
-        children: [
-          if (Navigator.of(context).canPop()) ...[
-            IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: p.textPrimary),
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFFEF4444).withValues(alpha: 0.15)
-                  : const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.3),
-              ),
-            ),
-            child: const Icon(
-              RemixIcons.delete_bin_line,
-              color: Color(0xFFEF4444),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
                       'Trash & Recovery Vault',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
                         color: p.textPrimary,
-                        letterSpacing: -0.3,
+                        letterSpacing: -0.4,
                       ),
                     ),
-                    if (totalCount > 0) ...[
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Text(
-                          '$totalCount items',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFEF4444),
-                          ),
+                  ),
+                  if (totalCount > 0) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFEF4444)
+                              .withValues(alpha: 0.35),
                         ),
                       ),
-                    ],
+                      child: Text(
+                        '$totalCount items',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
                   ],
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'Recover orders and reminders before they auto-purge, or permanently delete them.',
+                style: TextStyle(
+                  fontSize: 15.5,
+                  color: p.textMuted,
+                  height: 1.4,
                 ),
-                Text(
-                  'Recover orders and reminders before they auto-purge, or permanently delete them.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: p.textMuted,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          if (isLoading)
-            const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            IconButton(
-              icon: Icon(RemixIcons.refresh_line, color: p.textPrimary, size: 20),
-              tooltip: 'Refresh Trash',
-              onPressed: _handleRefresh,
-            ),
-          const SizedBox(width: 8),
-          if (totalCount > 0)
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark
-                    ? const Color(0xFFEF4444).withValues(alpha: 0.18)
-                    : const Color(0xFFFEE2E2),
-                foregroundColor: const Color(0xFFEF4444),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-                  ),
+        ),
+        const SizedBox(width: 16),
+        if (isLoading)
+          const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          IconButton(
+            icon: Icon(RemixIcons.refresh_line, color: p.textPrimary, size: 20),
+            tooltip: 'Refresh Trash',
+            onPressed: _handleRefresh,
+          ),
+        const SizedBox(width: 8),
+        if (totalCount > 0)
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark
+                  ? const Color(0xFFEF4444).withValues(alpha: 0.18)
+                  : const Color(0xFFFEE2E2),
+              foregroundColor: const Color(0xFFEF4444),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.4),
                 ),
-                elevation: 0,
               ),
-              icon: const Icon(RemixIcons.delete_bin_7_line, size: 16),
-              label: const Text(
-                'Empty Trash Bin',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              onPressed: () => _handleEmptyTrash(totalCount),
+              elevation: 0,
             ),
-        ],
-      ),
+            icon: const Icon(RemixIcons.delete_bin_7_line, size: 17),
+            label: const Text(
+              'Empty Trash Bin',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            onPressed: () => _handleEmptyTrash(totalCount),
+          ),
+      ],
     );
   }
 
   Widget _buildRetentionBanner(AppPalette p, bool isDark, int retentionDays) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+      margin: const EdgeInsets.fromLTRB(0, 14, 0, 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isDark
@@ -360,7 +359,9 @@ class _TrashScreenState extends State<TrashScreen>
                 fontSize: 12.5,
                 height: 1.4,
                 fontWeight: FontWeight.w500,
-                color: isDark ? const Color(0xFFE2D6B5) : const Color(0xFF6B4D08),
+                color: isDark
+                    ? const Color(0xFFE2D6B5)
+                    : const Color(0xFF6B4D08),
               ),
             ),
           ),
@@ -369,9 +370,14 @@ class _TrashScreenState extends State<TrashScreen>
     );
   }
 
-  Widget _buildTabBar(AppPalette p, bool isDark, int orderCount, int reminderCount) {
+  Widget _buildTabBar(
+    AppPalette p,
+    bool isDark,
+    int orderCount,
+    int reminderCount,
+  ) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       height: 42,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E222A) : const Color(0xFFE5E7EB),
@@ -394,7 +400,10 @@ class _TrashScreenState extends State<TrashScreen>
         dividerColor: Colors.transparent,
         labelColor: isDark ? AppColors.black : const Color(0xFF18181B),
         unselectedLabelColor: p.textMuted,
-        labelStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+        labelStyle: const TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+        ),
         unselectedLabelStyle: const TextStyle(
           fontSize: 13.5,
           fontWeight: FontWeight.w500,
@@ -440,7 +449,7 @@ class _TrashScreenState extends State<TrashScreen>
       onRefresh: _handleRefresh,
       color: AppColors.gold,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
         itemCount: orders.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -511,7 +520,11 @@ class _TrashScreenState extends State<TrashScreen>
                       ),
                       if (customer.city.isNotEmpty) ...[
                         const SizedBox(width: 12),
-                        Icon(RemixIcons.map_pin_line, size: 13, color: p.textMuted),
+                        Icon(
+                          RemixIcons.map_pin_line,
+                          size: 13,
+                          color: p.textMuted,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           customer.city,
@@ -548,92 +561,105 @@ class _TrashScreenState extends State<TrashScreen>
             ),
 
             // Countdown Badge & Deleted At
+            // Countdown Badge & Deleted At
             Expanded(
               flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUrgent
+                        ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                        : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
                       color: isUrgent
-                          ? const Color(0xFFEF4444).withValues(alpha: 0.15)
-                          : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isUrgent
-                            ? const Color(0xFFEF4444).withValues(alpha: 0.4)
-                            : const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                      ),
+                          ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                          : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          RemixIcons.hourglass_line,
-                          size: 13,
-                          color: isUrgent
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFD97706),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          daysRemaining <= 0
-                              ? 'Purges today'
-                              : '$daysRemaining days left',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            RemixIcons.hourglass_line,
+                            size: 13,
                             color: isUrgent
                                 ? const Color(0xFFEF4444)
                                 : const Color(0xFFD97706),
                           ),
+                          const SizedBox(width: 5),
+                          Text(
+                            daysRemaining <= 0
+                                ? 'Purges today'
+                                : '$daysRemaining days left',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isUrgent
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFFD97706),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (customer.deletedAt != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Deleted ${_formatDate(customer.deletedAt!)}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: p.textMuted,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                  if (customer.deletedAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Deleted ${_formatDate(customer.deletedAt!)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: p.textMuted,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
-
             const SizedBox(width: 16),
 
             // Action Buttons
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isDark ? AppColors.gold : const Color(0xFF1E1A14),
-                    foregroundColor:
-                        isDark ? AppColors.black : const Color(0xFFF3E7C4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? AppColors.gold
+                          : const Color(0xFF1E1A14),
+                      foregroundColor: isDark
+                          ? AppColors.black
+                          : const Color(0xFFF3E7C4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                    icon: const Icon(RemixIcons.restart_line, size: 16),
+                    label: const Text(
+                      'Restore',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    elevation: 0,
+                    onPressed: () => _restoreCustomer(customer),
                   ),
-                  icon: const Icon(RemixIcons.restart_line, size: 16),
-                  label: const Text(
-                    'Restore',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                  onPressed: () => _restoreCustomer(customer),
                 ),
                 const SizedBox(width: 6),
                 IconButton(
@@ -664,8 +690,7 @@ class _TrashScreenState extends State<TrashScreen>
         isDark,
         icon: RemixIcons.alarm_line,
         title: 'No Trashed Reminders',
-        subtitle:
-            'Deleted reminders will remain here for 14 days before permanent deletion.',
+        subtitle: 'Deleted reminders will remain here for 14 days before permanent deletion.',
       );
     }
 
@@ -673,7 +698,7 @@ class _TrashScreenState extends State<TrashScreen>
       onRefresh: _handleRefresh,
       color: AppColors.gold,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
         itemCount: reminders.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -737,7 +762,11 @@ class _TrashScreenState extends State<TrashScreen>
               flex: 2,
               child: Row(
                 children: [
-                  Icon(RemixIcons.calendar_event_line, size: 14, color: p.textMuted),
+                  Icon(
+                    RemixIcons.calendar_event_line,
+                    size: 14,
+                    color: p.textMuted,
+                  ),
                   const SizedBox(width: 5),
                   Text(
                     '${reminder.dateFormatted} at ${reminder.reminderTime}',
@@ -754,7 +783,10 @@ class _TrashScreenState extends State<TrashScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: isUrgent
                           ? const Color(0xFFEF4444).withValues(alpha: 0.15)
@@ -766,43 +798,50 @@ class _TrashScreenState extends State<TrashScreen>
                             : const Color(0xFFF59E0B).withValues(alpha: 0.4),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          RemixIcons.hourglass_line,
-                          size: 13,
-                          color: isUrgent
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFD97706),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              RemixIcons.hourglass_line,
+                              size: 13,
+                              color: isUrgent
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              daysRemaining <= 0
+                                  ? 'Purges today'
+                                  : '$daysRemaining days left',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isUrgent
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          daysRemaining <= 0
-                              ? 'Purges today'
-                              : '$daysRemaining days left',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: isUrgent
-                                ? const Color(0xFFEF4444)
-                                : const Color(0xFFD97706),
+                        if (reminder.deletedAt != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Deleted ${_formatDate(reminder.deletedAt!)}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: p.textMuted,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
-                  if (reminder.deletedAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Deleted ${_formatDate(reminder.deletedAt!)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: p.textMuted,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -813,27 +852,32 @@ class _TrashScreenState extends State<TrashScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isDark ? AppColors.gold : const Color(0xFF1E1A14),
-                    foregroundColor:
-                        isDark ? AppColors.black : const Color(0xFFF3E7C4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? AppColors.gold
+                          : const Color(0xFF1E1A14),
+                      foregroundColor: isDark
+                          ? AppColors.black
+                          : const Color(0xFFF3E7C4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                    icon: const Icon(RemixIcons.restart_line, size: 16),
+                    label: const Text(
+                      'Restore',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    elevation: 0,
+                    onPressed: () => _restoreReminder(reminder),
                   ),
-                  icon: const Icon(RemixIcons.restart_line, size: 16),
-                  label: const Text(
-                    'Restore',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                  onPressed: () => _restoreReminder(reminder),
                 ),
                 const SizedBox(width: 6),
                 IconButton(
@@ -902,8 +946,18 @@ class _TrashScreenState extends State<TrashScreen>
   String _formatDate(DateTime dt) {
     final local = dt.toLocal();
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final m = months[local.month - 1];
     final d = local.day;

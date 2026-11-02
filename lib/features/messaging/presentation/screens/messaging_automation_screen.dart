@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
@@ -167,10 +168,28 @@ class _TabItem extends StatelessWidget {
           curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? p.surface : Colors.transparent,
+            color: selected
+                ? (p.isDark
+                      ? AppColors.gold.withValues(alpha: 0.14)
+                      : AppColors.white)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: selected ? p.border : Colors.transparent),
-            boxShadow: selected && !p.isDark ? p.softShadow : null,
+            border: Border.all(
+              color: selected
+                  ? (p.isDark
+                        ? AppColors.gold.withValues(alpha: 0.35)
+                        : AppPalette.statusGold.withValues(alpha: 0.25))
+                  : Colors.transparent,
+            ),
+            boxShadow: selected && !p.isDark
+                ? [
+                    BoxShadow(
+                      color: AppPalette.statusGold.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: FittedBox(

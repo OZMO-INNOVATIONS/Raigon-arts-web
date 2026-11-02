@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           (_) => const WorkshopProfile(
             businessName: 'RAIGON ART',
             tagline: 'Photo Frames & Custom Framing',
-            businessPhone: '8137922114',
+            businessPhone: '9747099559',
             businessEmail: 'orders@raigonarts.com',
             workshopAddress: 'Main Workshop, MG Road, Trivandrum',
             gstin: '',

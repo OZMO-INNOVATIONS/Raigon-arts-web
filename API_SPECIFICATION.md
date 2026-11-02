@@ -81,7 +81,7 @@ CREATE TABLE workshop_settings (
     id VARCHAR(50) PRIMARY KEY DEFAULT 'default',
     business_name VARCHAR(150) NOT NULL DEFAULT 'RAIGON ART',
     tagline VARCHAR(255) DEFAULT 'Photo Frames & Custom Framing',
-    business_phone VARCHAR(20) NOT NULL DEFAULT '8137922114',
+    business_phone VARCHAR(20) NOT NULL DEFAULT '97470 99559',
     business_email VARCHAR(150) DEFAULT 'orders@raigonarts.com',
     workshop_address TEXT NOT NULL DEFAULT 'Main Workshop, MG Road, Trivandrum',
     gstin VARCHAR(50) DEFAULT '',
@@ -193,7 +193,7 @@ CREATE TABLE activity_logs (
 * **Request:**
 ```json
 {
-  "identifier": "admin@gmail.com", // Or phone number "8137922114"
+  "identifier": "admin@gmail.com", // Or phone number "97470 99559"
   "password": "securePassword123"
 }
 ```
@@ -208,7 +208,7 @@ CREATE TABLE activity_logs (
       "id": "e4b17b62-6029-4d64-83b1-3e4b3c076591",
       "name": "Raigon Admin",
       "email": "admin@gmail.com",
-      "phone": "8137922114",
+      "phone": "97470 99559",
       "role": "admin"
     }
   }
@@ -217,7 +217,7 @@ CREATE TABLE activity_logs (
 
 #### 1.2 Send WhatsApp / SMS OTP
 * **Endpoint:** `POST /api/v1/auth/forgot-password`
-* **Request:** `{ "phone": "8137922114" }`
+* **Request:** `{ "phone": "97470 99559" }`
 * **Response (200 OK):**
 ```json
 {
@@ -228,7 +228,7 @@ CREATE TABLE activity_logs (
 
 #### 1.3 Verify OTP
 * **Endpoint:** `POST /api/v1/auth/verify-otp`
-* **Request:** `{ "phone": "8137922114", "otp": "1234" }`
+* **Request:** `{ "phone": "97470 99559", "otp": "1234" }`
 * **Response (200 OK):**
 ```json
 {
@@ -242,7 +242,7 @@ CREATE TABLE activity_logs (
 * **Request:**
 ```json
 {
-  "phone": "8137922114",
+  "phone": "97470 99559",
   "resetToken": "otp_verified_token_9934",
   "newPassword": "newSecretPassword123"
 }
@@ -260,7 +260,7 @@ CREATE TABLE activity_logs (
     "id": "e4b17b62-6029-4d64-83b1-3e4b3c076591",
     "name": "Raigon Admin",
     "email": "admin@gmail.com",
-    "phone": "8137922114",
+    "phone": "97470 99559",
     "role": "admin"
   }
 }
@@ -662,7 +662,7 @@ CREATE TABLE activity_logs (
   "data": {
     "businessName": "RAIGON ART",
     "tagline": "Photo Frames & Custom Framing",
-    "businessPhone": "8137922114",
+    "businessPhone": "97470 99559",
     "businessEmail": "orders@raigonarts.com",
     "workshopAddress": "Main Workshop, MG Road, Trivandrum",
     "gstin": "32AAAAA0000A1Z5",

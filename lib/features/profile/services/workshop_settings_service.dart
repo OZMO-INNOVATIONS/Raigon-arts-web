@@ -24,7 +24,7 @@ class WorkshopProfile {
       WorkshopProfile(
         businessName: json['businessName'] as String? ?? 'RAIGON ART',
         tagline: json['tagline'] as String? ?? 'Photo Frames & Custom Framing',
-        businessPhone: json['businessPhone'] as String? ?? '8137922114',
+        businessPhone: json['businessPhone'] as String? ?? '97470 99559',
         businessEmail:
             json['businessEmail'] as String? ?? 'orders@raigonarts.com',
         workshopAddress:

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -69,6 +70,16 @@ class ReminderAudioService {
     } catch (_) {}
   }
 
+  Future<void> setPlaybackRate(double rate) async {
+    if (_isDisposed) return;
+
+    try {
+      await _player.setPlaybackRate(rate);
+    } catch (e) {
+      debugPrint('[ReminderAudioService] setPlaybackRate error: $e');
+    }
+  }
+
   void _initPlayerListeners() {
     _playerStateSub = _player.onPlayerStateChanged.listen((state) {
       if (_isDisposed) return;
@@ -110,7 +121,9 @@ class ReminderAudioService {
       _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (_isDisposed) return;
         if (_recordStartTime != null) {
-          _recordingSeconds = DateTime.now().difference(_recordStartTime!).inSeconds;
+          _recordingSeconds = DateTime.now()
+              .difference(_recordStartTime!)
+              .inSeconds;
           _safeAdd(_recordSecondsController, _recordingSeconds);
         }
       });
@@ -143,7 +156,9 @@ class ReminderAudioService {
           } catch (e) {
             debugPrint('[ReminderAudioService] Decode data URI error: $e');
           }
-        } else if (kIsWeb || path.startsWith('blob:') || path.startsWith('http')) {
+        } else if (kIsWeb ||
+            path.startsWith('blob:') ||
+            path.startsWith('http')) {
           try {
             final res = await http.get(Uri.parse(path));
             if (res.statusCode == 200) {
@@ -288,4 +303,3 @@ class ReminderAudioService {
 
   static int mathMax(int a, int b) => a > b ? a : b;
 }
-

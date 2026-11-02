@@ -40,6 +40,7 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
   StreamSubscription? _playerSub;
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
+  double _playbackRate = 1.0;
 
   @override
   void initState() {
@@ -80,6 +81,16 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
     final m = totalSeconds ~/ 60;
     final s = totalSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _togglePlaybackRate() async {
+    final newRate = _playbackRate == 1.0 ? 2.0 : 1.0;
+
+    await _audioService.setPlaybackRate(newRate);
+
+    if (mounted) {
+      setState(() => _playbackRate = newRate);
+    }
   }
 
   Future<void> _startRecording() async {
@@ -531,17 +542,59 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
                       ),
                       if (isPlayingThis) ...[
                         const SizedBox(height: 8),
-                        ScrubbableAudioWaveform(
-                          progress: progress,
-                          onSeek: (r) async {
-                            final targetMs = (r * effectiveTotalSec * 1000)
-                                .toInt();
-                            await _audioService.seek(
-                              Duration(milliseconds: targetMs),
-                            );
-                          },
-                          height: 20,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ScrubbableAudioWaveform(
+                                progress: progress,
+                                onSeek: (r) async {
+                                  final targetMs =
+                                      (r * effectiveTotalSec * 1000).toInt();
+
+                                  await _audioService.seek(
+                                    Duration(milliseconds: targetMs),
+                                  );
+                                },
+                                height: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _togglePlaybackRate,
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.gold.withValues(
+                                      alpha: _playbackRate == 2.0 ? 0.20 : 0.10,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppColors.gold.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${_playbackRate.toStringAsFixed(0)}x',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.gold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 8),
                       ],
                     ],
                   ),

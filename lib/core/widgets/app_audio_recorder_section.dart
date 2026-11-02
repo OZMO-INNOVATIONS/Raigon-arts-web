@@ -178,13 +178,14 @@ class _AnimatedRecordingWaveformState extends State<_AnimatedRecordingWaveform>
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT 3: SCRUBBABLE / ANIMATED PLAYBACK AUDIO WAVEFORM
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ScrubbableAudioWaveform extends StatelessWidget {
   const ScrubbableAudioWaveform({
     super.key,
-    required this.progress, // 0.0 to 1.0
+    required this.progress,
     required this.onSeek,
-    this.barCount = 28,
-    this.height = 28,
+    this.barCount = 90,
+    this.height = 32,
   });
 
   final double progress;
@@ -192,97 +193,110 @@ class ScrubbableAudioWaveform extends StatelessWidget {
   final int barCount;
   final double height;
 
-  static const List<double> _waveformPattern = [
-    0.30,
-    0.45,
-    0.75,
-    0.55,
-    0.90,
-    0.40,
-    0.85,
-    0.65,
-    0.95,
-    0.50,
-    0.80,
-    0.60,
-    0.70,
-    0.90,
-    0.45,
-    0.75,
-    0.85,
+  static const List<double> _baseHeights = [
     0.35,
-    0.95,
-    0.60,
-    0.80,
-    0.50,
     0.70,
+    0.45,
+    0.90,
+    0.60,
+    0.85,
     0.40,
+    0.95,
+    0.50,
+    0.80,
+    0.65,
+    0.40,
+    0.75,
+    0.30,
     0.85,
     0.55,
-    0.65,
-    0.30,
-    0.75,
-    0.40,
     0.90,
-    0.50,
+    0.45,
+    0.70,
+    0.35,
   ];
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final clampedProgress = progress.clamp(0.0, 1.0);
+    final playbackProgress = progress.clamp(0.0, 1.0);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth;
-        // Dynamically compute bar count based on available width
-        final targetBars = math.min(
-          barCount,
-          math.max(12, (availableWidth / 7).floor()),
-        );
+        final width = constraints.maxWidth;
+
+        if (width <= 0) return SizedBox(height: height);
+
+        // Calculate bars according to available width.
+        final count = math.min(barCount, math.max(1, (width / 6).floor()));
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onHorizontalDragUpdate: onSeek == null
               ? null
               : (details) {
-                  final localX = details.localPosition.dx.clamp(
-                    0.0,
-                    availableWidth,
-                  );
-                  onSeek!(localX / availableWidth);
+                  final x = details.localPosition.dx.clamp(0.0, width);
+                  onSeek!(x / width);
                 },
           onTapDown: onSeek == null
               ? null
               : (details) {
-                  final localX = details.localPosition.dx.clamp(
-                    0.0,
-                    availableWidth,
-                  );
-                  onSeek!(localX / availableWidth);
+                  final x = details.localPosition.dx.clamp(0.0, width);
+                  onSeek!(x / width);
                 },
           child: SizedBox(
             height: height,
             width: double.infinity,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: List.generate(targetBars, (i) {
-                final barRatio = (i + 1) / targetBars;
-                final isPlayed = barRatio <= clampedProgress;
-                final rawHeight = _waveformPattern[i % _waveformPattern.length];
-                final barH = 5.0 + (rawHeight * (height - 8));
+              children: List.generate(count, (i) {
+                final base = _baseHeights[i % _baseHeights.length];
 
-                return Container(
-                  width: 3.0,
-                  height: barH,
-                  decoration: BoxDecoration(
-                    color: isPlayed
-                        ? AppColors.gold
-                        : (p.isDark
-                              ? const Color(0xFF454760)
-                              : const Color(0xFFDDD9CD)),
-                    borderRadius: BorderRadius.circular(1.5),
+                // Keep the waveform shape stable during playback.
+                final barHeight = 6.0 + (base * 18.0);
+                final barRatio = (i + 1) / count;
+                final isPlayed = barRatio <= playbackProgress;
+
+                // Red -> orange -> gold gradient sweep.
+                final gradientPosition = playbackProgress > 0
+                    ? (barRatio / playbackProgress).clamp(0.0, 1.0)
+                    : 0.0;
+
+                final playedColor = Color.lerp(
+                  const Color(0xFFEF4444),
+                  const Color(0xFFF59E0B),
+                  gradientPosition,
+                )!;
+
+                final isPlayhead =
+                    isPlayed &&
+                    (playbackProgress - barRatio).abs() <= (1 / count);
+
+                return Expanded(
+                  child: Center(
+                    child: Container(
+                      width: 3,
+                      height: barHeight,
+                      decoration: BoxDecoration(
+                        color: isPlayed
+                            ? playedColor
+                            : (p.isDark
+                                  ? const Color(0xFF454760)
+                                  : const Color(0xFFE0DCCF)),
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: isPlayhead
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B)
+                                      .withValues(alpha: 0.45),
+                                  blurRadius: 7,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
                   ),
                 );
               }),

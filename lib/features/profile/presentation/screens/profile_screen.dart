@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:raigon_art/core/constants/asset_constants.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/features/profile/services/workshop_settings_service.dart';
 import 'package:remixicon/remixicon.dart';
 
@@ -16,8 +17,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String _businessName = 'RAIGON ART';
   String _tagline = 'Photo Frames & Custom Framing';
-  String _businessPhone = '9747099559';
+  String _businessPhone = '97470 99559';
   String _businessEmail = 'theraigonart@gmail.com';
+  String _workshopAddress =
+      'VP 302-A, R J Building, Kollamkonam Junction, Vilappilsala, Thiruvananthapuram, Kerala 695573';
   String _gstin = '32AAAAA0000A1Z5';
   int _retentionDays = 45;
   bool _autoCleanup = true;
@@ -97,9 +100,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           (_) => const WorkshopProfile(
             businessName: 'RAIGON ART',
             tagline: 'Photo Frames & Custom Framing',
-            businessPhone: '9747099559',
-            businessEmail: 'orders@raigonarts.com',
-            workshopAddress: 'Main Workshop, MG Road, Trivandrum',
+            businessPhone: '97470 99559',
+            businessEmail: 'theraigonart@gmail.com',
+            workshopAddress:
+                'VP 302-A, R J Building, Kollamkonam Junction, Vilappilsala, Thiruvananthapuram, Kerala 695573',
             gstin: '',
             businessHours: [],
           ),
@@ -121,6 +125,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _tagline = profile.tagline;
           _businessPhone = profile.businessPhone;
           _businessEmail = profile.businessEmail;
+          if (profile.workshopAddress.isNotEmpty) {
+            _workshopAddress = profile.workshopAddress;
+          }
           _gstin = profile.gstin.isNotEmpty ? profile.gstin : 'Not registered';
           _retentionDays = retention.retentionDays;
           _autoCleanup = retention.autoCleanupEnabled;
@@ -181,12 +188,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               p,
                               title: 'LOCATION',
                               rows: [
-                                const _InfoItem(
+                                _InfoItem(
                                   icon: RemixIcons.map_pin_line,
                                   label: 'Workshop Address',
-                                  value:
-                                      'VP 302-A, R J Building, Kollamkonam Junction, '
-                                      'Vilappilsala, Thiruvananthapuram, Kerala 695573',
+                                  value: _workshopAddress,
                                 ),
                                 const _InfoItem(
                                   icon: RemixIcons.building_line,
@@ -370,7 +375,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _title(AppPalette p) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
@@ -394,7 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         if (_isLoading)
           const Padding(
-            padding: EdgeInsets.only(top: 8),
+            padding: EdgeInsets.only(right: 14),
             child: SizedBox(
               width: 20,
               height: 20,
@@ -404,7 +409,298 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+        ElevatedButton.icon(
+          onPressed: _openEditProfileDialog,
+          icon: const Icon(RemixIcons.edit_line, size: 16),
+          label: const Text('Edit Profile'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.gold,
+            foregroundColor: AppColors.black,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  InputDecoration _dialogInputDec(AppPalette p, String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      labelStyle: TextStyle(fontSize: 13, color: p.textMuted),
+      hintStyle: TextStyle(fontSize: 13, color: p.textMuted.withValues(alpha: 0.6)),
+      filled: true,
+      fillColor: p.isDark ? const Color(0xFF26283C) : const Color(0xFFF7F6F2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: p.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: p.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+      ),
+    );
+  }
+
+  Future<void> _openEditProfileDialog() async {
+    final p = AppPalette.of(context);
+    final nameCtrl = TextEditingController(text: _businessName);
+    final taglineCtrl = TextEditingController(text: _tagline);
+    final phoneCtrl = TextEditingController(text: _businessPhone);
+    final emailCtrl = TextEditingController(text: _businessEmail);
+    final addressCtrl = TextEditingController(text: _workshopAddress);
+    final gstinCtrl = TextEditingController(
+      text: _gstin == 'Not registered' ? '' : _gstin,
+    );
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogContentCtx, setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 540),
+              decoration: BoxDecoration(
+                color: p.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: p.border, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 28,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              RemixIcons.store_2_line,
+                              color: AppColors.gold,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Edit Business Profile',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: p.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Update workshop contact info and settings in API',
+                                  style: TextStyle(fontSize: 12, color: p.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            color: p.textMuted,
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Divider(height: 1, color: p.border),
+                      const SizedBox(height: 18),
+
+                      // Business Name & Tagline
+                      TextFormField(
+                        controller: nameCtrl,
+                        style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                        decoration: _dialogInputDec(p, 'Business Name', hint: 'e.g. RAIGON ART'),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: taglineCtrl,
+                        style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                        decoration: _dialogInputDec(p, 'Tagline', hint: 'e.g. Photo Frames & Custom Framing'),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Phone & Email
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: phoneCtrl,
+                              style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                              decoration: _dialogInputDec(p, 'Business Phone', hint: 'e.g. 97470 99559'),
+                              validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: emailCtrl,
+                              style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                              decoration: _dialogInputDec(p, 'Business Email', hint: 'e.g. theraigonart@gmail.com'),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return 'Required';
+                                if (!v.contains('@')) return 'Enter valid email';
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Workshop Address
+                      TextFormField(
+                        controller: addressCtrl,
+                        maxLines: 2,
+                        style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                        decoration: _dialogInputDec(p, 'Workshop Address', hint: 'Full workshop street address'),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // GSTIN
+                      TextFormField(
+                        controller: gstinCtrl,
+                        style: TextStyle(color: p.textPrimary, fontSize: 13.5),
+                        decoration: _dialogInputDec(p, 'GSTIN / Tax ID (Optional)', hint: 'e.g. 32AAAAA0000A1Z5'),
+                      ),
+                      const SizedBox(height: 22),
+
+                      // Actions
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                side: BorderSide(color: p.border),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: p.textMuted, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      if (!formKey.currentState!.validate()) return;
+                                      setDialogState(() => isSaving = true);
+                                      try {
+                                        final service = WorkshopSettingsService();
+                                        final updated = await service.updateProfile({
+                                          'businessName': nameCtrl.text.trim(),
+                                          'tagline': taglineCtrl.text.trim(),
+                                          'businessPhone': phoneCtrl.text.trim(),
+                                          'businessEmail': emailCtrl.text.trim(),
+                                          'workshopAddress': addressCtrl.text.trim(),
+                                          'gstin': gstinCtrl.text.trim(),
+                                        });
+
+                                        if (!mounted) return;
+                                        setState(() {
+                                          _businessName = updated.businessName;
+                                          _tagline = updated.tagline;
+                                          _businessPhone = updated.businessPhone;
+                                          _businessEmail = updated.businessEmail;
+                                          if (updated.workshopAddress.isNotEmpty) {
+                                            _workshopAddress = updated.workshopAddress;
+                                          }
+                                          _gstin = updated.gstin.isNotEmpty ? updated.gstin : 'Not registered';
+                                        });
+
+                                        if (dialogCtx.mounted) {
+                                          Navigator.of(dialogCtx).pop();
+                                        }
+
+                                        if (!mounted) return;
+                                        AppSnackBar.success(
+                                          context,
+                                          'Business profile updated in API.',
+                                        );
+                                      } catch (e) {
+                                        if (dialogContentCtx.mounted) {
+                                          setDialogState(() => isSaving = false);
+                                        }
+                                        if (!mounted) return;
+                                        AppSnackBar.error(
+                                          context,
+                                          'Failed to update profile: $e',
+                                        );
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.gold,
+                                foregroundColor: AppColors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: isSaving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.black,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Save Changes',
+                                      style: TextStyle(fontWeight: FontWeight.w800),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

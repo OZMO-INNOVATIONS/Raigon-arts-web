@@ -20,19 +20,23 @@ class WorkshopProfile {
   final String gstin;
   final List<dynamic> businessHours;
 
-  factory WorkshopProfile.fromJson(Map<String, dynamic> json) =>
-      WorkshopProfile(
-        businessName: json['businessName'] as String? ?? 'RAIGON ART',
-        tagline: json['tagline'] as String? ?? 'Photo Frames & Custom Framing',
-        businessPhone: json['businessPhone'] as String? ?? '97470 99559',
-        businessEmail:
-            json['businessEmail'] as String? ?? 'orders@raigonarts.com',
-        workshopAddress:
-            json['workshopAddress'] as String? ??
-            'Main Workshop, MG Road, Trivandrum',
-        gstin: json['gstin'] as String? ?? '',
-        businessHours: json['businessHours'] as List? ?? const [],
-      );
+  factory WorkshopProfile.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> data =
+        json.containsKey('data') && json['data'] is Map
+            ? Map<String, dynamic>.from(json['data'] as Map)
+            : json;
+
+    return WorkshopProfile(
+      businessName: data['businessName'] as String? ?? 'RAIGON ART',
+      tagline: data['tagline'] as String? ?? 'Photo Frames & Custom Framing',
+      businessPhone: data['businessPhone'] as String? ?? '97470 99559',
+      businessEmail: data['businessEmail'] as String? ?? 'theraigonart@gmail.com',
+      workshopAddress: data['workshopAddress'] as String? ??
+          'VP 302-A, R J Building, Kollamkonam Junction, Vilappilsala, Thiruvananthapuram, Kerala 695573',
+      gstin: data['gstin'] as String? ?? '',
+      businessHours: data['businessHours'] as List? ?? const [],
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'businessName': businessName,

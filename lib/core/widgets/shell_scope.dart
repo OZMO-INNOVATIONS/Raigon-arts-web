@@ -6,11 +6,11 @@ enum NavDestination {
   customers,
   orders,
   reminders,
-  frameSizes,
+  // frameSizes,
   messagingAutomation,
   reports,
   trash,
-  profile,
+  // profile,
 }
 
 extension NavDestinationX on NavDestination {
@@ -19,11 +19,11 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers => 'Customers',
     NavDestination.orders => 'Orders',
     NavDestination.reminders => 'Reminders',
-    NavDestination.frameSizes => 'Material',
+    // NavDestination.frameSizes => 'Material',
     NavDestination.messagingAutomation => 'Messaging Automation',
     NavDestination.reports => 'Reports',
     NavDestination.trash => 'Trash & Bin',
-    NavDestination.profile => 'Profile',
+    // NavDestination.profile => 'Profile',
   };
 
   IconData get icon => switch (this) {
@@ -31,11 +31,11 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers => RemixIcons.team_line,
     NavDestination.orders => RemixIcons.inbox_line,
     NavDestination.reminders => RemixIcons.alarm_line,
-    NavDestination.frameSizes => RemixIcons.ruler_line,
+    // NavDestination.frameSizes => RemixIcons.ruler_line,
     NavDestination.messagingAutomation => RemixIcons.message_3_line,
     NavDestination.reports => RemixIcons.bar_chart_line,
     NavDestination.trash => RemixIcons.delete_bin_line,
-    NavDestination.profile => RemixIcons.store_2_line,
+    // NavDestination.profile => RemixIcons.store_2_line,
   };
 
   /// Screens Staff members are allowed to access.
@@ -43,10 +43,10 @@ extension NavDestinationX on NavDestination {
     NavDestination.customers ||
     NavDestination.orders ||
     NavDestination.reminders ||
-    NavDestination.frameSizes ||
+    // NavDestination.frameSizes ||
     NavDestination.messagingAutomation ||
     NavDestination.trash ||
-    NavDestination.profile => true,
+    // NavDestination.profile => true,
     _ => false,
   };
 

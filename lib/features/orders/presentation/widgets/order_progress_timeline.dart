@@ -158,9 +158,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
     final isOnHold = widget.status == Status.onHold;
     final isCancelled = widget.status == Status.cancelled;
     final currentIdx = _currentProductionIndex;
-    final activeStage = currentIdx >= 0 && currentIdx < _productionStages.length
-        ? _productionStages[currentIdx]
-        : widget.status;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -192,11 +189,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
 
             // 5. Horizontal Timeline with Connected Animated Fill Line
             _buildHorizontalTimeline(p, isDark, currentIdx),
-
-            const SizedBox(height: 18),
-
-            // 6. Active Spotlight Card
-            _buildActiveSpotlightCard(p, isDark, activeStage, currentIdx),
           ],
         );
 
@@ -241,6 +233,7 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
                   : const Color(0xFFA7F3D0),
             ),
           ),
+
           child: const Icon(
             Icons.tune_rounded,
             size: 18,
@@ -778,113 +771,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // ACTIVE SPOTLIGHT CARD (WEB)
-  // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildActiveSpotlightCard(
-    AppPalette p,
-    bool isDark,
-    Status activeStage,
-    int currentIdx,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF241D12) : const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFBBF24), Color(0xFFD97706)],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(
-              _stageIcons[activeStage] ?? Icons.circle,
-              size: 22,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        currentIdx >= 0
-                            ? 'STEP ${currentIdx + 1} OF ${_productionStages.length} IN PRODUCTION'
-                            : 'STAGE IN PRODUCTION',
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6,
-                          color: Color(0xFFD97706),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Current Stage: ${activeStage.label}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : const Color(0xFF1E1B16),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _getDetailedStageDescription(activeStage),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.35,
-                    color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // ON HOLD & CANCELLED BANNERS
   // ─────────────────────────────────────────────────────────────────────────
   Widget _buildOnHoldBanner(bool isDark) {
@@ -1058,30 +944,6 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
       'Dec',
     ][lastDt.month - 1];
     return 'Last updated $month ${lastDt.day} at $hour:$minute $ampm';
-  }
-
-  static String _getDetailedStageDescription(Status s) {
-    switch (s) {
-      case Status.pending:
-        return 'Order received. Awaiting confirmation & review.';
-      case Status.confirmed:
-        return 'Customer order verified. Ready for editing pipeline.';
-      case Status.editingProgress:
-      case Status.inProgress:
-        return 'Digital artisan photo retouching & layout refinement.';
-      case Status.dispatchForPrinting:
-        return 'Artwork dispatched to high-resolution print studio.';
-      case Status.printReceived:
-        return 'Prints received at workshop. Prepping frame mounts.';
-      case Status.framingProcess:
-        return 'Custom wooden moulding cut, mounted, and glazing fitted.';
-      case Status.completed:
-        return 'Framing completed, QA passed & delivered.';
-      case Status.onHold:
-        return 'Workshop operations paused. Awaiting resumption.';
-      case Status.cancelled:
-        return 'Order is cancelled and archived from production.';
-    }
   }
 
   static String _getStatusSubtitle(Status s) {

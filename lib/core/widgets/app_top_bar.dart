@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:remixicon/remixicon.dart';
-import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/theme/mx_theme.dart';
 import 'package:raigon_art/core/theme/theme_controller.dart';
@@ -70,12 +68,12 @@ class AppTopBar extends StatelessWidget {
               // ── Notifications ──
               _BellButton(count: notificationCount, onTap: onBellTap),
 
-              const SizedBox(width: 16),
-              Container(width: 1, height: 28, color: p.border),
-              const SizedBox(width: 16),
+              // const SizedBox(width: 16),
+              // Container(width: 1, height: 28, color: p.border),
+              // // const SizedBox(width: 16),
 
-              // ── Profile ──
-              _ProfileChip(compact: compact),
+              // // ── Profile ──
+              // _ProfileChip(compact: compact),
             ],
           );
         },
@@ -276,48 +274,48 @@ class _BellButtonState extends State<_BellButton> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Profile pill
-// ─────────────────────────────────────────────────────────────
+// // ─────────────────────────────────────────────────────────────
+// // Profile pill
+// // ─────────────────────────────────────────────────────────────
 
-class _ProfileChip extends StatelessWidget {
-  const _ProfileChip({required this.compact});
-  final bool compact;
+// class _ProfileChip extends StatelessWidget {
+//   const _ProfileChip({required this.compact});
+//   final bool compact;
 
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
+//   @override
+//   Widget build(BuildContext context) {
+//     final p = AppPalette.of(context);
 
-    return Tooltip(
-      message: 'Business Profile',
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () {
-            ShellScope.of(context).goTo(NavDestination.profile);
-          },
-          child: Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: p.avatarBg,
-              border: Border.all(color: AppColors.gold, width: 2),
-            ),
-            child: const Text(
-              'RA',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.gold,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+//     return Tooltip(
+//       message: 'Business Profile',
+//       child: Material(
+//         color: Colors.transparent,
+//         shape: const CircleBorder(),
+//         child: InkWell(
+//           customBorder: const CircleBorder(),
+//           onTap: () {
+//             ShellScope.of(context).goTo(NavDestination.profile);
+//           },
+//           child: Container(
+//             width: 46,
+//             height: 46,
+//             alignment: Alignment.center,
+//             decoration: BoxDecoration(
+//               shape: BoxShape.circle,
+//               color: p.avatarBg,
+//               border: Border.all(color: AppColors.gold, width: 2),
+//             ),
+//             child: const Text(
+//               'RA',
+//               style: TextStyle(
+//                 fontSize: 15,
+//                 fontWeight: FontWeight.w700,
+//                 color: AppColors.gold,
+//               ),
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }

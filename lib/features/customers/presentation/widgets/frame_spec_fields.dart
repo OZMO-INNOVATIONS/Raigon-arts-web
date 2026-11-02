@@ -149,9 +149,9 @@ class FrameSpecFields extends StatelessWidget {
       }
     }
 
-    final sizeNames = availableSizes.map((frame) => frame.name).toList();
+    // final sizeNames = availableSizes.map((frame) => frame.name).toList();
 
-    final selectedSize = sizeNames.contains(data.size) ? data.size : null;
+    // final selectedSize = sizeNames.contains(data.size) ? data.size : null;
 
     final currentUnitObj = FrameUnit.fromString(data.unit);
 
@@ -161,46 +161,6 @@ class FrameSpecFields extends StatelessWidget {
         // Frame Size and Measurement Unit
         FormRow(
           children: [
-            LabeledField(
-              label: 'Frame Size Preset',
-              child: sizeNames.isEmpty
-                  ? const InputDecorator(
-                      decoration: InputDecoration(border: OutlineInputBorder()),
-                      child: Text('No frame sizes available'),
-                    )
-                  : FormDropdown<String>(
-                      key: ValueKey(selectedSize),
-                      value: selectedSize,
-                      hint: 'Select Frame Size',
-                      items: sizeNames,
-                      labelOf: (name) => name,
-                      onChanged: (value) {
-                        data.size = value;
-
-                        final selectedFrame = availableSizes.firstWhere(
-                          (frame) => frame.name == value,
-                        );
-
-                        final frameUnit = FrameUnit.fromString(
-                          selectedFrame.unit,
-                        );
-
-                        data.width.text =
-                            FrameMeasurementHelper.formatDimension(
-                              selectedFrame.width,
-                            );
-
-                        data.height.text =
-                            FrameMeasurementHelper.formatDimension(
-                              selectedFrame.height,
-                            );
-
-                        data.unit = frameUnit.label;
-
-                        onChanged();
-                      },
-                    ),
-            ),
             LabeledField(
               label: 'Measurement Unit',
               child: FormDropdown<String>(
@@ -214,6 +174,10 @@ class FrameSpecFields extends StatelessWidget {
                 },
                 onChanged: _onUnitChanged,
               ),
+            ),
+            LabeledField(
+              label: 'Quantity',
+              child: NumberBox(controller: data.qty, min: 1),
             ),
           ],
         ),
@@ -245,39 +209,33 @@ class FrameSpecFields extends StatelessWidget {
                 onChanged: (_) => onChanged(),
               ),
             ),
-            // Photo Orientation and Quantity
-            FormRow(
-              children: [
-                LabeledField(
-                  label: 'Quantity',
-                  child: NumberBox(controller: data.qty, min: 1),
-                ),
-              ],
-            ),
           ],
         ),
 
         gap,
 
-        // Customer Note
-        LabeledField(
-          label: 'Customer Note',
-          child: AppTextBox(
-            controller: data.customerNote,
-            maxLines: 3,
-            hint: 'Enter additional notes from the customer...',
-          ),
-        ),
-        gap,
-
-        // Special Instructions
-        LabeledField(
-          label: 'Special Instructions / Mounting Notes',
-          child: AppTextBox(
-            controller: data.notes,
-            maxLines: 3,
-            hint: 'Glass type (Anti-glare, Clear), Matting board margin, mounting hooks...',
-          ),
+        // Width and Height
+        FormRow(
+          children: [
+            // Special Instructions
+            LabeledField(
+              label: 'Special Instructions / Mounting Notes',
+              child: AppTextBox(
+                controller: data.notes,
+                maxLines: 3,
+                hint: 'Glass type (Anti-glare, Clear), Matting board margin, mounting hooks...',
+              ),
+            ),
+            // Customer Note
+            LabeledField(
+              label: 'Customer Note',
+              child: AppTextBox(
+                controller: data.customerNote,
+                maxLines: 3,
+                hint: 'Enter additional notes from the customer...',
+              ),
+            ),
+          ],
         ),
       ],
     );

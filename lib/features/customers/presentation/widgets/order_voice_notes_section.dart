@@ -7,7 +7,6 @@ import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_audio_recorder_section.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
-import 'package:raigon_art/core/widgets/form_kit.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 
@@ -34,13 +33,13 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
   bool _isRecording = false;
   int _recordingSeconds = 0;
   String? _playingNoteId;
+  double _playbackRate = 1.0;
   Duration _currentPos = Duration.zero;
   Duration _totalDur = Duration.zero;
   StreamSubscription? _recSub;
   StreamSubscription? _playerSub;
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
-  double _playbackRate = 1.0;
 
   @override
   void initState() {
@@ -81,16 +80,6 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
     final m = totalSeconds ~/ 60;
     final s = totalSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _togglePlaybackRate() async {
-    final newRate = _playbackRate == 1.0 ? 2.0 : 1.0;
-
-    await _audioService.setPlaybackRate(newRate);
-
-    if (mounted) {
-      setState(() => _playbackRate = newRate);
-    }
   }
 
   Future<void> _startRecording() async {
@@ -183,6 +172,20 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
     }
   }
 
+  Future<void> _cyclePlaybackRate() async {
+    final nextRate = switch (_playbackRate) {
+      1.0 => 1.5,
+      1.5 => 2.0,
+      _ => 1.0,
+    };
+
+    await _audioService.setPlaybackRate(nextRate);
+
+    if (mounted) {
+      setState(() => _playbackRate = nextRate);
+    }
+  }
+
   void _removeNote(int index) {
     final note = widget.voiceNotes[index];
     if (_playingNoteId == note.id) {
@@ -203,7 +206,6 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final c = FormColors.of(context);
 
     final hasNotes = widget.voiceNotes.isNotEmpty;
 
@@ -214,9 +216,12 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: c.textBorder, width: 1.2),
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+          width: 1.2,
+        ),
       ),
 
       child: Column(
@@ -317,23 +322,12 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
                         ? AppColors.gold.withValues(
                             alpha: p.isDark ? 0.14 : 0.08,
                           )
-                        : (p.isDark
-                              ? const Color(0xFF1E2036)
-                              : const Color(0xFFFFFFFF)),
+                        : p.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isPlayingThis ? AppColors.gold : p.border,
                       width: isPlayingThis ? 1.3 : 1.0,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: p.isDark ? 0.2 : 0.03,
-                        ),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -550,7 +544,6 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
                                 onSeek: (r) async {
                                   final targetMs =
                                       (r * effectiveTotalSec * 1000).toInt();
-
                                   await _audioService.seek(
                                     Duration(milliseconds: targetMs),
                                   );
@@ -558,35 +551,40 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
                                 height: 20,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Material(
-                              color: Colors.transparent,
+                            const SizedBox(width: 10),
+                            Tooltip(
+                              message: 'Playback speed',
                               child: InkWell(
-                                onTap: _togglePlaybackRate,
-                                borderRadius: BorderRadius.circular(10),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
+                                onTap: _cyclePlaybackRate,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minWidth: 42,
+                                    minHeight: 28,
+                                  ),
+                                  alignment: Alignment.center,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
+                                    horizontal: 8,
+                                    vertical: 5,
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppColors.gold.withValues(
-                                      alpha: _playbackRate == 2.0 ? 0.20 : 0.10,
+                                      alpha: p.isDark ? 0.18 : 0.13,
                                     ),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: AppColors.gold.withValues(
-                                        alpha: 0.35,
+                                        alpha: 0.55,
                                       ),
+                                      width: 0.9,
                                     ),
                                   ),
                                   child: Text(
-                                    '${_playbackRate.toStringAsFixed(0)}x',
+                                    '${_playbackRate == 1.0 ? '1' : _playbackRate}×',
                                     style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
                                       color: AppColors.gold,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ),
@@ -594,7 +592,6 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
                       ],
                     ],
                   ),

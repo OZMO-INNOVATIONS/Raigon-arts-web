@@ -302,12 +302,16 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     final updatedNotes = <OrderVoiceNote>[];
     for (var i = 0; i < newNotes.length; i++) {
       final vn = newNotes[i];
-      if (vn.url.isEmpty && vn.localBytes != null && vn.localBytes!.isNotEmpty) {
+      if (vn.url.isEmpty &&
+          vn.localBytes != null &&
+          vn.localBytes!.isNotEmpty) {
         try {
           final fileName =
               'voice_order_${_c.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
-          final uploaded =
-              await StorageService().uploadFile(vn.localBytes!, fileName);
+          final uploaded = await StorageService().uploadFile(
+            vn.localBytes!,
+            fileName,
+          );
           if (uploaded.fileUrl.isNotEmpty) {
             updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
             continue;
@@ -576,18 +580,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _highlightBg(p),
-        borderRadius: BorderRadius.circular(20),
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: p.isDark ? const Color(0xFF4B4D7E) : p.border,
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+          width: 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -757,11 +755,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                       RemixIcons.calendar_line,
                       'Order Date: ${_c.orderDateLabel}',
                     ),
-                    _infoChip(
-                      p,
-                      RemixIcons.calendar_check_line,
-                      'Expected Date: ${_c.expectedDateLabel}',
-                    ),
+                    // _infoChip(
+                    //   p,
+                    //   RemixIcons.calendar_check_line,
+                    //   'Expected Date: ${_c.expectedDateLabel}',
+                    // ),
+
                     if (_c.effectiveRegion.isNotEmpty)
                       _infoChip(
                         p,
@@ -777,11 +776,18 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
         return Container(
           padding: const EdgeInsets.fromLTRB(26, 22, 26, 22),
+          // decoration: BoxDecoration(
+          //   color: _highlightBg(p),
+          //   borderRadius: BorderRadius.circular(16),
+          //   border: Border.all(
+          //     color: p.isDark ? const Color(0xFF4B4D7E) : p.border,
+          //   ),
+          // ),
           decoration: BoxDecoration(
-            color: _highlightBg(p),
+            color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: p.isDark ? const Color(0xFF4B4D7E) : p.border,
+              color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
             ),
           ),
           child: Row(
@@ -815,11 +821,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                           RemixIcons.calendar_line,
                           'Order Date: ${_c.orderDateLabel}',
                         ),
-                        _infoChip(
-                          p,
-                          RemixIcons.calendar_check_line,
-                          'Expected Date: ${_c.expectedDateLabel}',
-                        ),
+                        _expectedDateChip(p),
                         if (_c.effectiveRegion.isNotEmpty)
                           _infoChip(
                             p,
@@ -909,15 +911,48 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
+  Widget _expectedDateChip(AppPalette p) {
+    const green = Color(0xFF16A34A);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: green.withValues(alpha: p.isDark ? 0.20 : 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: green.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(RemixIcons.calendar_check_line, size: 13.5, color: green),
+          const SizedBox(width: 6),
+          Text(
+            'Expected Date: ${_c.expectedDateLabel}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: green,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _card(FormColors c, {required Widget child, EdgeInsets? padding}) {
     final p = c.p;
+
     return Container(
       padding: padding ?? const EdgeInsets.fromLTRB(22, 22, 22, 18),
+
       decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF2E3050) : p.surface,
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: p.isDark ? const Color(0xFF45477A) : p.border,
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+          width: 1.2,
         ),
       ),
       child: child,
@@ -1140,138 +1175,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
-  Widget _sameFrameHeaderBanner(
-    AppPalette p,
-    FrameSpec f,
-    int qty,
-    int photoCount,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: p.isDark ? 0.4 : 0.45),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          LayoutBuilder(
-            builder: (_, bannerConstraints) {
-              final isBannerNarrow = bannerConstraints.maxWidth < 460;
-              final badge = Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF1E1D1B),
-                      Color(0xFF332D24),
-                      Color(0xFF6B5838),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.55),
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.crop_original_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        '$qty Frame${qty == 1 ? '' : 's'} • ${f.sizeLabel}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              final headerTitle = Row(
-                children: [
-                  const Icon(
-                    RemixIcons.stack_line,
-                    size: 19,
-                    color: AppColors.gold,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'UNIFIED FRAME SPECIFICATION',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: p.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              );
-
-              if (isBannerNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [headerTitle, const SizedBox(height: 10), badge],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: headerTitle),
-                  const SizedBox(width: 12),
-                  badge,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            photoCount > 1
-                ? 'All $photoCount artworks share this identical frame size, material, finish, and moulding style.'
-                : 'Custom frame specification configured for this order.',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w400,
-              color: p.textMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _sameFrameSection(
     FormColors c,
     FrameSpec f,
@@ -1283,14 +1186,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _sameFrameHeaderBanner(p, f, qty, photos.length),
-        const SizedBox(height: 22),
-        _cardTitle(
-          p,
-          RemixIcons.stack_line,
-          'FRAME SPECIFICATION & ARTWORK VAULT (${photos.isNotEmpty ? photos.length : qty})',
-        ),
-        const SizedBox(height: 18),
         Container(
           decoration: BoxDecoration(
             color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
@@ -1311,6 +1206,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _cardTitle(p, RemixIcons.stack_line, 'Order Notes'),
+              const SizedBox(height: 18),
+
               _specRow(
                 icon: RemixIcons.ruler_line,
                 label: 'Frame Size & Dimensions:',
@@ -1319,24 +1217,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
               ),
               _dashedDivider(p),
               _specRow(
-                icon: RemixIcons.shopping_bag_3_line,
-                label: 'Frame Type & Material:',
-                value: '${f.frameType} • ${f.material}',
-                p: p,
-              ),
-              _dashedDivider(p),
-              _specRow(
-                icon: RemixIcons.palette_line,
-                label: 'Color & Finish:',
-                value: f.finish,
-                p: p,
-              ),
-              _dashedDivider(p),
-              _specRow(
                 icon: RemixIcons.compass_3_line,
-                label: 'Orientation & Total Qty:',
-                value:
-                    '${_shortOrientation(f.orientation)} • $qty Frame${qty == 1 ? '' : 's'}',
+                label: 'Total Qty:',
+                value: '$qty Frame${qty == 1 ? '' : 's'}',
                 p: p,
               ),
               if (f.notes.isNotEmpty) ...[

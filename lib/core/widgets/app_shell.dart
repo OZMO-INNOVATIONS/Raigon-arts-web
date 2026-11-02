@@ -21,11 +21,9 @@ import 'package:raigon_art/features/customers/presentation/widgets/add_customer_
 import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
 import 'package:raigon_art/features/customers/presentation/screens/customers_screen.dart';
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
-import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
 import 'package:raigon_art/features/messaging/presentation/screens/messaging_automation_screen.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';
-import 'package:raigon_art/features/profile/presentation/screens/profile_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -104,11 +102,11 @@ class _AppShellState extends State<AppShell> {
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
     NavDestination.reminders => const RemindersScreen(),
-    NavDestination.frameSizes => const FrameSizesScreen(),
+    // NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),
     NavDestination.reports => const ReportsScreen(),
     NavDestination.trash => const TrashScreen(),
-    NavDestination.profile => const ProfileScreen(),
+    // NavDestination.profile => const ProfileScreen(),
   };
 
   @override

@@ -395,6 +395,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     super.dispose();
   }
 
+  void _recalculatePaymentAmounts() {
+    final total = double.tryParse(_total.text) ?? 0;
+    final advance = double.tryParse(_advance.text) ?? 0;
+
+    _balance.text = math.max(0, total - advance).round().toString();
+  }
+
   Future<List<PickedPhoto>> _pick({bool multiple = true}) async {
     try {
       debugPrint('========== FILE PICK START ==========');
@@ -560,8 +567,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     }
 
     final total = (double.tryParse(_total.text) ?? 0).round();
-    final advance = (double.tryParse(_advance.text) ?? 0).round();
+    final enteredAdvance = (double.tryParse(_advance.text) ?? 0).round();
 
+    final advance = _payment == 'Paid'
+        ? total
+        : _payment == 'Unpaid'
+        ? 0
+        : enteredAdvance;
     if (total > 0 && advance > total) {
       AppSnackBar.error(
         context,
@@ -1019,10 +1031,23 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       value: _payment,
                       items: _paymentOptions,
                       labelOf: (s) => s,
-                      onChanged: (v) => setState(() {
-                        _payment = v;
-                        _paymentTouched = true;
-                      }),
+                      onChanged: (v) {
+                        setState(() {
+                          _payment = v;
+                          _paymentTouched = true;
+
+                          if (v == 'Paid') {
+                            _advance.text = _total.text;
+                            _balance.text = '0';
+                          } else if (v == 'Unpaid') {
+                            _advance.text = '0';
+                            final total = double.tryParse(_total.text) ?? 0;
+                            _balance.text = total.round().toString();
+                          } else {
+                            _recalculatePaymentAmounts();
+                          }
+                        });
+                      },
                     ),
                   ),
                   LabeledField(

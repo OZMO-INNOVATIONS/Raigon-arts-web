@@ -102,12 +102,16 @@ class OrderVoiceNote {
     }
 
     return OrderVoiceNote(
-      id: (j['id'] ?? 'voice_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      id: (j['id'] ?? 'voice_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
       url: (j['url'] ?? j['fileUrl'] ?? j['voiceUrl'] ?? '').toString(),
       name: (j['name'] ?? j['title'] ?? 'Voice Note').toString(),
-      durationSeconds: (j['durationSeconds'] ?? j['duration'] ?? 0 as num).toInt(),
+      durationSeconds: (j['durationSeconds'] ?? j['duration'] ?? 0 as num)
+          .toInt(),
       createdAt:
-          DateTime.tryParse((j['createdAt'] ?? j['created_at'] ?? '').toString()) ??
+          DateTime.tryParse(
+            (j['createdAt'] ?? j['created_at'] ?? '').toString(),
+          ) ??
           DateTime.now(),
       localBytes: parseBytes(j['bytes'] ?? j['localBytes'] ?? j['voiceBytes']),
     );
@@ -347,6 +351,7 @@ class Customer {
           'orientation': f.orientation,
           'qty': f.qty,
           'notes': f.notes,
+          'customerNote': f.customerNote,
           if (f.photoName != null && f.photoName!.isNotEmpty)
             'photoName': f.photoName,
           if (f.photoUrl != null && f.photoUrl!.isNotEmpty)
@@ -466,17 +471,22 @@ class Customer {
     }
 
     final voiceNotesList = <OrderVoiceNote>[];
-    for (final v in (j['voiceNotes'] ?? j['voice_notes'] as List? ?? const [])) {
+    for (final v
+        in (j['voiceNotes'] ?? j['voice_notes'] as List? ?? const [])) {
       if (v is Map) {
-        voiceNotesList.add(OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)));
+        voiceNotesList.add(
+          OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)),
+        );
       } else if (v is String && v.isNotEmpty) {
-        voiceNotesList.add(OrderVoiceNote(
-          id: 'voice_${voiceNotesList.length}',
-          url: v,
-          name: 'Voice Note ${voiceNotesList.length + 1}',
-          durationSeconds: 0,
-          createdAt: DateTime.now(),
-        ));
+        voiceNotesList.add(
+          OrderVoiceNote(
+            id: 'voice_${voiceNotesList.length}',
+            url: v,
+            name: 'Voice Note ${voiceNotesList.length + 1}',
+            durationSeconds: 0,
+            createdAt: DateTime.now(),
+          ),
+        );
       }
     }
 

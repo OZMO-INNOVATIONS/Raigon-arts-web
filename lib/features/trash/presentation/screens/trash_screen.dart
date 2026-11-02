@@ -20,16 +20,24 @@ class TrashScreen extends StatefulWidget {
 class _TrashScreenState extends State<TrashScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isInitialLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _loadTrash();
+  }
+
+  Future<void> _loadTrash() async {
+    if (mounted) setState(() => _isInitialLoading = true);
+    try {
+      await context.read<CustomerAndOrderProvider>().fetchTrash();
+    } finally {
       if (mounted) {
-        context.read<CustomerAndOrderProvider>().fetchTrash();
+        setState(() => _isInitialLoading = false);
       }
-    });
+    }
   }
 
   @override
@@ -39,7 +47,7 @@ class _TrashScreenState extends State<TrashScreen>
   }
 
   Future<void> _handleRefresh() async {
-    await context.read<CustomerAndOrderProvider>().fetchTrash();
+    await _loadTrash();
   }
 
   Future<void> _handleEmptyTrash(int totalCount) async {
@@ -157,6 +165,7 @@ class _TrashScreenState extends State<TrashScreen>
     final totalCount = provider.totalTrashCount;
     final isLoading = provider.isLoadingTrash;
     final retentionDays = provider.trashRetentionDays;
+    final isBusy = _isInitialLoading || isLoading;
 
     return Scaffold(
       backgroundColor: p.pageBg,
@@ -164,7 +173,7 @@ class _TrashScreenState extends State<TrashScreen>
         child: Column(
           children: [
             // Header Bar
-            _buildHeader(context, p, isDark, totalCount, isLoading),
+            _buildHeader(context, p, isDark, totalCount, isBusy),
 
             // 14-Day Retention Banner
             _buildRetentionBanner(p, isDark, retentionDays),
@@ -172,12 +181,42 @@ class _TrashScreenState extends State<TrashScreen>
             // Tab Bar
             _buildTabBar(p, isDark, orders.length, reminders.length),
 
+            if (isBusy && (orders.isNotEmpty || reminders.isNotEmpty))
+              LinearProgressIndicator(
+                minHeight: 2.5,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isDark ? AppColors.gold : const Color(0xFF1E1A14),
+                ),
+              ),
+
             // Tab Views
             Expanded(
-              child: isLoading && orders.isEmpty && reminders.isEmpty
+              child: isBusy && orders.isEmpty && reminders.isEmpty
                   ? Center(
-                      child: CircularProgressIndicator(
-                        color: isDark ? AppColors.gold : const Color(0xFF1E1A14),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.8,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isDark ? AppColors.gold : const Color(0xFF1E1A14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Loading trash items...',
+                            style: TextStyle(
+                              color: p.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : TabBarView(

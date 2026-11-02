@@ -107,6 +107,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Future<void> _completeReminder(CustomerReminder r) async {
+    final confirmed = await showCompleteReminderConfirmationDialog(context, r);
+    if (!confirmed || !mounted) return;
+
     final provider = context.read<ReminderProvider>();
     final completedBy = AuthService.isAdmin ? 'Admin' : 'Workshop Staff';
     await provider.completeReminder(r.id, completedBy: completedBy);

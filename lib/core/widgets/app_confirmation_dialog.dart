@@ -102,6 +102,30 @@ Future<bool> showDeleteReminderConfirmationDialog(
   );
 }
 
+/// Confirmation dialog for completing a reminder with high-end luxury styling.
+Future<bool> showCompleteReminderConfirmationDialog(
+  BuildContext context,
+  CustomerReminder reminder,
+) {
+  final title = reminder.title.trim().isNotEmpty
+      ? reminder.title.trim()
+      : 'this reminder';
+  final customer = reminder.customerName.trim().isNotEmpty
+      ? ' for ${reminder.customerName.trim()}'
+      : '';
+  return showAppConfirmationDialog(
+    context,
+    title: 'Complete Reminder',
+    message: 'Are you sure you want to mark "$title"$customer as completed?',
+    confirmLabel: 'Complete',
+    cancelLabel: 'Cancel',
+    icon: RemixIcons.checkbox_circle_line,
+    iconColor: const Color(0xFF10B981),
+    confirmColor: const Color(0xFF10B981),
+    isDestructive: false,
+  );
+}
+
 /// Reusable compact confirmation dialog widget.
 class AppConfirmationDialog extends StatelessWidget {
   const AppConfirmationDialog({

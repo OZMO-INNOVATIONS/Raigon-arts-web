@@ -38,7 +38,8 @@ class AddOrEditReminderDialog extends StatefulWidget {
   final CustomerReminder? existingReminder;
 
   @override
-  State<AddOrEditReminderDialog> createState() => _AddOrEditReminderDialogState();
+  State<AddOrEditReminderDialog> createState() =>
+      _AddOrEditReminderDialogState();
 }
 
 class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
@@ -66,8 +67,11 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final cust = widget.initialCustomer;
 
     _titleCtrl = TextEditingController(
-      text: rem?.title ??
-          (cust != null ? 'Follow up with ${cust.name}' : 'Customer Contact Reminder'),
+      text:
+          rem?.title ??
+          (cust != null
+              ? 'Follow up with ${cust.name}'
+              : 'Customer Contact Reminder'),
     );
     _customerNameCtrl = TextEditingController(
       text: rem?.customerName ?? cust?.name ?? '',
@@ -78,22 +82,23 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     _orderIdCtrl = TextEditingController(
       text: rem?.orderId ?? (cust != null ? '#${cust.id}' : ''),
     );
-    _phoneCtrl = TextEditingController(
-      text: rem?.phone ?? cust?.phone ?? '',
-    );
+    _phoneCtrl = TextEditingController(text: rem?.phone ?? cust?.phone ?? '');
     _regionCtrl = TextEditingController(
       text: rem?.region ?? cust?.effectiveRegion ?? '',
     );
-    _descCtrl = TextEditingController(
-      text: rem?.description ?? '',
-    );
+    _descCtrl = TextEditingController(text: rem?.description ?? '');
 
-    _selectedDate = rem?.reminderDate ?? DateTime.now().add(const Duration(days: 1));
+    _selectedDate =
+        rem?.reminderDate ?? DateTime.now().add(const Duration(days: 1));
     _selectedTime = const TimeOfDay(hour: 10, minute: 0);
     _priority = rem?.priority ?? ReminderPriority.medium;
-    _assignedStaff = rem?.assignedStaff ?? (AuthService.isAdmin ? 'Admin' : 'Workshop Staff');
+    _assignedStaff =
+        rem?.assignedStaff ??
+        (AuthService.isAdmin ? 'Admin' : 'Workshop Staff');
 
-    _voiceNotes = rem != null ? List<OrderVoiceNote>.of(rem.effectiveVoiceNotes) : [];
+    _voiceNotes = rem != null
+        ? List<OrderVoiceNote>.of(rem.effectiveVoiceNotes)
+        : [];
   }
 
   @override
@@ -166,7 +171,8 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
       _orderIdCtrl.text = '#${c.id}';
       _phoneCtrl.text = c.phone;
       _regionCtrl.text = c.effectiveRegion;
-      if (_titleCtrl.text.isEmpty || _titleCtrl.text == 'Customer Contact Reminder') {
+      if (_titleCtrl.text.isEmpty ||
+          _titleCtrl.text == 'Customer Contact Reminder') {
         _titleCtrl.text = 'Follow up with ${c.name}';
       }
     });
@@ -184,25 +190,35 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
     final updatedVoiceNotes = <OrderVoiceNote>[];
     for (var i = 0; i < _voiceNotes.length; i++) {
       final vn = _voiceNotes[i];
-      if (vn.url.isEmpty && vn.localBytes != null && vn.localBytes!.isNotEmpty) {
+      if (vn.url.isEmpty &&
+          vn.localBytes != null &&
+          vn.localBytes!.isNotEmpty) {
         try {
           final fileName =
               'voice_rem_${DateTime.now().millisecondsSinceEpoch}_${i + 1}.m4a';
-          final uploaded =
-              await StorageService().uploadFile(vn.localBytes!, fileName);
+          final uploaded = await StorageService().uploadFile(
+            vn.localBytes!,
+            fileName,
+          );
           if (uploaded.fileUrl.isNotEmpty) {
             updatedVoiceNotes.add(vn.copyWith(url: uploaded.fileUrl));
             continue;
           }
         } catch (e) {
-          debugPrint('[AddReminder] Storage voice upload notice: $e (stored locally)');
+          debugPrint(
+            '[AddReminder] Storage voice upload notice: $e (stored locally)',
+          );
         }
       }
       updatedVoiceNotes.add(vn);
     }
 
-    final primaryUrl = updatedVoiceNotes.isNotEmpty ? updatedVoiceNotes.first.url : '';
-    final primaryDuration = updatedVoiceNotes.isNotEmpty ? updatedVoiceNotes.first.durationSeconds : 0;
+    final primaryUrl = updatedVoiceNotes.isNotEmpty
+        ? updatedVoiceNotes.first.url
+        : '';
+    final primaryDuration = updatedVoiceNotes.isNotEmpty
+        ? updatedVoiceNotes.first.durationSeconds
+        : 0;
 
     try {
       if (isEdit) {
@@ -247,7 +263,10 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
         );
         if (mounted) {
           Navigator.of(context).pop();
-          AppSnackBar.success(context, 'Reminder scheduled for ${_customerNameCtrl.text.trim()}.');
+          AppSnackBar.success(
+            context,
+            'Reminder scheduled for ${_customerNameCtrl.text.trim()}.',
+          );
         }
       }
     } catch (e) {
@@ -317,7 +336,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEdit ? 'Edit Follow-up Reminder' : 'Schedule Customer Reminder',
+                            isEdit
+                                ? 'Edit Follow-up Reminder'
+                                : 'Schedule Customer Reminder',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -384,7 +405,10 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                               value: c,
                               child: Text(
                                 '${c.name} (${c.id}) • ${c.phone}',
-                                style: TextStyle(color: p.textPrimary, fontSize: 13),
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                         ],
@@ -401,8 +425,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                 _buildLabel(p, 'REMINDER TITLE *'),
                 TextFormField(
                   controller: _titleCtrl,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Reminder title is required' : null,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Reminder title is required'
+                      : null,
                   style: TextStyle(color: p.textPrimary, fontSize: 14),
                   decoration: _buildInputDec(
                     p,
@@ -426,11 +451,17 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                             validator: (v) => v == null || v.trim().isEmpty
                                 ? 'Customer name is required'
                                 : null,
-                            style: TextStyle(color: p.textPrimary, fontSize: 14),
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: 14,
+                            ),
                             decoration: _buildInputDec(
                               p,
                               'e.g. Priya Sharma',
-                              prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                              prefixIcon: const Icon(
+                                Icons.person_outline_rounded,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -446,11 +477,17 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                           TextFormField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
-                            style: TextStyle(color: p.textPrimary, fontSize: 14),
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: 14,
+                            ),
                             decoration: _buildInputDec(
                               p,
                               '9998887776',
-                              prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                              prefixIcon: const Icon(
+                                Icons.phone_outlined,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -473,7 +510,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: p.chipFill,
                                 borderRadius: BorderRadius.circular(10),
@@ -481,7 +520,11 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.gold),
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 18,
+                                    color: AppColors.gold,
+                                  ),
                                   const SizedBox(width: 10),
                                   Text(
                                     dateFormatted,
@@ -509,7 +552,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: p.chipFill,
                                 borderRadius: BorderRadius.circular(10),
@@ -517,7 +562,11 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.access_time_rounded, size: 18, color: AppColors.gold),
+                                  const Icon(
+                                    Icons.access_time_rounded,
+                                    size: 18,
+                                    color: AppColors.gold,
+                                  ),
                                   const SizedBox(width: 10),
                                   Text(
                                     timeFormatted,
@@ -552,21 +601,30 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                                 Expanded(
                                   child: Padding(
                                     padding: EdgeInsets.only(
-                                      right: prio != ReminderPriority.high ? 6 : 0,
+                                      right: prio != ReminderPriority.high
+                                          ? 6
+                                          : 0,
                                     ),
                                     child: InkWell(
-                                      onTap: () => setState(() => _priority = prio),
+                                      onTap: () =>
+                                          setState(() => _priority = prio),
                                       borderRadius: BorderRadius.circular(8),
                                       child: Container(
                                         height: 38,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
                                           color: _priority == prio
-                                              ? prio.color.withValues(alpha: 0.18)
+                                              ? prio.color.withValues(
+                                                  alpha: 0.18,
+                                                )
                                               : p.chipFill,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                           border: Border.all(
-                                            color: _priority == prio ? prio.color : p.border,
+                                            color: _priority == prio
+                                                ? prio.color
+                                                : p.border,
                                             width: _priority == prio ? 1.5 : 1,
                                           ),
                                         ),
@@ -575,7 +633,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
-                                            color: _priority == prio ? prio.color : p.textMuted,
+                                            color: _priority == prio
+                                                ? prio.color
+                                                : p.textMuted,
                                           ),
                                         ),
                                       ),
@@ -624,11 +684,16 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: BorderSide(color: p.border),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: Text(
                           'Cancel',
-                          style: TextStyle(color: p.textMuted, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: p.textMuted,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -642,7 +707,9 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                           foregroundColor: AppColors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: _isSaving
                             ? const SizedBox(
@@ -650,12 +717,17 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.black),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.black,
+                                  ),
                                 ),
                               )
                             : Text(
                                 isEdit ? 'Save Changes' : 'Schedule Reminder',
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14.5,
+                                ),
                               ),
                       ),
                     ),
@@ -691,7 +763,10 @@ class _AddOrEditReminderDialogState extends State<AddOrEditReminderDialog> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: p.textMuted.withValues(alpha: 0.6), fontSize: 13),
+      hintStyle: TextStyle(
+        color: p.textMuted.withValues(alpha: 0.6),
+        fontSize: 13,
+      ),
       prefixIcon: prefixIcon != null
           ? IconTheme(
               data: IconThemeData(color: p.textMuted, size: 18),

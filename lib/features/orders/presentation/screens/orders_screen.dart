@@ -466,8 +466,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
 
     final addButton = AppPrimaryButton(
-      label: 'Add New Customer',
-      icon: RemixIcons.user_add_line,
+      label: 'Add New Order',
+      icon: RemixIcons.file_add_line,
       onPressed: () => ShellScope.of(context).openAddCustomer(),
     );
 

@@ -18,7 +18,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _tagline = 'Photo Frames & Custom Framing';
   String _businessPhone = '9747099559';
   String _businessEmail = 'theraigonart@gmail.com';
-  String _gstin = '32AAAAA0000A1Z5';
   int _retentionDays = 45;
   bool _autoCleanup = true;
 
@@ -97,8 +96,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           (_) => const WorkshopProfile(
             businessName: 'RAIGON ART',
             tagline: 'Photo Frames & Custom Framing',
-            businessPhone: '8137922114',
-            businessEmail: 'orders@raigonarts.com',
+            businessPhone: '9747099559',
+            businessEmail: 'theraigonart@gmail.com',
             workshopAddress: 'Main Workshop, MG Road, Trivandrum',
             gstin: '',
             businessHours: [],
@@ -119,9 +118,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _businessName = profile.businessName;
           _tagline = profile.tagline;
-          _businessPhone = profile.businessPhone;
-          _businessEmail = profile.businessEmail;
-          _gstin = profile.gstin.isNotEmpty ? profile.gstin : 'Not registered';
+          _businessPhone = (profile.businessPhone.isNotEmpty &&
+                  profile.businessPhone != '8137922114')
+              ? profile.businessPhone
+              : '9747099559';
+          _businessEmail = (profile.businessEmail.isNotEmpty &&
+                  profile.businessEmail != 'orders@raigonarts.com')
+              ? profile.businessEmail
+              : 'theraigonart@gmail.com';
           _retentionDays = retention.retentionDays;
           _autoCleanup = retention.autoCleanupEnabled;
           _isLoading = false;
@@ -231,11 +235,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   value: _orderTypes,
                                 ),
                                 _InfoItem(
-                                  icon: RemixIcons.bill_line,
-                                  label: 'GSTIN',
-                                  value: _gstin,
-                                ),
-                                _InfoItem(
                                   icon: RemixIcons.cloud_line,
                                   label: 'Photo Vault Retention',
                                   value:
@@ -255,20 +254,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16),
                   Center(
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
                           RemixIcons.magic_line,
-                          size: 16,
+                          size: 15,
                           color: AppColors.gold,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Powered by RAIGON ART',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: p.textMuted,
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Powered by OZMO INNOVATIONS',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: p.textMuted,
+                            ),
                           ),
                         ),
                       ],

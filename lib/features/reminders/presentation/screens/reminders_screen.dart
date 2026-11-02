@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/widgets/app_audio_recorder_section.dart';
 import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_primary_button.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
@@ -28,10 +29,29 @@ class _RemindersScreenState extends State<RemindersScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final ReminderAudioService _audioService = ReminderAudioService();
   StreamSubscription? _playerSub;
+  StreamSubscription? _posSub;
+  StreamSubscription? _durSub;
+
+  Duration _currentPos = Duration.zero;
+  Duration _totalDur = Duration.zero;
+
+  double _playbackRate = 1.0;
 
   @override
   void initState() {
     super.initState();
+
+    _posSub = _audioService.onPositionChanged.listen((pos) {
+      if (mounted) {
+        setState(() => _currentPos = pos);
+      }
+    });
+
+    _durSub = _audioService.onDurationChanged.listen((dur) {
+      if (mounted) {
+        setState(() => _totalDur = dur);
+      }
+    });
     _playerSub = _audioService.onPlayerStateChanged.listen((_) {
       if (mounted) setState(() {});
     });
@@ -48,7 +68,19 @@ class _RemindersScreenState extends State<RemindersScreen> {
     _playerSub = null;
     _searchCtrl.dispose();
     _audioService.dispose();
+    _posSub?.cancel();
+    _durSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _togglePlaybackRate() async {
+    final newRate = _playbackRate == 1.0 ? 2.0 : 1.0;
+
+    await _audioService.setPlaybackRate(newRate);
+
+    if (mounted) {
+      setState(() => _playbackRate = newRate);
+    }
   }
 
   Future<void> _togglePlayReminderVoice(
@@ -64,6 +96,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
         _audioService.isPlaying) {
       await _audioService.stop();
     } else {
+      await _audioService.setPlaybackRate(_playbackRate);
       if (targetNote != null) {
         if (targetNote.localBytes != null &&
             targetNote.localBytes!.isNotEmpty) {
@@ -844,35 +877,48 @@ class _RemindersScreenState extends State<RemindersScreen> {
     int totalCount,
   ) {
     final mediaId = '${r.id}_${note.id}';
+
     final isThisPlaying =
         _audioService.currentlyPlayingId == mediaId && _audioService.isPlaying;
+
     final title = totalCount > 1
         ? 'Voice Note #${index + 1}'
         : 'Voice Reminder';
-    final durText = note.durationSeconds > 0
-        ? '${note.durationSeconds}s audio recording'
-        : (r.voiceDurationSeconds > 0
-              ? '${r.voiceDurationSeconds}s audio recording'
-              : 'Audio recording');
+
+    final durationSeconds = note.durationSeconds > 0
+        ? note.durationSeconds
+        : r.voiceDurationSeconds;
+
+    final effectiveTotalSec = _totalDur.inSeconds > 0
+        ? _totalDur.inSeconds
+        : (durationSeconds > 0 ? durationSeconds : 1);
+
+    final progress = (_currentPos.inMilliseconds / (effectiveTotalSec * 1000))
+        .clamp(0.0, 1.0);
+
+    final durText = durationSeconds > 0
+        ? '${durationSeconds}s audio recording'
+        : 'Audio recording';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.gold.withValues(alpha: p.isDark ? 0.12 : 0.08),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.25),
-          width: 1,
         ),
       ),
       child: Row(
         children: [
+          // Play / Pause button
           InkWell(
             onTap: () => _togglePlayReminderVoice(r, note),
             borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 32,
-              height: 32,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 34,
+              height: 34,
               decoration: const BoxDecoration(
                 color: AppColors.gold,
                 shape: BoxShape.circle,
@@ -880,11 +926,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
               child: Icon(
                 isThisPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: AppColors.black,
-                size: 20,
+                size: 21,
               ),
             ),
           ),
+
           const SizedBox(width: 10),
+
+          // Audio information and waveform
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -897,20 +946,92 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       color: AppColors.gold,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: p.textPrimary,
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: p.textPrimary,
+                        ),
                       ),
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 3),
+
                 Text(
-                  isThisPlaying ? 'Playing voice note...' : durText,
-                  style: TextStyle(fontSize: 11, color: p.textMuted),
+                  isThisPlaying
+                      ? '${_currentPos.inMinutes}:${(_currentPos.inSeconds % 60).toString().padLeft(2, '0')} / ${effectiveTotalSec ~/ 60}:${(effectiveTotalSec % 60).toString().padLeft(2, '0')}'
+                      : durText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isThisPlaying ? AppColors.gold : p.textMuted,
+                    fontWeight: isThisPlaying
+                        ? FontWeight.w700
+                        : FontWeight.normal,
+                  ),
                 ),
+
+                // Waveform and playback speed
+                if (isThisPlaying) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ScrubbableAudioWaveform(
+                          progress: progress,
+                          onSeek: (r) async {
+                            final targetMs = (r * effectiveTotalSec * 1000)
+                                .toInt();
+
+                            await _audioService.seek(
+                              Duration(milliseconds: targetMs),
+                            );
+                          },
+                          height: 20,
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _togglePlaybackRate,
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(
+                                alpha: _playbackRate == 2.0 ? 0.20 : 0.10,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              '${_playbackRate.toStringAsFixed(0)}x',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.gold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

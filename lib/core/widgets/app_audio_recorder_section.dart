@@ -184,7 +184,7 @@ class ScrubbableAudioWaveform extends StatelessWidget {
     super.key,
     required this.progress,
     required this.onSeek,
-    this.barCount = 90,
+    this.barCount = 120,
     this.height = 32,
   });
 

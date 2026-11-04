@@ -229,10 +229,10 @@ String _inr(int v) {
 
 String _orDash(String s) => s.trim().isEmpty ? '—' : s.trim();
 
-String _shortOrientation(String o) {
-  final i = o.indexOf(' (');
-  return i == -1 ? o : o.substring(0, i);
-}
+// String _shortOrientation(String o) {
+//   final i = o.indexOf(' (');
+//   return i == -1 ? o : o.substring(0, i);
+// }
 
 String _paymentLabel(Customer c) {
   if (c.paymentStatus != 'Unpaid') return c.paymentStatus;
@@ -560,7 +560,6 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                     voiceNotes: _c.voiceNotes,
                     onChanged: _updateVoiceNotes,
                     isEditable: true,
-                    title: 'Order Voice Instructions',
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -1206,7 +1205,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _cardTitle(p, RemixIcons.stack_line, 'Order Notes'),
+              _cardTitle(p, RemixIcons.stack_line, 'ORDER NOTES'),
               const SizedBox(height: 18),
 
               _specRow(
@@ -1373,13 +1372,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _individualFrameHeaderBanner(p, cardCount),
-        const SizedBox(height: 22),
-        _cardTitle(
-          p,
-          RemixIcons.stack_line,
-          'INDIVIDUAL FRAME PHOTO VAULT ($cardCount)',
-        ),
+        // _individualFrameHeaderBanner(p, cardCount),
+        // const SizedBox(height: 22),
+        _cardTitle(p, RemixIcons.stack_line, 'INDIVIDUAL ORDER NOTES'),
         const SizedBox(height: 18),
         LayoutBuilder(
           builder: (context, cons) {
@@ -1407,131 +1402,131 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     );
   }
 
-  Widget _individualFrameHeaderBanner(AppPalette p, int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: p.isDark ? 0.4 : 0.45),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (_, bannerConstraints) {
-              final isBannerNarrow = bannerConstraints.maxWidth < 460;
-              final badge = Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF1E1D1B),
-                      Color(0xFF332D24),
-                      Color(0xFF6B5838),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.55),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      RemixIcons.equalizer_line,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$count Custom Frame${count == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+  // Widget _individualFrameHeaderBanner(AppPalette p, int count) {
+  //   return Container(
+  //     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+  //     decoration: BoxDecoration(
+  //       color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+  //       borderRadius: BorderRadius.circular(16),
+  //       border: Border.all(
+  //         color: AppColors.gold.withValues(alpha: p.isDark ? 0.4 : 0.45),
+  //         width: 1.2,
+  //       ),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
+  //           blurRadius: 10,
+  //           offset: const Offset(0, 3),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         LayoutBuilder(
+  //           builder: (_, bannerConstraints) {
+  //             final isBannerNarrow = bannerConstraints.maxWidth < 460;
+  //             final badge = Container(
+  //               padding: const EdgeInsets.symmetric(
+  //                 horizontal: 12,
+  //                 vertical: 6,
+  //               ),
+  //               decoration: BoxDecoration(
+  //                 gradient: const LinearGradient(
+  //                   colors: [
+  //                     Color(0xFF1E1D1B),
+  //                     Color(0xFF332D24),
+  //                     Color(0xFF6B5838),
+  //                   ],
+  //                 ),
+  //                 borderRadius: BorderRadius.circular(10),
+  //                 border: Border.all(
+  //                   color: AppColors.gold.withValues(alpha: 0.55),
+  //                   width: 1.2,
+  //                 ),
+  //                 boxShadow: [
+  //                   BoxShadow(
+  //                     color: Colors.black.withValues(alpha: 0.3),
+  //                     blurRadius: 6,
+  //                     offset: const Offset(0, 2),
+  //                   ),
+  //                 ],
+  //               ),
+  //               child: Row(
+  //                 mainAxisSize: MainAxisSize.min,
+  //                 children: [
+  //                   const Icon(
+  //                     RemixIcons.equalizer_line,
+  //                     size: 14,
+  //                     color: Colors.white,
+  //                   ),
+  //                   const SizedBox(width: 6),
+  //                   Text(
+  //                     '$count Custom Frame${count == 1 ? '' : 's'}',
+  //                     style: const TextStyle(
+  //                       fontSize: 12.5,
+  //                       fontWeight: FontWeight.w700,
+  //                       color: Colors.white,
+  //                       letterSpacing: 0.3,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             );
 
-              final headerTitle = Row(
-                children: [
-                  const Icon(
-                    RemixIcons.stack_line,
-                    size: 19,
-                    color: AppColors.gold,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'INDIVIDUAL FRAME SPECIFICATIONS CONFIGURED',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              );
+  //             // final headerTitle = Row(
+  //             //   children: [
+  //             //     const Icon(
+  //             //       RemixIcons.stack_line,
+  //             //       size: 19,
+  //             //       color: AppColors.gold,
+  //             //     ),
+  //             //     // const SizedBox(width: 8),
+  //             //     // Expanded(
+  //             //     //   child: Text(
+  //             //     //     'INDIVIDUAL FRAME SPECIFICATIONS CONFIGURED',
+  //             //     //     style: TextStyle(
+  //             //     //       fontSize: 13.5,
+  //             //     //       fontWeight: FontWeight.w800,
+  //             //     //       letterSpacing: 0.5,
+  //             //     //       color: p.textPrimary,
+  //             //     //     ),
+  //             //     //   ),
+  //             //     // ),
+  //             //   ],
+  //             // );
 
-              if (isBannerNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [headerTitle, const SizedBox(height: 10), badge],
-                );
-              }
+  //             // if (isBannerNarrow) {
+  //             //   return Column(
+  //             //     crossAxisAlignment: CrossAxisAlignment.start,
+  //             //     children: [headerTitle, const SizedBox(height: 10), badge],
+  //             //   );
+  //             // }
 
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: headerTitle),
-                  const SizedBox(width: 12),
-                  badge,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Each photo below has its own distinct frame size, material, color, and mounting specifications configured.',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w400,
-              color: p.textMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  //             // return Row(
+  //             //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //             //   crossAxisAlignment: CrossAxisAlignment.center,
+  //             //   children: [
+  //             //     Expanded(child: headerTitle),
+  //             //     const SizedBox(width: 12),
+  //             //     badge,
+  //             //   ],
+  //             // );
+  //           },
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           'Each photo below has its own distinct frame size, material, color, and mounting specifications configured.',
+  //           style: TextStyle(
+  //             fontSize: 12.5,
+  //             fontWeight: FontWeight.w400,
+  //             color: p.textMuted,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _individualFrameCard(
     FormColors c,
@@ -1838,25 +1833,27 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             value: f.formattedDimensions,
             p: p,
           ),
-          _dashedDivider(p),
-          _specRow(
-            icon: RemixIcons.shopping_bag_3_line,
-            label: 'Frame Type & Material:',
-            value: '${f.frameType} • ${f.material}',
-            p: p,
-          ),
-          _dashedDivider(p),
-          _specRow(
-            icon: RemixIcons.palette_line,
-            label: 'Color & Finish:',
-            value: f.finish,
-            p: p,
-          ),
+          // _dashedDivider(p),
+          // _specRow(
+          //   icon: RemixIcons.shopping_bag_3_line,
+          //   label: 'Frame Type & Material:',
+          //   value: '${f.frameType} • ${f.material}',
+          //   p: p,
+          // ),
+          // _dashedDivider(p),
+          // _specRow(
+          //   icon: RemixIcons.palette_line,
+          //   label: 'Color & Finish:',
+          //   value: f.finish,
+          //   p: p,
+          // ),
           _dashedDivider(p),
           _specRow(
             icon: RemixIcons.compass_3_line,
-            label: 'Orientation & Qty:',
-            value: '${_shortOrientation(f.orientation)} • $qty Frame(s)',
+            label: 'Quantity:',
+            value:
+                // '${_shortOrientation(f.orientation)} • $qty Frame(s)',
+                "$qty Frame(s)",
             p: p,
           ),
           if (f.notes.trim().isNotEmpty) ...[

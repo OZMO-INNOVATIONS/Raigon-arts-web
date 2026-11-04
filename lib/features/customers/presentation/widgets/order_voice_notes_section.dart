@@ -16,7 +16,7 @@ class OrderVoiceNotesSection extends StatefulWidget {
     required this.voiceNotes,
     required this.onChanged,
     this.isEditable = true,
-    this.title = 'Order Voice Instructions',
+    this.title = 'ORDER VOICE INSTRUCTIONS',
   });
 
   final List<OrderVoiceNote> voiceNotes;

@@ -1,7 +1,8 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web/web.dart' as web;
+import 'package:raigon_art/core/network/web_storage.dart';
 
 class AuthUser {
   const AuthUser({
@@ -63,9 +64,9 @@ class AuthTokenManager {
   void _restoreFromLocalStorage() {
     if (!kIsWeb) return;
     try {
-      final token = web.window.localStorage.getItem(_keyToken);
-      final refresh = web.window.localStorage.getItem(_keyRefreshToken);
-      final userJson = web.window.localStorage.getItem(_keyUser);
+      final token = WebStorage.getItem(_keyToken);
+      final refresh = WebStorage.getItem(_keyRefreshToken);
+      final userJson = WebStorage.getItem(_keyUser);
 
       if (token != null && token.trim().isNotEmpty) {
         _accessToken = token.trim();
@@ -127,12 +128,12 @@ class AuthTokenManager {
 
     if (kIsWeb) {
       try {
-        web.window.localStorage.setItem(_keyToken, token);
+        WebStorage.setItem(_keyToken, token);
         if (refreshToken != null) {
-          web.window.localStorage.setItem(_keyRefreshToken, refreshToken);
+          WebStorage.setItem(_keyRefreshToken, refreshToken);
         }
         if (user != null) {
-          web.window.localStorage.setItem(_keyUser, jsonEncode(user.toJson()));
+          WebStorage.setItem(_keyUser, jsonEncode(user.toJson()));
         }
       } catch (e) {
         debugPrint('[AuthTokenManager] localStorage save error: $e');
@@ -162,9 +163,9 @@ class AuthTokenManager {
 
     if (kIsWeb) {
       try {
-        web.window.localStorage.setItem(_keyToken, token);
+        WebStorage.setItem(_keyToken, token);
         if (refreshToken != null) {
-          web.window.localStorage.setItem(_keyRefreshToken, refreshToken);
+          WebStorage.setItem(_keyRefreshToken, refreshToken);
         }
       } catch (_) {}
     }
@@ -183,7 +184,7 @@ class AuthTokenManager {
 
     if (kIsWeb) {
       try {
-        web.window.localStorage.setItem(_keyUser, jsonEncode(user.toJson()));
+        WebStorage.setItem(_keyUser, jsonEncode(user.toJson()));
       } catch (_) {}
     }
 
@@ -201,9 +202,9 @@ class AuthTokenManager {
 
     if (kIsWeb) {
       try {
-        web.window.localStorage.removeItem(_keyToken);
-        web.window.localStorage.removeItem(_keyRefreshToken);
-        web.window.localStorage.removeItem(_keyUser);
+        WebStorage.removeItem(_keyToken);
+        WebStorage.removeItem(_keyRefreshToken);
+        WebStorage.removeItem(_keyUser);
       } catch (_) {}
     }
 

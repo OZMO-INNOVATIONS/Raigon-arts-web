@@ -4,8 +4,11 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links_linux
+  audioplayers_linux
   desktop_drop
   file_saver
+  file_selector_linux
+  record_linux
   url_launcher_linux
 )
 

@@ -88,13 +88,17 @@ class SectionHeader extends StatelessWidget {
           const SizedBox(width: 14),
           Icon(icon, size: 20, color: c.sectionText),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-              color: c.sectionText,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: c.sectionText,
+              ),
             ),
           ),
         ],

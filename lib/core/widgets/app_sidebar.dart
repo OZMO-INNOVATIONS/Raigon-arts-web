@@ -1,3 +1,6 @@
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:raigon_art/core/constants/asset_constants.dart';
@@ -57,6 +60,30 @@ class AppSidebar extends StatelessWidget {
                         icon: destination.icon,
                         active: destination == current,
                         showLabels: showLabels,
+                        badge: destination == NavDestination.reminders
+                            ? () {
+                                try {
+                                  final rp = context.watch<ReminderProvider>();
+                                  final due = rp.dueCount;
+                                  if (due > 0) return due;
+                                  final active = rp.activeCount;
+                                  if (active > 0) return active;
+                                  return null;
+                                } catch (_) {
+                                  return null;
+                                }
+                              }()
+                            : destination == NavDestination.trash
+                                ? () {
+                                    try {
+                                      final tp = context.watch<CustomerAndOrderProvider>();
+                                      final count = tp.totalTrashCount;
+                                      return count > 0 ? count : null;
+                                    } catch (_) {
+                                      return null;
+                                    }
+                                  }()
+                                : null,
                         onTap: () => onSelect(destination),
                       ),
                   ],
@@ -116,7 +143,7 @@ class AppSidebar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'RAIGON ARTS',
+                          'RAIGON ART',
                           maxLines: 1,
                           overflow: TextOverflow.clip,
                           style: TextStyle(
@@ -143,7 +170,11 @@ class AppSidebar extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: onToggle,
-                    icon: Icon(RemixIcons.menu_line, color: p.textPrimary, size: 22),
+                    icon: Icon(
+                      RemixIcons.menu_line,
+                      color: p.textPrimary,
+                      size: 22,
+                    ),
                   ),
                 ],
               ),
@@ -166,6 +197,7 @@ class AppSidebar extends StatelessWidget {
     required bool showLabels,
     required VoidCallback onTap,
     Color? color,
+    int? badge,
   }) {
     final fg = active ? Colors.white : (color ?? p.navText);
     final tile = Material(
@@ -208,6 +240,25 @@ class AppSidebar extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (badge != null && badge > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppPalette.statusRed,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   )

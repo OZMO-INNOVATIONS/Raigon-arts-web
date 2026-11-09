@@ -1,3 +1,7 @@
+import 'package:raigon_art/features/trash/presentation/screens/trash_screen.dart';
+import 'package:raigon_art/features/reminders/models/reminder_model.dart';
+import 'package:raigon_art/features/reminders/presentation/screens/reminders_screen.dart';
+import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/authentication/services/auth_service.dart';
@@ -6,6 +10,7 @@ import 'package:raigon_art/features/authentication/providers/auth_provider.dart'
 import 'package:raigon_art/app/app_router.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
 import 'package:raigon_art/core/widgets/app_sidebar.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/app_top_bar.dart';
@@ -13,14 +18,12 @@ import 'package:raigon_art/core/widgets/notification_model.dart';
 import 'package:raigon_art/core/widgets/notification_panel.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/add_customer_dialog.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/customer_view_dialog.dart';
 import 'package:raigon_art/features/customers/presentation/screens/customers_screen.dart';
 import 'package:raigon_art/features/dashboard/presentation/screens/dashboard_screen.dart';
-import 'package:raigon_art/features/frame_sizes/presentation/screens/frame_sizes_screen.dart';
-import 'package:raigon_art/features/messaging_automation/presentation/screens/messaging_automation_screen.dart';
+import 'package:raigon_art/features/messaging/presentation/screens/messaging_automation_screen.dart';
 import 'package:raigon_art/features/orders/presentation/screens/orders_screen.dart';
-import 'package:raigon_art/features/photo_collection/presentation/screens/photo_collection_screen.dart';
 import 'package:raigon_art/features/reports/presentation/screens/reports_screen.dart';
-import 'package:raigon_art/features/profile/presentation/screens/profile_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -50,6 +53,7 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
 
       context.read<CustomerAndOrderProvider>().init();
+      context.read<ReminderProvider>().init();
     });
   }
 
@@ -72,6 +76,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _logout() async {
+    final confirmed = await showLogoutConfirmationDialog(context);
+    if (!confirmed || !mounted) return;
+
     try {
       await context.read<AuthProvider>().signOut();
 
@@ -94,18 +101,26 @@ class _AppShellState extends State<AppShell> {
     NavDestination.dashboard => const DashboardScreen(),
     NavDestination.customers => const CustomersScreen(),
     NavDestination.orders => const OrdersScreen(),
-    NavDestination.photoCollection => const PhotoCollectionScreen(),
-    NavDestination.frameSizes => const FrameSizesScreen(),
+    NavDestination.reminders => const RemindersScreen(),
+    // NavDestination.frameSizes => const FrameSizesScreen(),
     NavDestination.messagingAutomation => const MessagingAutomationScreen(),
     NavDestination.reports => const ReportsScreen(),
-    NavDestination.profile => const ProfileScreen(),
+    NavDestination.trash => const TrashScreen(),
+    // NavDestination.profile => const ProfileScreen(),
   };
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final customers = context.watch<CustomerAndOrderProvider>().customers;
-    final notifications = buildNotificationsFromCustomers(customers);
+    List<CustomerReminder> reminders = const [];
+    try {
+      final rp = context.watch<ReminderProvider>();
+      reminders = rp.reminderList;
+    } catch (_) {
+      reminders = const [];
+    }
+    final notifications = buildNotificationsFromCustomers(customers, reminders);
 
     return ShellScope(
       goTo: _goTo,
@@ -173,6 +188,16 @@ class _AppShellState extends State<AppShell> {
                   },
                   onViewDetails: () => _goTo(NavDestination.orders),
                   onViewAll: () => _goTo(NavDestination.orders),
+                  onSelectNotification: (item) {
+                    setState(() => _showNotifications = false);
+                    if (item.reminder != null) {
+                      _goTo(NavDestination.reminders);
+                    } else if (item.customer != null) {
+                      showViewCustomerDialog(context, item.customer!);
+                    } else {
+                      _goTo(NavDestination.orders);
+                    }
+                  },
                 ),
               ),
             ],

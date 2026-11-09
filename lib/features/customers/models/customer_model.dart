@@ -1,10 +1,140 @@
-import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:raigon_art/core/utils/helper.dart';
-import 'package:raigon_art/features/customers/models/frame_spec.dart';
+import 'package:flutter/material.dart' show Color;
 import 'package:raigon_art/core/models/status.dart';
+import 'package:raigon_art/core/utils/helper.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/features/customers/models/frame_spec.dart';
+
+enum OrderPriority {
+  urgent('Urgent', Color(0xFFEF4444)),
+  high('High', Color(0xFFF59E0B)),
+  normal('Normal', Color(0xFF3B82F6)),
+  low('Low', Color(0xFF6B7280));
+
+  const OrderPriority(this.label, this.color);
+  final String label;
+  final Color color;
+}
+
+class OrderStatusHistoryItem {
+  final Status previousStatus;
+  final Status newStatus;
+  final DateTime updatedAt;
+  final String updatedBy;
+  final String notes;
+
+  const OrderStatusHistoryItem({
+    required this.previousStatus,
+    required this.newStatus,
+    required this.updatedAt,
+    required this.updatedBy,
+    this.notes = '',
+  });
+
+  Map<String, dynamic> toJson() => {
+    'previousStatus': previousStatus.name,
+    'newStatus': newStatus.name,
+    'updatedAt': updatedAt.toIso8601String(),
+    'updatedBy': updatedBy,
+    'notes': notes,
+  };
+
+  factory OrderStatusHistoryItem.fromJson(Map<String, dynamic> j) {
+    return OrderStatusHistoryItem(
+      previousStatus: Customer.parseStatus(
+        j['previousStatus'] ?? j['previous_status'],
+      ),
+      newStatus: Customer.parseStatus(j['newStatus'] ?? j['new_status']),
+      updatedAt:
+          DateTime.tryParse(
+            (j['updatedAt'] ?? j['updated_at'] ?? '').toString(),
+          ) ??
+          DateTime.now(),
+      updatedBy: (j['updatedBy'] ?? j['updated_by'] ?? 'Workshop Staff')
+          .toString(),
+      notes: (j['notes'] ?? '').toString(),
+    );
+  }
+}
+
+class OrderVoiceNote {
+  final String id;
+  final String url;
+  final String name;
+  final int durationSeconds;
+  final DateTime createdAt;
+  final Uint8List? localBytes;
+
+  const OrderVoiceNote({
+    required this.id,
+    required this.url,
+    this.name = 'Voice Note',
+    this.durationSeconds = 0,
+    required this.createdAt,
+    this.localBytes,
+  });
+
+  bool get hasAudio =>
+      url.isNotEmpty || (localBytes != null && localBytes!.isNotEmpty);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'url': url,
+    'name': name,
+    'durationSeconds': durationSeconds,
+    'createdAt': createdAt.toIso8601String(),
+    if (localBytes != null) 'bytes': base64Encode(localBytes!),
+  };
+
+  factory OrderVoiceNote.fromJson(Map<String, dynamic> j) {
+    Uint8List? parseBytes(dynamic v) {
+      if (v == null) return null;
+      if (v is Uint8List) return v;
+      if (v is String && v.isNotEmpty) {
+        try {
+          return base64Decode(v);
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    return OrderVoiceNote(
+      id: (j['id'] ?? 'voice_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
+      url: (j['url'] ?? j['fileUrl'] ?? j['voiceUrl'] ?? '').toString(),
+      name: (j['name'] ?? j['title'] ?? 'Voice Note').toString(),
+      durationSeconds: (j['durationSeconds'] ?? j['duration'] ?? 0 as num)
+          .toInt(),
+      createdAt:
+          DateTime.tryParse(
+            (j['createdAt'] ?? j['created_at'] ?? '').toString(),
+          ) ??
+          DateTime.now(),
+      localBytes: parseBytes(j['bytes'] ?? j['localBytes'] ?? j['voiceBytes']),
+    );
+  }
+
+  OrderVoiceNote copyWith({
+    String? id,
+    String? url,
+    String? name,
+    int? durationSeconds,
+    DateTime? createdAt,
+    Uint8List? localBytes,
+  }) {
+    return OrderVoiceNote(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      name: name ?? this.name,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      createdAt: createdAt ?? this.createdAt,
+      localBytes: localBytes ?? this.localBytes,
+    );
+  }
+}
 
 class Customer {
   const Customer({
@@ -21,6 +151,7 @@ class Customer {
     required this.advance,
     required this.status,
     required this.orderDate,
+    this.region = '',
     this.photoUrls = const [],
     this.altPhone = '',
     this.pincode = '',
@@ -30,13 +161,39 @@ class Customer {
     this.photoBytes = const [],
     this.photoNames = const [],
     this.photoSizeLabels = const [],
+    this.statusHistory = const [],
+    this.voiceNotes = const [],
     this.createdAt,
     this.updatedAt,
+    this.isDeleted = false,
+    this.deletedAt,
   });
+
+  static Status parseStatus(dynamic value) {
+    if (value == null) return Status.pending;
+    if (value is Status) return value;
+    final s = value.toString().trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+    if (s == 'confirmed') return Status.confirmed;
+    if (s == 'onhold' || s == 'hold') return Status.onHold;
+    if (s == 'cancelled' || s == 'canceled') return Status.cancelled;
+    if (s == 'editingprogress' || s == 'editing') return Status.editingProgress;
+    if (s == 'dispatchforprinting' || s == 'dispatch' || s == 'printing') {
+      return Status.dispatchForPrinting;
+    }
+    if (s == 'printreceived' || s == 'printed') return Status.printReceived;
+    if (s == 'framingprocess' || s == 'framing') return Status.framingProcess;
+    if (s == 'completed') return Status.completed;
+    if (s == 'inprogress') return Status.inProgress;
+    return Status.pending;
+  }
 
   final String id;
   final String name;
   final String city;
+  final String region;
   final String phone;
   final String address;
   final int photoCount;
@@ -56,18 +213,66 @@ class Customer {
   final List<FrameSpec> frames;
   final List<Uint8List> photoBytes;
   final List<String> photoSizeLabels;
+  final List<OrderStatusHistoryItem> statusHistory;
+  final List<OrderVoiceNote> voiceNotes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isDeleted;
+  final DateTime? deletedAt;
+
+  /// Calculates days remaining before permanent purge (14-day policy)
+  int get daysRemainingInTrash {
+    if (deletedAt == null) return 14;
+    final elapsed = DateTime.now().difference(deletedAt!).inDays;
+    return math.max(0, 14 - elapsed);
+  }
 
   int get balance => total - advance;
   String get orderDateLabel => Helper.formatDate(orderDate);
+
+  String get expectedDateLabel {
+    if (expectedDelivery == null) return 'Not set';
+    return Helper.formatExpectedDate(expectedDelivery!);
+  }
+
+  String get effectiveRegion =>
+      region.isNotEmpty ? region : (city.isNotEmpty ? city : 'Main Region');
+
+  /// Computes order priority based on delivery date urgency, status and pending balance.
+  OrderPriority get orderPriority {
+    if (status == Status.completed || status == Status.cancelled) {
+      return OrderPriority.low;
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (expectedDelivery != null) {
+      final exp = DateTime(
+        expectedDelivery!.year,
+        expectedDelivery!.month,
+        expectedDelivery!.day,
+      );
+      if (exp.isBefore(today) || exp.isAtSameMomentAs(today)) {
+        return OrderPriority.urgent;
+      }
+      if (exp.difference(today).inDays <= 3) {
+        return OrderPriority.high;
+      }
+    }
+    if (status == Status.inProgress && balance > 5000) {
+      return OrderPriority.high;
+    }
+    if (status == Status.inProgress) {
+      return OrderPriority.high;
+    }
+    return OrderPriority.normal;
+  }
 
   List<FrameSpec> get effectiveFrames => frames.isNotEmpty
       ? frames
       : [
           FrameSpec(
             size: frameSize,
-            unit: 'Inch',
+            unit: 'Inches',
             frameType: frameType,
             material: 'Teak Wood Moulding',
             finish: 'Walnut Brown',
@@ -80,6 +285,7 @@ class Customer {
     'id': id,
     'name': name,
     'city': city,
+    'region': region,
     'phone': phone,
     'altPhone': altPhone,
     'address': address,
@@ -95,11 +301,17 @@ class Customer {
     'total': total,
     'advance': advance,
     'paymentStatus': paymentStatus,
-    'status': status.name,
+    'status': status.apiValue,
     'orderDate': orderDate.toIso8601String(),
-    'expectedDelivery': expectedDelivery?.toIso8601String(),
+    if (expectedDelivery != null)
+      'expectedDelivery': expectedDelivery!.toIso8601String(),
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'is_deleted': isDeleted,
+    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
+    'statusHistory': [for (final h in statusHistory) h.toJson()],
+    'voiceNotes': [for (final v in voiceNotes) v.toJson()],
+    'voice_notes': [for (final v in voiceNotes) v.toJson()],
     'frames': [for (final f in frames) f.toJson()],
   };
 
@@ -107,6 +319,7 @@ class Customer {
     'id': id,
     'name': name,
     'city': city,
+    'region': region,
     'phone': phone,
     'altPhone': altPhone,
     'address': address,
@@ -117,12 +330,14 @@ class Customer {
     'total': total,
     'advance': advance,
     'paymentStatus': paymentStatus,
-    'status': status.name,
+    'status': status.apiValue,
     'orderDate': orderDate.toIso8601String(),
     if (expectedDelivery != null)
       'expectedDelivery': expectedDelivery!.toIso8601String(),
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'statusHistory': [for (final h in statusHistory) h.toJson()],
+    'voiceNotes': [for (final v in voiceNotes) v.toJson()],
     'frames': [
       for (final f in effectiveFrames)
         {
@@ -136,6 +351,7 @@ class Customer {
           'orientation': f.orientation,
           'qty': f.qty,
           'notes': f.notes,
+          'customerNote': f.customerNote,
           if (f.photoName != null && f.photoName!.isNotEmpty)
             'photoName': f.photoName,
           if (f.photoUrl != null && f.photoUrl!.isNotEmpty)
@@ -148,7 +364,9 @@ class Customer {
     var j = raw;
     if (j.containsKey('data') && j['data'] is Map && !j.containsKey('id')) {
       j = Map<String, dynamic>.from(j['data'] as Map);
-    } else if (j.containsKey('customer') && j['customer'] is Map && !j.containsKey('id')) {
+    } else if (j.containsKey('customer') &&
+        j['customer'] is Map &&
+        !j.containsKey('id')) {
       j = Map<String, dynamic>.from(j['customer'] as Map);
     }
 
@@ -163,18 +381,13 @@ class Customer {
       for (final k in keys) {
         final list = j[k];
         if (list is List) {
-          return [for (final v in list) if (v != null) v.toString()];
+          return [
+            for (final v in list)
+              if (v != null) v.toString(),
+          ];
         }
       }
       return [];
-    }
-
-    Status parseStatus(dynamic value) {
-      final s = value?.toString().toLowerCase().replaceAll('-', '').replaceAll('_', '') ?? '';
-      if (s == 'inprogress') return Status.inProgress;
-      if (s == 'completed') return Status.completed;
-      if (s == 'cancelled') return Status.cancelled;
-      return Status.pending;
     }
 
     DateTime parseDate(dynamic value) {
@@ -185,8 +398,7 @@ class Customer {
     final rawFrames = j['frames'] ?? j['customer_frames'];
     final frames = [
       for (final f in (rawFrames is List ? rawFrames : const []))
-        if (f is Map)
-          FrameSpec.fromJson(Map<String, dynamic>.from(f)),
+        if (f is Map) FrameSpec.fromJson(Map<String, dynamic>.from(f)),
     ];
 
     final pNames = extractStrings(['photoNames', 'photo_names']);
@@ -197,75 +409,46 @@ class Customer {
     if (rawUrls.isEmpty && rawCustPhotos is List) {
       for (final p in rawCustPhotos) {
         if (p is Map) {
-          final u = p['file_url'] ?? p['fileUrl'] ?? p['url'];
-          if (u != null && u.toString().trim().isNotEmpty) {
-            rawUrls.add(u.toString().trim());
-          }
-          final n = p['file_name'] ?? p['fileName'] ?? p['name'];
-          if (n != null && n.toString().trim().isNotEmpty) {
-            pNames.add(n.toString().trim());
+          final u = p['photo_url'] ?? p['url'];
+          final n = p['photo_name'] ?? p['file_name'];
+          if (u != null && u.toString().isNotEmpty) {
+            rawUrls.add(u.toString());
+            pNames.add(n?.toString() ?? 'Photo_${rawUrls.length}.jpg');
           }
         }
       }
     }
 
-    var pUrls = [
-      for (final u in rawUrls) ImageUrlHelper.resolve(u),
-    ].where((u) => u.isNotEmpty).toList();
-    final pSizeLabels = extractStrings(['photoSizeLabels', 'photo_size_labels']);
-
-    // Collect any frame photos that might not be in pUrls
-    for (var i = 0; i < frames.length; i++) {
-      final f = frames[i];
-      if (f.photoUrl != null && f.photoUrl!.isNotEmpty) {
-        final resolvedFrameUrl = ImageUrlHelper.resolve(f.photoUrl!);
-        if (!pUrls.contains(resolvedFrameUrl)) {
-          pUrls.add(resolvedFrameUrl);
-          final fname = f.photoName ?? 'Frame_${i + 1}.webp';
-          if (!pNames.contains(fname)) {
-            pNames.add(fname);
-          }
-        }
+    final pUrls = <String>[];
+    for (final u in rawUrls) {
+      final res = ImageUrlHelper.resolve(u);
+      if (res.isNotEmpty && !pUrls.contains(res)) {
+        pUrls.add(res);
       }
     }
 
-    // Link frames to pUrls if frame has no photoUrl but customer vault has photos
+    final pSizeLabels = extractStrings([
+      'photoSizeLabels',
+      'photo_size_labels',
+    ]);
+    final rawPhotoCount = j['photoCount'] ?? j['photo_count'];
+    final photoCount = toInt(
+      rawPhotoCount,
+      math.max(pUrls.length, frames.length),
+    );
+
     final resolvedFrames = <FrameSpec>[];
-    for (var i = 0; i < frames.length; i++) {
-      final f = frames[i];
-      if ((f.photoUrl == null || f.photoUrl!.isEmpty) && pUrls.isNotEmpty) {
-        final assignedUrl = i < pUrls.length ? pUrls[i] : pUrls.first;
-        final assignedName = i < pNames.length ? pNames[i] : 'Photo_${i + 1}';
-        resolvedFrames.add(FrameSpec(
-          size: f.size,
-          unit: f.unit,
-          customWidth: f.customWidth,
-          customHeight: f.customHeight,
-          frameType: f.frameType,
-          material: f.material,
-          finish: f.finish,
-          orientation: f.orientation,
-          qty: f.qty,
-          notes: f.notes,
-          photoName: f.photoName ?? assignedName,
-          photoUrl: assignedUrl,
-          photoBytes: f.photoBytes,
-        ));
-      } else {
-        resolvedFrames.add(f);
-      }
+    if (frames.isNotEmpty) {
+      resolvedFrames.addAll(frames);
     }
 
-    final rawPhotoCount = toInt(j['photoCount'] ?? j['photo_count'], 0);
-    final photoCount = rawPhotoCount > 0
-        ? rawPhotoCount
-        : (pUrls.isNotEmpty ? pUrls.length : pNames.length);
-
-    final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
     final bytesList = <Uint8List>[];
+    final rawBytes = j['photoBytes'] ?? j['photo_bytes'];
     if (rawBytes is List) {
       for (final s in rawBytes) {
-        if (s is String && s.isNotEmpty) {
+        if (s is Uint8List) {
+          bytesList.add(s);
+        } else if (s is String && s.isNotEmpty) {
           try {
             bytesList.add(base64Decode(s));
           } catch (_) {}
@@ -273,15 +456,58 @@ class Customer {
       }
     }
 
+    final historyList = <OrderStatusHistoryItem>[];
+    final rawHistory = j['statusHistory'] ?? j['status_history'];
+    if (rawHistory is List) {
+      for (final h in rawHistory) {
+        if (h is Map<String, dynamic>) {
+          historyList.add(OrderStatusHistoryItem.fromJson(h));
+        } else if (h is Map) {
+          historyList.add(
+            OrderStatusHistoryItem.fromJson(Map<String, dynamic>.from(h)),
+          );
+        }
+      }
+    }
+
+    final voiceNotesList = <OrderVoiceNote>[];
+    for (final v
+        in (j['voiceNotes'] ?? j['voice_notes'] as List? ?? const [])) {
+      if (v is Map) {
+        voiceNotesList.add(
+          OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)),
+        );
+      } else if (v is String && v.isNotEmpty) {
+        voiceNotesList.add(
+          OrderVoiceNote(
+            id: 'voice_${voiceNotesList.length}',
+            url: v,
+            name: 'Voice Note ${voiceNotesList.length + 1}',
+            durationSeconds: 0,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+    }
+
     final rawOrderDate = j['orderDate'] ?? j['order_date'];
     final rawExpectedDelivery = j['expectedDelivery'] ?? j['expected_delivery'];
     final rawCreatedAt = j['createdAt'] ?? j['created_at'];
     final rawUpdatedAt = j['updatedAt'] ?? j['updated_at'];
+    final isDeleted = j['is_deleted'] == true || j['isDeleted'] == true;
+    final rawDeletedAt = j['deleted_at'] ?? j['deletedAt'];
+    final deletedAt = rawDeletedAt != null
+        ? DateTime.tryParse(rawDeletedAt.toString())
+        : null;
 
     return Customer(
       id: (j['id'] ?? '')?.toString() ?? '',
       name: (j['name'] ?? '')?.toString() ?? '',
       city: (j['city'] ?? '')?.toString() ?? '',
+      region:
+          (j['region'] ?? j['regionId'] ?? j['region_id'] ?? j['city'] ?? '')
+              ?.toString() ??
+          '',
       phone: (j['phone'] ?? '')?.toString() ?? '',
       altPhone: (j['altPhone'] ?? j['alt_phone'] ?? '')?.toString() ?? '',
       address: (j['address'] ?? '')?.toString() ?? '',
@@ -291,32 +517,55 @@ class Customer {
       photoUrls: pUrls,
       photoSizeLabels: pSizeLabels,
       photoBytes: bytesList,
-      frameSize: (j['frameSize'] ?? j['frame_size'] ?? j['frame_size_summary'] ?? '')?.toString() ?? '',
-      frameType: (j['frameType'] ?? j['frame_type'] ?? j['frame_type_summary'] ?? '')?.toString() ?? '',
+      frameSize:
+          (j['frameSize'] ?? j['frame_size'] ?? j['frame_size_summary'] ?? '')
+              ?.toString() ??
+          '',
+      frameType:
+          (j['frameType'] ?? j['frame_type'] ?? j['frame_type_summary'] ?? '')
+              ?.toString() ??
+          '',
       qty: toInt(j['qty'], 1),
       total: toInt(j['total'], 0),
       advance: toInt(j['advance'], 0),
-      paymentStatus: (j['paymentStatus'] ?? j['payment_status'] ?? 'Unpaid')?.toString() ?? 'Unpaid',
+      paymentStatus:
+          (j['paymentStatus'] ?? j['payment_status'] ?? 'Unpaid')?.toString() ??
+          'Unpaid',
       status: parseStatus(j['status']),
       orderDate: parseDate(rawOrderDate),
       expectedDelivery: rawExpectedDelivery == null
           ? null
           : DateTime.tryParse(rawExpectedDelivery.toString()),
       frames: resolvedFrames,
-      createdAt: rawCreatedAt != null ? DateTime.tryParse(rawCreatedAt.toString()) : null,
-      updatedAt: rawUpdatedAt != null ? DateTime.tryParse(rawUpdatedAt.toString()) : null,
+      statusHistory: historyList,
+      voiceNotes: voiceNotesList,
+      createdAt: rawCreatedAt != null
+          ? DateTime.tryParse(rawCreatedAt.toString())
+          : null,
+      updatedAt: rawUpdatedAt != null
+          ? DateTime.tryParse(rawUpdatedAt.toString())
+          : null,
+      isDeleted: isDeleted,
+      deletedAt: deletedAt,
     );
   }
 
   Customer copyWith({
     Status? status,
+    String? region,
     String? paymentStatus,
+    DateTime? expectedDelivery,
+    List<OrderStatusHistoryItem>? statusHistory,
+    List<OrderVoiceNote>? voiceNotes,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) => Customer(
     id: id,
     name: name,
     city: city,
+    region: region ?? this.region,
     phone: phone,
     address: address,
     photoCount: photoCount,
@@ -330,28 +579,39 @@ class Customer {
     photoUrls: photoUrls,
     altPhone: altPhone,
     pincode: pincode,
-    expectedDelivery: expectedDelivery,
+    expectedDelivery: expectedDelivery ?? this.expectedDelivery,
     paymentStatus: paymentStatus ?? this.paymentStatus,
     frames: frames,
     photoBytes: photoBytes,
     photoNames: photoNames,
     photoSizeLabels: photoSizeLabels,
+    statusHistory: statusHistory ?? this.statusHistory,
+    voiceNotes: voiceNotes ?? this.voiceNotes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    isDeleted: isDeleted ?? this.isDeleted,
+    deletedAt: deletedAt ?? this.deletedAt,
   );
 
   Customer copyWithImages({
+    String? region,
     List<Uint8List>? photoBytes,
     List<String>? photoNames,
     List<String>? photoUrls,
     List<FrameSpec>? frames,
+    List<OrderVoiceNote>? voiceNotes,
     int? photoCount,
+    DateTime? expectedDelivery,
+    List<OrderStatusHistoryItem>? statusHistory,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) => Customer(
     id: id,
     name: name,
     city: city,
+    region: region ?? this.region,
     phone: phone,
     address: address,
     photoCount: photoCount ?? this.photoCount,
@@ -366,12 +626,16 @@ class Customer {
     orderDate: orderDate,
     altPhone: altPhone,
     pincode: pincode,
-    expectedDelivery: expectedDelivery,
+    expectedDelivery: expectedDelivery ?? this.expectedDelivery,
     paymentStatus: paymentStatus,
     frames: frames ?? this.frames,
     photoBytes: photoBytes ?? this.photoBytes,
     photoSizeLabels: photoSizeLabels,
+    statusHistory: statusHistory ?? this.statusHistory,
+    voiceNotes: voiceNotes ?? this.voiceNotes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    isDeleted: isDeleted ?? this.isDeleted,
+    deletedAt: deletedAt ?? this.deletedAt,
   );
 }

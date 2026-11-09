@@ -76,15 +76,18 @@ class FrameSizeProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    _isLoading = true;
     _error = null;
+    notifyListeners();
     try {
       await _fetchFromApi();
       _initialized = true;
-      notifyListeners();
     } catch (error) {
       _error = error;
-      notifyListeners();
       rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

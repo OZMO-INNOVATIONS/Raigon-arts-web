@@ -110,6 +110,17 @@ class AppPalette {
   static AppPalette of(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? dark : light;
 
+
+  LinearGradient get goldAccentGradient => const LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFE9DFC0),
+      Color(0xFFCDBB88),
+      Color(0xFFA89458),
+    ],
+  );
+
   BoxDecoration card({double radius = 18}) => BoxDecoration(
     color: surface,
     borderRadius: BorderRadius.circular(radius),

@@ -3,12 +3,24 @@
     "public": "build/web",
     "ignore": [
       "firebase.json",
-      "**/.*",
+      "**/.git/**",
+      "**/.DS_Store",
       "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
     ],
     "rewrites": [
       {
-        "source": "**",
+        "source": "!(/assets/**|/canvaskit/**|/icons/**|/main.dart.*)",
         "destination": "/index.html"
       }
     ]

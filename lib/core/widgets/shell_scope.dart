@@ -5,11 +5,12 @@ enum NavDestination {
   dashboard,
   customers,
   orders,
-  photoCollection,
-  frameSizes,
+  reminders,
+  // frameSizes,
   messagingAutomation,
   reports,
-  profile,
+  trash,
+  // profile,
 }
 
 extension NavDestinationX on NavDestination {
@@ -17,31 +18,35 @@ extension NavDestinationX on NavDestination {
     NavDestination.dashboard => 'Dashboard',
     NavDestination.customers => 'Customers',
     NavDestination.orders => 'Orders',
-    NavDestination.photoCollection => 'Photo Collection',
-    NavDestination.frameSizes => 'Frame Sizes',
+    NavDestination.reminders => 'Reminders',
+    // NavDestination.frameSizes => 'Material',
     NavDestination.messagingAutomation => 'Messaging Automation',
     NavDestination.reports => 'Reports',
-    NavDestination.profile => 'Profile',
+    NavDestination.trash => 'Trash & Bin',
+    // NavDestination.profile => 'Profile',
   };
 
   IconData get icon => switch (this) {
     NavDestination.dashboard => RemixIcons.dashboard_line,
     NavDestination.customers => RemixIcons.team_line,
     NavDestination.orders => RemixIcons.inbox_line,
-    NavDestination.photoCollection => RemixIcons.gallery_line,
-    NavDestination.frameSizes => RemixIcons.ruler_line,
+    NavDestination.reminders => RemixIcons.alarm_line,
+    // NavDestination.frameSizes => RemixIcons.ruler_line,
     NavDestination.messagingAutomation => RemixIcons.message_3_line,
     NavDestination.reports => RemixIcons.bar_chart_line,
-    NavDestination.profile => RemixIcons.store_2_line,
+    NavDestination.trash => RemixIcons.delete_bin_line,
+    // NavDestination.profile => RemixIcons.store_2_line,
   };
 
   /// Screens Staff members are allowed to access.
   bool get isStaffAllowed => switch (this) {
     NavDestination.customers ||
     NavDestination.orders ||
-    NavDestination.photoCollection ||
-    NavDestination.frameSizes ||
-    NavDestination.profile => true,
+    NavDestination.reminders ||
+    // NavDestination.frameSizes ||
+    NavDestination.messagingAutomation ||
+    NavDestination.trash ||
+    // NavDestination.profile => true,
     _ => false,
   };
 

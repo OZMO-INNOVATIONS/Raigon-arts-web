@@ -54,7 +54,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
       await context.read<CustomerAndOrderProvider>().remove(customer.id);
 
       if (mounted) {
-        AppSnackBar.success(context, 'Customer deleted successfully.');
+        AppSnackBar.success(
+          context,
+          'Customer ${customer.id} moved to trash.',
+          actionLabel: 'View Trash',
+          onAction: () {
+            try {
+              ShellScope.of(context).goTo(NavDestination.trash);
+            } catch (_) {}
+          },
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -159,13 +168,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: _toolbar(p, wide),
                       ),
 
-                      if (customerProvider.isLoading && !customerProvider.initialized)
+                      if (customerProvider.isLoading &&
+                          customerProvider.initialized)
+                        const LinearProgressIndicator(
+                          color: AppColors.gold,
+                          backgroundColor: Colors.transparent,
+                          minHeight: 3,
+                        ),
+
+                      if (customerProvider.isLoading &&
+                          !customerProvider.initialized)
                         const Expanded(
                           child: Center(
-                            child: CircularProgressIndicator(color: AppColors.gold),
+                            child: CircularProgressIndicator(
+                              color: AppColors.gold,
+                            ),
                           ),
                         )
-                      else if (customerProvider.error != null && customerProvider.customers.isEmpty)
+                      else if (customerProvider.error != null &&
+                          customerProvider.customers.isEmpty)
                         Expanded(
                           child: Center(
                             child: Padding(
@@ -173,7 +194,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(RemixIcons.cloud_off_line, size: 48, color: AppColors.error),
+                                  const Icon(
+                                    RemixIcons.cloud_off_line,
+                                    size: 48,
+                                    color: AppColors.error,
+                                  ),
                                   const SizedBox(height: 14),
                                   Text(
                                     'Failed to load customers',
@@ -186,26 +211,42 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   const SizedBox(height: 6),
                                   Text(
                                     customerProvider.error is ApiException
-                                        ? (customerProvider.error as ApiException).userFriendlyMessage
+                                        ? (customerProvider.error
+                                                  as ApiException)
+                                              .userFriendlyMessage
                                         : 'Please check your connection to the server.',
-                                    style: TextStyle(fontSize: 14, color: p.textMuted),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: p.textMuted,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      customerProvider.refresh().then((_) {
-                                        if (context.mounted) {
-                                          AppSnackBar.success(context, 'Customers loaded successfully.');
-                                        }
-                                      }).catchError((e) {
-                                        if (context.mounted) {
-                                          final msg = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
-                                          AppSnackBar.error(context, msg);
-                                        }
-                                      });
+                                      customerProvider
+                                          .refresh()
+                                          .then((_) {
+                                            if (context.mounted) {
+                                              AppSnackBar.success(
+                                                context,
+                                                'Customers loaded successfully.',
+                                              );
+                                            }
+                                          })
+                                          .catchError((e) {
+                                            if (context.mounted) {
+                                              final msg = e is ApiException
+                                                  ? e.userFriendlyMessage
+                                                  : 'Retry failed.';
+                                              AppSnackBar.error(context, msg);
+                                            }
+                                          });
                                     },
-                                    icon: const Icon(RemixIcons.refresh_line, size: 16),
+                                    icon: const Icon(
+                                      RemixIcons.refresh_line,
+                                      size: 16,
+                                    ),
                                     label: const Text('Retry'),
                                   ),
                                 ],
@@ -335,7 +376,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
         decoration: InputDecoration(
           hintText: 'Search customer, phone, ID...',
           hintStyle: TextStyle(fontSize: 15, color: p.textMuted),
-          prefixIcon: Icon(RemixIcons.search_line, size: 20, color: p.textMuted),
+          prefixIcon: Icon(
+            RemixIcons.search_line,
+            size: 20,
+            color: p.textMuted,
+          ),
           filled: true,
           fillColor: p.surface,
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -349,7 +394,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Widget _toolbar(AppPalette p, bool wide) {
     final status = AppDropdown<Status?>(
       value: context.watch<CustomersScreenProvider>().status,
-      items: [null, ...Status.values],
+      items: [null, ...Status.standardStatuses],
       labelOf: (status) => status?.label ?? 'All Statuses',
       width: 175,
       onChanged: (value) {

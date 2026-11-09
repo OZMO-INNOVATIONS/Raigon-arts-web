@@ -1,7 +1,26 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+  <base href="$FLUTTER_BASE_HREF">
+
   <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Raigon Art - Creative Framing & Art Studio">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Raigon Art">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png" />
+
+  <title>Raigon Art</title>
+  <link rel="manifest" href="manifest.json">
+
 
   <script>
     // ============================================================
@@ -64,7 +83,7 @@
       for (const url of photoObjectUrls) {
         try {
           URL.revokeObjectURL(url);
-        } catch (_) {}
+        } catch (_) { }
       }
 
       photoObjectUrls = [];
@@ -737,6 +756,22 @@
         }
       };
 
+    // ============================================================
+    // LOCAL OFFLINE DOWNLOAD HELPER
+    // ============================================================
+
+    window.downloadPhotoFile = function (url, fileName) {
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.error('[PHOTO_COLLECTION_JS] download error:', err);
+      }
+    };
 
     // ============================================================
     // DEBUG
@@ -775,12 +810,7 @@
 </head>
 
 <body>
-
-  <script
-    src="flutter_bootstrap.js"
-    async>
-  </script>
-
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 
 </html>

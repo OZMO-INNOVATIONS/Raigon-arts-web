@@ -23,8 +23,8 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _usernameCtrl = TextEditingController(text: AuthModel.adminEmail);
-  final _passwordCtrl = TextEditingController(text: 'securePassword123');
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(text: AuthModel.registeredPhone);
   final _otpCtrl = TextEditingController();
   final _newPassCtrl = TextEditingController();
@@ -212,19 +212,18 @@ class _AuthScreenState extends State<AuthScreen> {
     _auth.backToSignIn();
   }
 
-  void _goTo(AuthStep step) => _auth.goTo(step);
+  // void _goTo(AuthStep step) => _auth.goTo(step);
 
   @override
   Widget build(BuildContext context) {
-    final isAuth = context.select<AuthProvider, bool>((a) => a.isAuthenticated) ||
+    final isAuth =
+        context.select<AuthProvider, bool>((a) => a.isAuthenticated) ||
         AuthTokenManager.instance.isAuthenticated;
 
     if (isAuth) {
       return const Scaffold(
         backgroundColor: AppColors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.gold),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppColors.gold)),
       );
     }
 
@@ -323,19 +322,24 @@ class _AuthScreenState extends State<AuthScreen> {
           title: 'Welcome Back',
           subtitle: 'Please sign in to access your workshop dashboard.',
         ),
-        const SizedBox(height: 40),
-        const AuthFieldLabel('Mobile Number / Email'),
+        const SizedBox(height: 36),
+        const AuthFieldLabel('Email / Mobile Number'),
         AuthTextField(
           controller: _usernameCtrl,
-          prefixIcon: RemixIcons.user_3_line,
+          prefixIcon: RemixIcons.mail_line,
+          hint: 'Enter your email or mobile number',
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.username, AutofillHints.email],
           textInputAction: TextInputAction.next,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         const AuthFieldLabel('Password'),
         AuthTextField(
           controller: _passwordCtrl,
           prefixIcon: RemixIcons.lock_line,
+          hint: 'Enter your password',
           obscureText: _hidePassword,
+          autofillHints: const [AutofillHints.password],
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _signIn(),
           suffix: _eyeButton(
@@ -343,14 +347,14 @@ class _AuthScreenState extends State<AuthScreen> {
             () => setState(() => _hidePassword = !_hidePassword),
           ),
         ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: AuthTextLink(
-            label: 'Forgot Password?',
-            onTap: () => _goTo(AuthStep.forgot),
-          ),
-        ),
+        const SizedBox(height: 8),
+        // Align(
+        //   alignment: Alignment.centerRight,
+        //   child: AuthTextLink(
+        //     label: 'Forgot Password?',
+        //     onTap: () => _goTo(AuthStep.forgot),
+        //   ),
+        // ),
         const SizedBox(height: 14),
         AuthButton(
           label: 'Sign In to Workshop',

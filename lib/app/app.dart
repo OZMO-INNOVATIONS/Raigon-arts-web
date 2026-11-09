@@ -1,3 +1,4 @@
+import 'package:raigon_art/features/reminders/providers/reminder_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,7 +10,7 @@ import 'package:raigon_art/features/authentication/providers/auth_provider.dart'
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/provider/customers_screen_provider.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
-import 'package:raigon_art/features/messaging_automation/providers/messaging_automation_provider.dart';
+import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
 
 class RaigonartApp extends StatelessWidget {
   const RaigonartApp({super.key});
@@ -34,6 +35,8 @@ class RaigonartApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FrameSizeProvider()),
         ChangeNotifierProvider(create: (_) => MessagingAutomationProvider()),
         ChangeNotifierProvider(create: (_) => CustomersScreenProvider()),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()..init()),
+
         // ChangeNotifierProvider(create: (_) => AddCustomerProvider()),
       ],
       child: AnnotatedRegion<SystemUiOverlayStyle>(

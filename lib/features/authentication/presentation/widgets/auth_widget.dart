@@ -164,6 +164,7 @@ class AuthTextField extends StatefulWidget {
     this.letterSpacing,
     this.autofocus = false,
     this.iconColor,
+    this.autofillHints,
   });
 
   final TextEditingController controller;
@@ -180,6 +181,7 @@ class AuthTextField extends StatefulWidget {
   final double? letterSpacing;
   final bool autofocus;
   final Color? iconColor;
+  final Iterable<String>? autofillHints;
 
   @override
   State<AuthTextField> createState() => _AuthTextFieldState();
@@ -211,7 +213,8 @@ class _AuthTextFieldState extends State<AuthTextField> {
         color: focused ? AppColors.gold.withValues(alpha: 0.22) : null,
       ),
       child: Container(
-        height: 52,
+        constraints: const BoxConstraints(minHeight: 52),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: widget.readOnly
               ? AppColors.fieldFillDisabled
@@ -229,28 +232,36 @@ class _AuthTextFieldState extends State<AuthTextField> {
           focusNode: _focus,
           readOnly: widget.readOnly,
           obscureText: widget.obscureText,
+          obscuringCharacter: '•',
           autofocus: widget.autofocus,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
           maxLength: widget.maxLength,
           textInputAction: widget.textInputAction,
           onSubmitted: widget.onSubmitted,
+          autofillHints: widget.autofillHints,
           cursorColor: AppColors.black,
+          textAlignVertical: TextAlignVertical.center,
           style: TextStyle(
-            fontSize: 15.5,
-            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
             letterSpacing: widget.letterSpacing,
           ),
           decoration: InputDecoration(
+            isDense: true,
             counterText: '',
             border: InputBorder.none,
             hintText: widget.hint,
             hintStyle: const TextStyle(
-              fontSize: 15,
+              fontSize: 14.5,
               fontWeight: FontWeight.w400,
-              color: AppColors.textHint,
+              color: Color(0xFF8A889A),
               letterSpacing: 0,
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 46,
+              minHeight: 46,
             ),
             prefixIcon: Icon(
               widget.prefixIcon,
@@ -259,8 +270,15 @@ class _AuthTextFieldState extends State<AuthTextField> {
                   widget.iconColor ??
                   (focused ? AppColors.black : AppColors.fieldIcon),
             ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 46,
+              minHeight: 46,
+            ),
             suffixIcon: widget.suffix,
-            contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 14,
+            ),
           ),
         ),
       ),

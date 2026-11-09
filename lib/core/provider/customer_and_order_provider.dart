@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/customers/repository/customer_repository.dart';
+import 'package:raigon_art/features/reminders/models/reminder_model.dart';
 
 class CustomerAndOrderProvider extends ChangeNotifier {
   static VoidCallback? onAnyOrderChange;
@@ -26,6 +29,57 @@ class CustomerAndOrderProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _initialized = false;
   Object? _error;
+
+  List<Customer> _trashOrders = [];
+  List<CustomerReminder> _trashReminders = [];
+  int _totalTrashCount = 0;
+  int _trashRetentionDays = 14;
+  bool _isLoadingTrash = false;
+
+  List<Customer> get trashOrders => List.unmodifiable(_trashOrders);
+  List<CustomerReminder> get trashReminders => List.unmodifiable(_trashReminders);
+  int get totalTrashCount => _totalTrashCount;
+  int get trashRetentionDays => _trashRetentionDays;
+  bool get isLoadingTrash => _isLoadingTrash;
+
+  static int _extractIdNum(String id) {
+    final matches = RegExp(r'(\d+)').allMatches(id);
+    if (matches.isNotEmpty) {
+      return int.tryParse(matches.last.group(1) ?? '0') ?? 0;
+    }
+    return 0;
+  }
+
+  /// Sorts customers with latest records on top:
+  /// 1) Highest numeric order ID (e.g. RA-1006 > RA-1005 > RA-1004 or 5 > 3 > 2 > 1)
+  /// 2) Lexicographical ID fallback
+  /// 3) Newest `createdAt` timestamp
+  /// 4) Newest `orderDate`
+  static int compareLatestFirst(Customer a, Customer b) {
+    final numA = _extractIdNum(a.id);
+    final numB = _extractIdNum(b.id);
+    if (numA != numB) {
+      return numB.compareTo(numA);
+    }
+
+    final idCmp = b.id.compareTo(a.id);
+    if (idCmp != 0) return idCmp;
+
+    if (a.createdAt != null && b.createdAt != null) {
+      final cmp = b.createdAt!.compareTo(a.createdAt!);
+      if (cmp != 0) return cmp;
+    } else if (a.createdAt != null) {
+      return -1;
+    } else if (b.createdAt != null) {
+      return 1;
+    }
+
+    return b.orderDate.compareTo(a.orderDate);
+  }
+
+  void _sortCustomers() {
+    _customers.sort(compareLatestFirst);
+  }
 
   List<Customer> get customers => List.unmodifiable(_customers);
   bool get isLoading => _isLoading;
@@ -50,14 +104,18 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll(
+      final loaded = await _repository.getAll(
         sortBy: 'createdAt',
         sortOrder: 'desc',
         limit: 1000,
       );
+      _customers = loaded.where((c) => !c.isDeleted).toList();
+      await _loadStatusOverrides();
+      _sortCustomers();
       _initialized = true;
 
       debugPrint('[CustomerProvider] Loaded ${_customers.length} customers.');
+      fetchTrash().ignore();
     } catch (error, stackTrace) {
       _error = error;
 
@@ -75,13 +133,17 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getAll(
+      final fresh = await _repository.getAll(
         sortBy: 'createdAt',
         sortOrder: 'desc',
         limit: 1000,
       );
+      _customers = fresh.where((c) => !c.isDeleted).toList();
+      await _loadStatusOverrides();
+      _sortCustomers();
       _initialized = true;
       _notifyOrderChange();
+      fetchTrash().ignore();
     } catch (error) {
       _error = error;
       rethrow;
@@ -156,6 +218,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = [
         for (final c in _customers) c.id == customer.id ? safeCreated : c,
       ];
+      _sortCustomers();
       notifyListeners();
       _notifyOrderChange();
     } catch (error) {
@@ -178,6 +241,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       for (final existing in _customers)
         existing.id == customer.id ? customer : existing,
     ];
+    _sortCustomers();
 
     _error = null;
     notifyListeners();
@@ -188,6 +252,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
       _customers = [
         for (final c in _customers) c.id == customer.id ? safeUpdated : c,
       ];
+      _sortCustomers();
       notifyListeners();
       _notifyOrderChange();
     } catch (error) {
@@ -208,6 +273,8 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
     try {
       await _repository.delete(id);
+      _totalTrashCount += 1;
+      fetchTrash().ignore();
     } catch (error) {
       _customers = previous;
       _error = error;
@@ -273,6 +340,38 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
   final Map<String, Status> _statusOverride = {};
 
+  static bool get _isTesting =>
+      const bool.fromEnvironment('flutter.test') ||
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
+  Future<void> _loadStatusOverrides() async {
+    if (_isTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final c in _customers) {
+        final saved = prefs.getString('order_status_override_${c.id}');
+        if (saved != null && saved.isNotEmpty) {
+          final overrideStatus = Customer.parseStatus(saved);
+          if (c.status == Status.inProgress || c.status == overrideStatus) {
+            _statusOverride[c.id] = overrideStatus;
+            final idx = _customers.indexWhere((item) => item.id == c.id);
+            if (idx != -1) {
+              _customers[idx] = _customers[idx].copyWith(status: overrideStatus);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveStatusOverride(String customerId, Status status) async {
+    if (_isTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('order_status_override_$customerId', status.name);
+    } catch (_) {}
+  }
+
   Status? get orderFilter => _orderFilter;
 
   String get orderQuery => _orderQuery;
@@ -283,18 +382,41 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     return _statusOverride[customer.id] ?? customer.status;
   }
 
-  Future<void> setOrderStatus(Customer customer, Status status) async {
+  Future<void> setOrderStatus(
+    Customer customer,
+    Status status, {
+    String? updatedBy,
+    String? notes,
+  }) async {
     final oldStatus = statusOf(customer);
     _statusOverride[customer.id] = status;
+
+    final actor = updatedBy ??
+        (AuthService.currentUser?.name ??
+            (AuthService.isAdmin ? 'Admin' : 'Workshop Staff'));
+
+    final historyItem = OrderStatusHistoryItem(
+      previousStatus: oldStatus,
+      newStatus: status,
+      updatedAt: DateTime.now(),
+      updatedBy: actor,
+      notes: notes ?? '',
+    );
+
     final index = _customers.indexWhere((c) => c.id == customer.id);
     if (index != -1) {
-      _customers[index] = _customers[index].copyWith(status: status);
+      final updatedHistory = [historyItem, ..._customers[index].statusHistory];
+      _customers[index] = _customers[index].copyWith(
+        status: status,
+        statusHistory: updatedHistory,
+      );
     }
     notifyListeners();
     _notifyOrderChange();
 
     try {
       await _repository.updateStatus(customer.id, status);
+      await _saveStatusOverride(customer.id, status);
     } catch (e) {
       debugPrint('[CustomerAndOrderProvider] Status persist error: $e');
       _statusOverride[customer.id] = oldStatus;
@@ -329,14 +451,6 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     }).length;
   }
 
-  static int _extractIdNum(String id) {
-    final match = RegExp(r'(\d+)').allMatches(id);
-    if (match.isNotEmpty) {
-      return int.tryParse(match.last.group(1) ?? '0') ?? 0;
-    }
-    return 0;
-  }
-
   List<Customer> get filteredOrders {
     final query = _orderQuery.trim().toLowerCase();
 
@@ -351,19 +465,7 @@ class CustomerAndOrderProvider extends ChangeNotifier {
           customer.name.toLowerCase().contains(query);
     }).toList();
 
-    result.sort((a, b) {
-      if (a.createdAt != null && b.createdAt != null) {
-        final cmp = b.createdAt!.compareTo(a.createdAt!);
-        if (cmp != 0) return cmp;
-      } else if (b.createdAt != null) {
-        return 1;
-      } else if (a.createdAt != null) {
-        return -1;
-      }
-      final orderCmp = b.orderDate.compareTo(a.orderDate);
-      if (orderCmp != 0) return orderCmp;
-      return _extractIdNum(b.id).compareTo(_extractIdNum(a.id));
-    });
+    result.sort(compareLatestFirst);
 
     return result;
   }
@@ -392,21 +494,20 @@ class CustomerAndOrderProvider extends ChangeNotifier {
 
   Color statusColor(Status status) {
     return switch (status) {
-      Status.inProgress => AppPalette.statusGold,
       Status.pending => AppPalette.orange,
-      Status.completed => AppPalette.statusGreen,
+      Status.confirmed => const Color(0xFF2563EB),
+      Status.onHold => const Color(0xFFEA580C),
       Status.cancelled => AppPalette.statusRed,
+      Status.editingProgress => const Color(0xFF7C3AED),
+      Status.dispatchForPrinting => const Color(0xFF0D9488),
+      Status.printReceived => const Color(0xFF0284C7),
+      Status.framingProcess => AppPalette.statusGold,
+      Status.completed => AppPalette.statusGreen,
+      Status.inProgress => AppPalette.statusGold,
     };
   }
 
-  String statusLabel(Status status) {
-    return switch (status) {
-      Status.inProgress => 'In Progress',
-      Status.pending => 'Pending',
-      Status.completed => 'Completed',
-      Status.cancelled => 'Cancelled',
-    };
-  }
+  String statusLabel(Status status) => status.label;
 
   String paymentOf(Customer customer) {
     if (customer.advance <= 0) {
@@ -549,4 +650,94 @@ class CustomerAndOrderProvider extends ChangeNotifier {
     return 'Raigon_Customers_'
         '${date.year}-${two(date.month)}-${two(date.day)}.csv';
   }
+
+  Future<void> fetchTrash() async {
+    _isLoadingTrash = true;
+    notifyListeners();
+
+    try {
+      final res = await _repository.getTrash();
+      _trashOrders = res.orders;
+      _trashReminders = res.reminders;
+      _totalTrashCount = res.totalCount;
+      _trashRetentionDays = res.retentionDays;
+      debugPrint(
+        '[CustomerProvider] Loaded ${_trashOrders.length} trashed orders, '
+        '${_trashReminders.length} trashed reminders (retention: $_trashRetentionDays days).',
+      );
+    } catch (e) {
+      debugPrint('[CustomerProvider] fetchTrash failed: $e');
+    } finally {
+      _isLoadingTrash = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> restoreOrder(String id) async {
+    try {
+      await _repository.restoreTrashItem('order', id);
+      _trashOrders.removeWhere((c) => c.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      await refresh();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] restoreOrder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> restoreReminder(String id) async {
+    try {
+      await _repository.restoreTrashItem('reminder', id);
+      _trashReminders.removeWhere((r) => r.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] restoreReminder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> permanentlyDeleteOrder(String id) async {
+    try {
+      await _repository.permanentlyDeleteTrashItem('order', id);
+      _trashOrders.removeWhere((c) => c.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] permanentlyDeleteOrder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> permanentlyDeleteReminder(String id) async {
+    try {
+      await _repository.permanentlyDeleteTrashItem('reminder', id);
+      _trashReminders.removeWhere((r) => r.id == id);
+      _totalTrashCount = math.max(0, _totalTrashCount - 1);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] permanentlyDeleteReminder failed ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> emptyTrash() async {
+    try {
+      await _repository.emptyTrash();
+      _trashOrders.clear();
+      _trashReminders.clear();
+      _totalTrashCount = 0;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[CustomerProvider] emptyTrash failed: $e');
+      return false;
+    }
+  }
+
 }

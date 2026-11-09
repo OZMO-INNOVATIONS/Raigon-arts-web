@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
-import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -39,57 +39,89 @@ class AppViewerItem {
 
 List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
   final items = <AppViewerItem>[];
+  final seenKeys = <String>{};
 
-  // 1. Memory bytes
-  for (var i = 0; i < customer.photoBytes.length; i++) {
-    final b = customer.photoBytes[i];
-    final name = i < customer.photoNames.length
-        ? customer.photoNames[i]
-        : 'Photo #${i + 1}';
-    final frameTitle = i < customer.frames.length
-        ? '${customer.frames[i].sizeLabel} · ${customer.frames[i].frameType}'
-        : null;
-
-    items.add(
-      AppViewerItem(
-        bytes: b,
-        title: frameTitle ?? name,
-        subtitle: '${customer.id} · ${customer.name}',
-      ),
-    );
+  void addItem(AppViewerItem item, [String? dedupeKey]) {
+    final key = (dedupeKey != null && dedupeKey.isNotEmpty)
+        ? dedupeKey.toLowerCase()
+        : (item.title ?? '').toLowerCase();
+    if (seenKeys.contains(key)) return;
+    seenKeys.add(key);
+    items.add(item);
   }
 
-  // 2. URLs
-  final allUrls = <String>{};
-  for (final u in customer.photoUrls) {
-    if (u.trim().isNotEmpty) allUrls.add(u.trim());
-  }
-  for (final f in customer.frames) {
-    final fu = f.photoUrl?.trim();
-    if (fu != null && fu.isNotEmpty) allUrls.add(fu);
-  }
+  // 1. If customer has frames, resolve per frame
+  if (customer.frames.isNotEmpty) {
+    for (var i = 0; i < customer.frames.length; i++) {
+      final f = customer.frames[i];
+      final title = '${f.sizeLabel} · ${f.frameType}';
+      final photoName = (f.photoName != null && f.photoName!.isNotEmpty)
+          ? f.photoName!
+          : (i < customer.photoNames.length && customer.photoNames[i].isNotEmpty
+              ? customer.photoNames[i]
+              : 'Photo #${i + 1}');
 
-  var urlIndex = 0;
-  for (final u in allUrls) {
-    FrameSpec? matchingFrame;
-    for (final f in customer.frames) {
-      if (f.photoUrl == u) {
-        matchingFrame = f;
-        break;
+      final bytes = f.photoBytes ?? (i < customer.photoBytes.length ? customer.photoBytes[i] : null);
+      final rawUrl = (f.photoUrl != null && f.photoUrl!.isNotEmpty)
+          ? f.photoUrl
+          : (i < customer.photoUrls.length ? customer.photoUrls[i] : null);
+      final url = (rawUrl != null && rawUrl.isNotEmpty) ? ImageUrlHelper.resolve(rawUrl) : null;
+      final key = url != null ? url.split('?').first.split('/').last : photoName;
+
+      if (bytes != null) {
+        addItem(
+          AppViewerItem(
+            bytes: bytes,
+            url: url,
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+          key,
+        );
+      } else if (url != null && url.isNotEmpty) {
+        addItem(
+          AppViewerItem(
+            url: url,
+            title: title,
+            subtitle: '${customer.id} · ${customer.name} · $photoName',
+          ),
+          key,
+        );
       }
     }
-    final title = matchingFrame != null
-        ? '${matchingFrame.sizeLabel} · ${matchingFrame.frameType}'
-        : 'Attached Artwork #${urlIndex + 1}';
+  }
 
-    items.add(
-      AppViewerItem(
-        url: u,
-        title: title,
-        subtitle: '${customer.id} · ${customer.name}',
-      ),
-    );
-    urlIndex++;
+  // 2. Extra customer-level photos beyond frames
+  final maxExtra = math.max(customer.photoBytes.length, customer.photoUrls.length);
+  for (var i = customer.frames.length; i < maxExtra; i++) {
+    final bytes = i < customer.photoBytes.length ? customer.photoBytes[i] : null;
+    final rawUrl = i < customer.photoUrls.length ? customer.photoUrls[i] : null;
+    final url = (rawUrl != null && rawUrl.isNotEmpty) ? ImageUrlHelper.resolve(rawUrl) : null;
+    final photoName = i < customer.photoNames.length && customer.photoNames[i].isNotEmpty
+        ? customer.photoNames[i]
+        : (url != null ? url.split('?').first.split('/').last : 'Photo #${i + 1}');
+    final key = url != null ? url.split('?').first.split('/').last : photoName;
+
+    if (bytes != null) {
+      addItem(
+        AppViewerItem(
+          bytes: bytes,
+          url: url,
+          title: 'Artwork #${i + 1}',
+          subtitle: '${customer.id} · ${customer.name} · $photoName',
+        ),
+        key,
+      );
+    } else if (url != null && url.isNotEmpty) {
+      addItem(
+        AppViewerItem(
+          url: url,
+          title: 'Artwork #${i + 1}',
+          subtitle: '${customer.id} · ${customer.name} · $photoName',
+        ),
+        key,
+      );
+    }
   }
 
   return items;

@@ -1,10 +1,11 @@
-import 'package:raigon_art/core/utils/image_url_helper.dart';
-import 'package:raigon_art/core/widgets/app_image_viewer.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_confirmation_dialog.dart';
+import 'package:raigon_art/core/widgets/app_image_viewer.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:remixicon/remixicon.dart';
@@ -22,6 +23,8 @@ import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/features/customers/service/customer_whatsapp_service.dart';
 import 'package:raigon_art/core/network/api_exception.dart';
+import 'package:raigon_art/core/services/storage_service.dart';
+import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
 
 Future<void> showAddCustomerDialog(BuildContext context) async {
@@ -52,34 +55,116 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
   if (result == null || !context.mounted) return;
 
   try {
+    var finalResult = result;
+    if (result.voiceNotes.isNotEmpty) {
+      final updatedNotes = <OrderVoiceNote>[];
+      for (var i = 0; i < result.voiceNotes.length; i++) {
+        final vn = result.voiceNotes[i];
+        if (vn.url.isEmpty &&
+            vn.localBytes != null &&
+            vn.localBytes!.isNotEmpty) {
+          try {
+            final fileName =
+                'voice_order_${result.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            final uploaded = await StorageService().uploadFile(
+              vn.localBytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderSave] Voice note upload notice: $e');
+          }
+        }
+        updatedNotes.add(vn);
+      }
+      finalResult = result.copyWith(voiceNotes: updatedNotes);
+    }
+
+    if (!context.mounted) return;
+
     // Save the customer first.
-    await context.read<CustomerAndOrderProvider>().add(result);
+    await context.read<CustomerAndOrderProvider>().add(finalResult);
 
     if (!context.mounted) return;
 
     AppSnackBar.success(context, 'Customer & frame order saved successfully.');
 
-    // Open the same WhatsApp order confirmation template.
+    // Automatically open WhatsApp order confirmation receipt.
     try {
       final opened = await CustomerWhatsAppService.openOrderConfirmation(
-        result,
+        finalResult,
       );
 
       if (!opened && context.mounted) {
-        AppSnackBar.error(
-          context,
-          'Customer saved, but WhatsApp could not be opened.',
+        showDialog(
+          context: context,
+          builder: (ctx) {
+            final p = AppPalette.of(ctx);
+            return AlertDialog(
+              backgroundColor: p.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: p.border),
+              ),
+              title: Row(
+                children: [
+                  const Icon(
+                    RemixIcons.whatsapp_fill,
+                    color: AppColors.green,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Open WhatsApp Receipt',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                'Customer ${result.name} is saved. Tap below to send the order confirmation receipt on WhatsApp.',
+                style: TextStyle(fontSize: 14, color: p.textPrimary),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('Close', style: TextStyle(color: p.textMuted)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    CustomerWhatsAppService.openOrderConfirmation(result);
+                  },
+                  icon: const Icon(RemixIcons.whatsapp_fill, size: 16),
+                  label: const Text(
+                    'Open WhatsApp',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       }
     } catch (error) {
       debugPrint('WhatsApp confirmation failed: $error');
-
-      if (context.mounted) {
-        AppSnackBar.error(
-          context,
-          'Customer saved, but WhatsApp could not be opened.',
-        );
-      }
     }
   } catch (error) {
     debugPrint('Customer save failed: $error');
@@ -106,7 +191,37 @@ Future<void> showEditCustomerDialog(
   if (result == null || !context.mounted) return;
 
   try {
-    await context.read<CustomerAndOrderProvider>().update(result);
+    var finalResult = result;
+    if (result.voiceNotes.isNotEmpty) {
+      final updatedNotes = <OrderVoiceNote>[];
+      for (var i = 0; i < result.voiceNotes.length; i++) {
+        final vn = result.voiceNotes[i];
+        if (vn.url.isEmpty &&
+            vn.localBytes != null &&
+            vn.localBytes!.isNotEmpty) {
+          try {
+            final fileName =
+                'voice_order_${result.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            final uploaded = await StorageService().uploadFile(
+              vn.localBytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedNotes.add(vn.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderUpdate] Voice note upload notice: $e');
+          }
+        }
+        updatedNotes.add(vn);
+      }
+      finalResult = result.copyWith(voiceNotes: updatedNotes);
+    }
+
+    if (!context.mounted) return;
+
+    await context.read<CustomerAndOrderProvider>().update(finalResult);
 
     if (context.mounted) {
       AppSnackBar.success(context, 'Customer updated successfully.');
@@ -160,6 +275,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   final _balance = TextEditingController();
   final List<PickedPhoto> _photos = [];
   final List<_ExistingPhotoItem> _existingPhotos = [];
+  List<OrderVoiceNote> _voiceNotes = [];
   final FrameSpecData _shared = FrameSpecData();
   final List<_FrameEntry> _entries = [];
   FrameMode _mode = FrameMode.same;
@@ -169,7 +285,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   DateTime? _delivery;
   String _payment = 'Unpaid';
   bool _paymentTouched = false;
-  Status _status = Status.inProgress;
+  Status _status = Status.pending;
 
   @override
   void initState() {
@@ -194,6 +310,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     _delivery = c.expectedDelivery;
     _payment = c.paymentStatus;
     _status = c.status;
+    _voiceNotes = List<OrderVoiceNote>.of(c.voiceNotes);
 
     final frames = c.effectiveFrames;
     if (frames.length > 1) {
@@ -218,7 +335,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       for (var i = 0; i < c.photoUrls.length; i++) {
         final u = c.photoUrls[i];
         if (u.trim().isNotEmpty) {
-          final n = i < c.photoNames.length ? c.photoNames[i] : 'Photo_${i + 1}.webp';
+          final n = i < c.photoNames.length
+              ? c.photoNames[i]
+              : 'Photo_${i + 1}.webp';
           _existingPhotos.add(_ExistingPhotoItem(url: u, name: n));
         }
       }
@@ -239,10 +358,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         if (frames.first.photoUrl != null &&
             frames.first.photoUrl!.isNotEmpty &&
             !_existingPhotos.any((e) => e.url == frames.first.photoUrl)) {
-          _existingPhotos.add(_ExistingPhotoItem(
-            url: frames.first.photoUrl!,
-            name: frames.first.photoName ?? 'Frame_Photo.webp',
-          ));
+          _existingPhotos.add(
+            _ExistingPhotoItem(
+              url: frames.first.photoUrl!,
+              name: frames.first.photoName ?? 'Frame_Photo.webp',
+            ),
+          );
         }
       }
       if (c.frames.isEmpty) {
@@ -272,6 +393,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       e.spec.dispose();
     }
     super.dispose();
+  }
+
+  void _recalculatePaymentAmounts() {
+    final total = double.tryParse(_total.text) ?? 0;
+    final advance = double.tryParse(_advance.text) ?? 0;
+
+    _balance.text = math.max(0, total - advance).round().toString();
   }
 
   Future<List<PickedPhoto>> _pick({bool multiple = true}) async {
@@ -424,19 +552,28 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       ? '—'
       : (v.length == 1 ? v.first : '${v.first} +${v.length - 1} more');
 
-  void _save() {
+  Future<void> _save() async {
     final name = _name.text.trim();
     final phone = _phone.text.trim();
+
     if (name.isEmpty) {
       AppSnackBar.error(context, 'Enter the customer name.');
       return;
     }
+
     if (phone.length != 10) {
       AppSnackBar.error(context, 'Enter a valid 10-digit phone number.');
       return;
     }
+
     final total = (double.tryParse(_total.text) ?? 0).round();
-    final advance = (double.tryParse(_advance.text) ?? 0).round();
+    final enteredAdvance = (double.tryParse(_advance.text) ?? 0).round();
+
+    final advance = _payment == 'Paid'
+        ? total
+        : _payment == 'Unpaid'
+        ? 0
+        : enteredAdvance;
     if (total > 0 && advance > total) {
       AppSnackBar.error(
         context,
@@ -445,19 +582,44 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       return;
     }
 
+    final isEdit = widget.existing != null;
+
+    // Confirmation before creating or updating customer.
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: isEdit ? 'Update Customer?' : 'Create Customer?',
+      message: isEdit
+          ? 'Are you sure you want to save the changes for $name?'
+          : 'Are you sure you want to create a customer profile for $name?',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Save',
+      icon: RemixIcons.user_line,
+      iconColor: AppColors.gold,
+      iconBg: AppColors.gold.withValues(alpha: 0.12),
+      confirmColor: AppColors.gold,
+      isDestructive: false,
+    );
+
+    if (!confirmed) return;
+    // Cancel: stay on the form with all entered details.
+    if (confirmed != true || !mounted) return;
+
     final same = _mode == FrameMode.same;
+
     final photos = same
         ? List<PickedPhoto>.of(_photos)
         : [
             for (final e in _entries)
               if (e.photo != null) e.photo!,
           ];
+
     final frames = same
         ? [_shared.toSpec()]
         : [for (final e in _entries) e.spec.toSpec(e.photo)];
+
     final int qty = same
         ? frames.first.qty *
-            math.max(1, _existingPhotos.length + photos.length).toInt()
+              math.max(1, _existingPhotos.length + photos.length).toInt()
         : frames.fold<int>(0, (a, f) => a + f.qty);
 
     final remainingUrls = same
@@ -469,6 +631,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   e.existingUrl!.isNotEmpty)
                 e.existingUrl!,
           ];
+
     final remainingNames = same
         ? [for (final e in _existingPhotos) e.name]
         : [
@@ -478,6 +641,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   e.existingName!.isNotEmpty)
                 e.existingName!,
           ];
+
     final newPhotoNames = [for (final p in photos) p.name];
     final allPhotoNames = [...remainingNames, ...newPhotoNames];
     final totalPhotoCount = remainingUrls.length + photos.length;
@@ -498,7 +662,10 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoCount: totalPhotoCount > 0
           ? totalPhotoCount
           : (widget.existing?.photoCount ?? 0),
-      photoBytes: [for (final p in photos) p.bytes],
+      photoBytes: [
+        for (final p in photos)
+          if (p.bytes != null) p.bytes!,
+      ],
       frameSize: _join([for (final f in frames) f.sizeLabel]),
       frameType: _join([for (final f in frames) f.frameType]),
       qty: qty,
@@ -511,9 +678,14 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoUrls: remainingUrls,
       photoSizeLabels: widget.existing?.photoSizeLabels ?? const [],
       frames: frames,
+      voiceNotes: _voiceNotes,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
+
+    if (!mounted) return;
+
+    // Return the customer only after Save is confirmed.
     Navigator.of(context).pop(customer);
   }
 
@@ -521,100 +693,149 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Widget build(BuildContext context) {
     final c = FormColors.of(context);
     final p = c.p;
-    final size = MediaQuery.of(context).size;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
-          ),
-        ),
-        Center(
-          child: Padding(
-            padding: EdgeInsets.all(size.width < 600 ? 12 : 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 840,
-                maxHeight: size.height - 48,
-              ),
-              child: Material(
-                color: c.modalBg,
-                elevation: 24,
-                shadowColor: Colors.black.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(24),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _header(p),
-                    Divider(height: 1, color: p.border),
-                    Flexible(child: _body(c)),
-                    Divider(height: 1, color: p.border),
-                    _footer(c),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final isNarrow = size.width < 600;
+    final verticalPadding = isNarrow ? 12.0 : 24.0;
+    final availableHeight =
+        size.height - keyboardHeight - (verticalPadding * 2);
 
-  Widget _header(AppPalette p) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
-      child: Row(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: Stack(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: AppColors.iconDarkGradient,
-              borderRadius: BorderRadius.circular(14),
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
+              ),
             ),
-            child: const Icon(RemixIcons.user_add_line, color: Colors.white, size: 26),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.existing == null
-                      ? 'Add New Customer & Frame Order'
-                      : 'Edit Customer & Order (${widget.existing!.id})',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
+          SafeArea(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(
+                bottom: keyboardHeight,
+                left: isNarrow ? 8 : 24,
+                right: isNarrow ? 8 : 24,
+                top: isNarrow ? 8 : 20,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 840,
+                    maxHeight: availableHeight.clamp(240.0, size.height),
+                  ),
+                  child: Material(
+                    color: c.modalBg,
+                    elevation: 24,
+                    shadowColor: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(isNarrow ? 16 : 24),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _header(p),
+                        Divider(height: 1, color: p.border),
+                        Flexible(child: _body(c)),
+                        Divider(height: 1, color: p.border),
+                        _footer(c),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Fill in customer profile, workshop framing details, and photos',
-                  style: TextStyle(fontSize: 13.5, color: p.textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: p.chipFill,
-                shape: BoxShape.circle,
               ),
-              child: Icon(RemixIcons.close_line, size: 21, color: p.textPrimary),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _header(AppPalette p) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 500;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            isNarrow ? 16 : 24,
+            isNarrow ? 16 : 20,
+            isNarrow ? 16 : 24,
+            isNarrow ? 14 : 18,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: isNarrow ? 42 : 52,
+                height: isNarrow ? 42 : 52,
+                decoration: BoxDecoration(
+                  gradient: AppColors.iconDarkGradient,
+                  borderRadius: BorderRadius.circular(isNarrow ? 10 : 14),
+                ),
+                child: Icon(
+                  RemixIcons.user_add_line,
+                  color: Colors.white,
+                  size: isNarrow ? 22 : 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.existing == null
+                          ? 'Add Customer & Order'
+                          : 'Edit Order (${widget.existing!.id})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isNarrow ? 18 : 22,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isNarrow ? 'Workshop framing details & photos' : 'Fill in customer profile, workshop framing details, and photos',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isNarrow ? 12 : 13.5,
+                        color: p.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: isNarrow ? 36 : 40,
+                  height: isNarrow ? 36 : 40,
+                  decoration: BoxDecoration(
+                    color: p.chipFill,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: p.border),
+                  ),
+                  child: Icon(
+                    RemixIcons.close_line,
+                    size: isNarrow ? 18 : 20,
+                    color: p.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -741,6 +962,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 _sameContent(c)
               else
                 _individualContent(c),
+              const SizedBox(height: 24),
+              OrderVoiceNotesSection(
+                voiceNotes: _voiceNotes,
+                onChanged: (notes) => setState(() => _voiceNotes = notes),
+                isEditable: true,
+              ),
               const SizedBox(height: 26),
               const SectionHeader(
                 icon: RemixIcons.bill_line,
@@ -758,7 +985,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                     ),
                   ),
                   LabeledField(
-                    label: 'Expected Delivery Date',
+                    label: 'Expected Date',
                     child: DateField(
                       value: _delivery,
                       onChanged: (d) => setState(() => _delivery = d),
@@ -804,17 +1031,30 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       value: _payment,
                       items: _paymentOptions,
                       labelOf: (s) => s,
-                      onChanged: (v) => setState(() {
-                        _payment = v;
-                        _paymentTouched = true;
-                      }),
+                      onChanged: (v) {
+                        setState(() {
+                          _payment = v;
+                          _paymentTouched = true;
+
+                          if (v == 'Paid') {
+                            _advance.text = _total.text;
+                            _balance.text = '0';
+                          } else if (v == 'Unpaid') {
+                            _advance.text = '0';
+                            final total = double.tryParse(_total.text) ?? 0;
+                            _balance.text = total.round().toString();
+                          } else {
+                            _recalculatePaymentAmounts();
+                          }
+                        });
+                      },
                     ),
                   ),
                   LabeledField(
                     label: 'Order Status',
                     child: FormDropdown<Status>(
                       value: _status,
-                      items: Status.values,
+                      items: Status.standardStatuses,
                       labelOf: (status) => status.label,
                       onChanged: (value) {
                         setState(() => _status = value);
@@ -941,7 +1181,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               child: Column(
                 children: [
-                  Icon(RemixIcons.upload_cloud_2_line, size: 58, color: p.textPrimary),
+                  Icon(
+                    RemixIcons.upload_cloud_2_line,
+                    size: 58,
+                    color: p.textPrimary,
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Drag & Drop Customer Photos Here',
@@ -1004,7 +1248,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(RemixIcons.gallery_line, size: 16, color: AppColors.gold),
+              const Icon(
+                RemixIcons.gallery_line,
+                size: 16,
+                color: AppColors.gold,
+              ),
               const SizedBox(width: 8),
               Text(
                 '${_existingPhotos.length + _photos.length} photos attached'
@@ -1092,7 +1340,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                         top: 5,
                         right: 5,
                         child: InkWell(
-                          onTap: () => setState(() => _existingPhotos.removeAt(i)),
+                          onTap: () =>
+                              setState(() => _existingPhotos.removeAt(i)),
                           customBorder: const CircleBorder(),
                           child: Container(
                             width: 22,
@@ -1146,10 +1395,15 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                             borderRadius: BorderRadius.circular(10),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                _photos[i].bytes,
-                                fit: BoxFit.cover,
-                              ),
+                              child: _photos[i].bytes != null
+                                  ? Image.memory(
+                                      _photos[i].bytes!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      color: p.chipFill,
+                                      child: const Icon(Icons.image),
+                                    ),
                             ),
                           ),
                         ),
@@ -1217,7 +1471,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(RemixIcons.add_circle_line, size: 22, color: p.textPrimary),
+                  Icon(
+                    RemixIcons.add_circle_line,
+                    size: 22,
+                    color: p.textPrimary,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     'Add Another Photo & Frame',
@@ -1270,16 +1528,23 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             color: p.avatarBg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: photo != null
-              ? Image.memory(photo.bytes, fit: BoxFit.cover)
+          child: (photo != null && photo.bytes != null)
+              ? Image.memory(photo.bytes!, fit: BoxFit.cover)
+              : (photo != null && photo.url != null)
+              ? Image.network(
+                  ImageUrlHelper.resolve(photo.url!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+                )
               : hasExisting
-                  ? Image.network(
-                      ImageUrlHelper.resolve(e.existingUrl!),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
-                    )
-                  : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+              ? Image.network(
+                  ImageUrlHelper.resolve(e.existingUrl!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+                )
+              : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
         ),
       ),
     );
@@ -1293,7 +1558,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                photo?.name ?? e.existingName ?? (hasExisting ? 'Attached Photo' : 'No photo selected'),
+                photo?.name ??
+                    e.existingName ??
+                    (hasExisting ? 'Attached Photo' : 'No photo selected'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1456,42 +1723,71 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
 
   Widget _footer(FormColors c) {
     final p = c.p;
-    return Container(
-      color: c.footerBg,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-              decoration: p.isDark
-                  ? BoxDecoration(
-                      color: p.chipFill,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: p.border),
-                    )
-                  : null,
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w600,
-                  color: p.textPrimary,
-                ),
+
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final isNarrow = constraints.maxWidth < 540;
+
+        final cancelBtn = InkWell(
+          onTap: () => Navigator.of(context).pop(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 16 : 20,
+              vertical: 13,
+            ),
+            alignment: isNarrow ? Alignment.center : null,
+            decoration: p.isDark
+                ? BoxDecoration(
+                    color: p.chipFill,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: p.border),
+                  )
+                : BoxDecoration(
+                    color: p.chipFill.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w600,
+                color: p.textPrimary,
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          AppPrimaryButton(
-            label: 'Save Customer & Order',
-            icon: RemixIcons.check_line,
-            onPressed: _save,
+        );
+
+        final saveBtn = AppPrimaryButton(
+          label: isNarrow ? 'Save Order' : 'Save Customer & Order',
+          icon: RemixIcons.check_line,
+          padding: EdgeInsets.symmetric(
+            horizontal: isNarrow ? 12 : 22,
+            vertical: 14,
           ),
-        ],
-      ),
+          onPressed: _save,
+        );
+
+        return Container(
+          color: c.footerBg,
+          padding: EdgeInsets.symmetric(
+            horizontal: isNarrow ? 16 : 24,
+            vertical: 14,
+          ),
+          child: isNarrow
+              ? Row(
+                  children: [
+                    Expanded(child: cancelBtn),
+                    const SizedBox(width: 10),
+                    Expanded(child: saveBtn),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [cancelBtn, const SizedBox(width: 14), saveBtn],
+                ),
+        );
+      },
     );
   }
 }

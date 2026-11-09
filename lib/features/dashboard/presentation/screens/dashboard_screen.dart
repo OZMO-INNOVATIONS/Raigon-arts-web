@@ -14,6 +14,7 @@ import 'package:raigon_art/features/customers/presentation/widgets/customer_view
 import 'package:raigon_art/core/network/api_exception.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
 import 'package:raigon_art/core/widgets/shell_scope.dart';
+import 'package:raigon_art/features/authentication/services/auth_service.dart';
 import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -38,8 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     (label: 'CUSTOMER ID', width: 130),
     (label: 'CUSTOMER NAME', width: 230),
     (label: 'PHONE NO', width: 150),
-    (label: 'FRAME SIZE', width: 130),
-    (label: 'FRAME TYPE', width: 150),
     (label: 'QTY', width: 70),
     (label: 'TOTAL', width: 130),
     (label: 'STATUS', width: 150),
@@ -67,6 +66,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+
+    if (!AuthService.isAdmin) {
+      return Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.4),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.3 : 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: AppColors.darkGradient,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.gold, width: 1.5),
+                ),
+                child: const Icon(
+                  RemixIcons.shield_user_line,
+                  size: 28,
+                  color: AppColors.gold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Dashboard Financials Restricted',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: p.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Total revenue and financial analytics on the dashboard are restricted to Administrator accounts. Please navigate to Customers or Orders to manage framing work.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, height: 1.5, color: p.textMuted),
+              ),
+              const SizedBox(height: 24),
+              AppPrimaryButton(
+                label: 'Go to Customers',
+                icon: RemixIcons.team_line,
+                onPressed: () {
+                  ShellScope.of(context).goTo(NavDestination.customers);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final customerAndOrderProvider = context.watch<CustomerAndOrderProvider>();
     final customers = customerAndOrderProvider.customers;
 
@@ -87,7 +155,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(RemixIcons.cloud_off_line, size: 54, color: AppColors.error),
+              const Icon(
+                RemixIcons.cloud_off_line,
+                size: 54,
+                color: AppColors.error,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Connection Issue',
@@ -111,16 +183,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Retry Connection',
                 icon: RemixIcons.refresh_line,
                 onPressed: () {
-                  customerAndOrderProvider.refresh().then((_) {
-                    if (context.mounted) {
-                      AppSnackBar.success(context, 'Connected successfully.');
-                    }
-                  }).catchError((e) {
-                    if (context.mounted) {
-                      final errText = e is ApiException ? e.userFriendlyMessage : 'Retry failed.';
-                      AppSnackBar.error(context, errText);
-                    }
-                  });
+                  customerAndOrderProvider
+                      .refresh()
+                      .then((_) {
+                        if (context.mounted) {
+                          AppSnackBar.success(
+                            context,
+                            'Connected successfully.',
+                          );
+                        }
+                      })
+                      .catchError((e) {
+                        if (context.mounted) {
+                          final errText = e is ApiException
+                              ? e.userFriendlyMessage
+                              : 'Retry failed.';
+                          AppSnackBar.error(context, errText);
+                        }
+                      });
                 },
               ),
             ],
@@ -200,7 +280,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Welcome back, Raigon Arts Workshop Manager',
+          'Welcome back, RAIGON ART Workshop Manager',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 15.5, color: p.textMuted),
@@ -265,6 +345,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final p = AppPalette.of(context);
     int count(Status s) => customers.where((c) => c.status == s).length;
+    final inProgressCount = customers
+        .where(
+          (c) =>
+              c.status == Status.inProgress ||
+              c.status == Status.confirmed ||
+              c.status == Status.editingProgress ||
+              c.status == Status.dispatchForPrinting ||
+              c.status == Status.printReceived ||
+              c.status == Status.framingProcess,
+        )
+        .length;
     final billable = customers
         .where((c) => c.status != Status.cancelled)
         .toList();
@@ -317,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           (
             title: 'In Progress',
-            value: '${count(Status.inProgress)}',
+            value: '$inProgressCount',
             icon: RemixIcons.hammer_line,
             tileBg: p.tileTeal,
             tileIcon: AppPalette.teal,
@@ -517,7 +608,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     final p = AppPalette.of(context);
     final sortedCustomers = [...customers]
-      ..sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      ..sort(CustomerAndOrderProvider.compareLatestFirst);
 
     const pageSize = 8;
     final recent = sortedCustomers.take(pageSize).toList();
@@ -623,7 +714,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         txt(
-                          o.city,
+                          o.effectiveRegion.isNotEmpty
+                              ? o.effectiveRegion
+                              : o.city,
                           TextStyle(fontSize: 13, color: p.textMuted),
                         ),
                       ],
@@ -633,12 +726,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             cellBox(2, txt(o.phone, cell)),
-            cellBox(3, txt(o.frameSize, cell)),
-            cellBox(4, txt(o.frameType, cell)),
-            cellBox(5, txt('${o.qty}', bold)),
-            cellBox(6, txt(_inr(o.total), bold)),
+            cellBox(3, txt('${o.qty}', bold)),
+            cellBox(4, txt(_inr(o.total), bold)),
             cellBox(
-              7,
+              5,
               Align(
                 alignment: Alignment.centerLeft,
                 child: FittedBox(
@@ -649,7 +740,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             cellBox(
-              8,
+              6,
               Align(
                 alignment: Alignment.centerLeft,
                 child: FittedBox(

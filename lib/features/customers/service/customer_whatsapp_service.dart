@@ -8,7 +8,10 @@ import 'package:raigon_art/core/models/status.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 
 const String kWorkshopPhone = AuthModel.registeredPhone;
-const String kWorkshopAddress = 'Main Workshop, MG Road, Trivandrum';
+// const String kWorkshopAddress = 'Main Workshop, MG Road, Trivandrum';
+const String kWorkshopAddress =
+    'VP 302-A, R J Building, Kollamkonam Junction, '
+    'Vilappilsala, Thiruvananthapuram, Kerala 695573';
 
 class CustomerWhatsAppService {
   static String _formatDate(DateTime? date) {
@@ -64,73 +67,175 @@ class CustomerWhatsAppService {
   }
 
   static String _orderStatus(Status status) {
-    return switch (status) {
-      Status.pending => 'Pending',
-      Status.inProgress => 'In Progress',
-      Status.completed => 'Completed',
-      Status.cancelled => 'Cancelled',
-    };
+    return status.label;
   }
 
-  static String _orientation(String value) {
-    final index = value.indexOf(' (');
-    return index == -1 ? value : value.substring(0, index);
-  }
+  //   static String buildMessage(Customer customer) {
+  //     final balance = customer.total - customer.advance;
+  //     final frames = customer.effectiveFrames;
 
-  static String _frameDetails(Customer customer) {
-    final frames = customer.effectiveFrames;
+  //     // Collect special instructions from individual frames.
+  //     final specialRequests = frames
+  //         .map((frame) => frame.notes.trim())
+  //         .where((note) => note.isNotEmpty)
+  //         .toSet()
+  //         .join(', ');
 
-    return frames
-        .map((frame) {
-          final size = frame.sizeLabel.isEmpty
-              ? 'Size not specified'
-              : frame.sizeLabel;
+  //     // Build numbered frame sizes.
+  //     final frameDetails = frames.isEmpty
+  //         ? 'Not specified'
+  //         : frames
+  //               .asMap()
+  //               .entries
+  //               .map((entry) {
+  //                 final frame = entry.value;
+  //                 final size = frame.sizeLabel.isNotEmpty
+  //                     ? frame.sizeLabel
+  //                     : 'Size not specified';
 
-          return '$size (${frame.frameType} - ${frame.material})';
-        })
-        .join('\n');
-  }
+  //                 return '${entry.key + 1}. $size';
+  //               })
+  //               .join('\n');
 
-  static String _frameFinishes(Customer customer) {
-    return customer.effectiveFrames
-        .map((frame) {
-          return '${frame.finish} | ${_orientation(frame.orientation)}';
-        })
-        .join('\n');
-  }
+  //     // Dynamic payment and order status.
+  //     final paymentStatus = _paymentStatus(customer);
+  //     final orderStatus = _orderStatus(customer.status);
+
+  //     // Google Maps location.
+  //     const workshopMapUrl = 'https://maps.app.goo.gl/Dr5ySuwTxbSHc4FH6';
+
+  //     return '''
+
+  // 🎨 *RAIGON ART GALLERY*
+  // 🧾 *ORDER CONFIRMATION*
+
+  // Dear *${customer.name}*,
+
+  // Thank you for choosing *RAIGON ART GALLERY*! ❤️ We're pleased to confirm your order. Please find your order details below.
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 📋 *ORDER DETAILS*
+
+  // *Order ID:* ${customer.id}
+  // *Order Date:* ${_formatDate(customer.orderDate)}
+  // *Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+
+  // 🖼️ *Items Ordered:*
+  // $frameDetails
+
+  // ${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}📦 *Total Quantity:* ${customer.qty} Pieces
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 💰 *PAYMENT SUMMARY*
+
+  // *Total Amount:* ${_money(customer.total)}
+  // *Advance Paid:* ${_money(customer.advance)}
+  // *Balance Due:* ${_money(balance)}
+
+  // 🚚 *Note:* Shipping charges are extra and will be calculated separately.
+
+  // 💳 *Payment Status:* $paymentStatus
+  // 🛠️ *Order Status:* $orderStatus
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 📍 *PRODUCTION HOUSE LOCATION:*
+  // $workshopMapUrl
+
+  // 📞 *Contact:* +91 $kWorkshopPhone
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 🙏 Thank you for trusting *RAIGON ART GALLERY* with your order. We appreciate your support and look forward to delivering your artwork!
+
+  // *RAIGON ART GALLERY* 🖼️✨
+  // '''
+  //         .trim();
+  //   }
 
   static String buildMessage(Customer customer) {
     final balance = customer.total - customer.advance;
+    final frames = customer.effectiveFrames;
+
+    // Collect special instructions from individual frames.
+    final specialRequests = frames
+        .map((frame) => frame.notes.trim())
+        .where((note) => note.isNotEmpty)
+        .toSet()
+        .join(', ');
+
+    // Build numbered frame sizes.
+    final frameDetails = frames.isEmpty
+        ? 'Not specified'
+        : frames
+              .asMap()
+              .entries
+              .map((entry) {
+                final frame = entry.value;
+                final size = frame.sizeLabel.isNotEmpty
+                    ? frame.sizeLabel
+                    : 'Size not specified';
+
+                return '${entry.key + 1}. $size';
+              })
+              .join('\n');
+
+    // Dynamic payment and order status.
+    final paymentStatus = _paymentStatus(customer);
+    final orderStatus = _orderStatus(customer.status);
+
+    // Google Maps location.
+    const workshopMapUrl = 'https://maps.app.goo.gl/Dr5ySuwTxbSHc4FH6';
 
     return '''
-📦 *RAIGON ARTS WORKSHOP* - Order Confirmation
-----------------------------------------
+
+*RAIGON ART GALLERY*
+*ORDER CONFIRMATION*
+
 Dear *${customer.name}*,
 
-Thank you for your framing order with Raigon Arts! Here are your complete order details:
+Thank you for choosing *RAIGON ART GALLERY*! We're pleased to confirm your order. Please find your order details below.
 
-🧾 *Order ID:* ${customer.id}
-📅 *Order Date:* ${_formatDate(customer.orderDate)}
-🚚 *Expected Delivery Date:* ${_formatDate(customer.expectedDelivery)}
+━━━━━━━━━━━━━━━━━━━━
 
-🖼️ *Frame Details:*
-${_frameDetails(customer)}
+*ORDER DETAILS*
 
-🎨 *Color Finish | Orientation:*
-${_frameFinishes(customer)}
+*Order ID:* ${customer.id}
+*Order Date:* ${_formatDate(customer.orderDate)}
+*Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
 
-🔢 *Total Quantity:* ${customer.qty}
+*Items Ordered:*
+$frameDetails
 
-💰 *TOTAL AMOUNT:* ${_money(customer.total)}
-💵 *Advance Paid:* ${_money(customer.advance)}
-💳 *BALANCE DUE:* ${_money(balance)}
-📌 *Payment Status:* ${_paymentStatus(customer)}
-📋 *Order Status:* ${_orderStatus(customer.status)}
-----------------------------------------
-📍 *Workshop Address:* $kWorkshopAddress
-📞 *Contact:* +91 $kWorkshopPhone
+${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
 
-Thank you for choosing Raigon Arts! ❤️
+━━━━━━━━━━━━━━━━━━━━
+
+*PAYMENT SUMMARY*
+
+*Total Amount:* ${_money(customer.total)}
+*Advance Paid:* ${_money(customer.advance)}
+*Balance Due:* ${_money(balance)}
+
+*Note:* Shipping charges are extra and will be calculated separately.
+
+*Payment Status:* $paymentStatus
+*Order Status:* $orderStatus
+
+━━━━━━━━━━━━━━━━━━━━
+
+*PRODUCTION HOUSE LOCATION:*
+$workshopMapUrl
+
+*Contact:* +91 $kWorkshopPhone
+
+━━━━━━━━━━━━━━━━━━━━
+
+Thank you for trusting *RAIGON ART GALLERY* with your order. We appreciate your support and look forward to delivering your artwork!
+
+*RAIGON ART GALLERY*
 '''
         .trim();
   }
@@ -143,54 +248,270 @@ Thank you for choosing Raigon Arts! ❤️
       digits = digits.substring(1);
     }
 
-    // Normalize Indian mobile numbers to country code +91.
+    // Normalize 10-digit Indian mobile numbers to country code 91.
     if (digits.length == 10) {
       digits = '91$digits';
-    } else if (digits.length == 12 && digits.startsWith('91')) {
-      // Already has the Indian country code.
     }
 
     return digits;
   }
 
+  //   static String buildPaymentReminderMessage(Customer customer) {
+  //     final balance = customer.total - customer.advance;
+  //     final frames = customer.effectiveFrames;
+
+  //     final specialRequests = frames
+  //         .map((frame) => frame.notes.trim())
+  //         .where((note) => note.isNotEmpty)
+  //         .toSet()
+  //         .join(', ');
+
+  //     final frameDetails = frames.isEmpty
+  //         ? 'Not specified'
+  //         : frames
+  //               .asMap()
+  //               .entries
+  //               .map((entry) {
+  //                 final frame = entry.value;
+  //                 final size = frame.sizeLabel.isNotEmpty
+  //                     ? frame.sizeLabel
+  //                     : 'Size not specified';
+
+  //                 return '${entry.key + 1}. $size';
+  //               })
+  //               .join('\n');
+
+  //     final paymentStatus = _paymentStatus(customer);
+  //     final orderStatus = _orderStatus(customer.status);
+
+  //     const workshopMapUrl = 'https://maps.app.goo.gl/T2UKxfZCaXzkEj5H7';
+
+  //     return '''
+  // 🎨 *RAIGON ART GALLERY*
+  // 💳 *PAYMENT REMINDER*
+
+  // Dear *${customer.name}*,
+
+  // We hope you are doing well! ❤️
+
+  // This is a friendly reminder regarding the pending balance for your framing order with *RAIGON ART GALLERY*.
+
+  // Please find your order and payment details below.
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 📋 *ORDER DETAILS*
+
+  // *Order ID:* ${customer.id}
+  // *Order Date:* ${_formatDate(customer.orderDate)}
+  // *Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+
+  // 🖼️ *Items Ordered:*
+  // $frameDetails
+
+  // ${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}📦 *Total Quantity:* ${customer.qty} Pieces
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 💰 *PAYMENT SUMMARY*
+
+  // *Total Amount:* ${_money(customer.total)}
+  // *Advance Paid:* ${_money(customer.advance)}
+  // *Balance Due:* ${_money(balance)}
+
+  // 💳 *Payment Status:* $paymentStatus
+  // 🛠️ *Order Status:* $orderStatus
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 📢 *PAYMENT REQUEST*
+
+  // We kindly request you to clear the pending balance of *${_money(balance)}* at your earliest convenience.
+
+  // Your timely payment will help us proceed smoothly with your order.
+
+  // 🚚 *Note:* Shipping charges are extra and will be calculated separately.
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 📍 *PRODUCTION HOUSE LOCATION:*
+  // $kWorkshopAddress
+
+  // 🗺️ *Google Maps:*
+  // $workshopMapUrl
+
+  // 📞 *Contact / GPay / UPI:* +91 $kWorkshopPhone
+
+  // ━━━━━━━━━━━━━━━━━━━━
+
+  // 🙏 Thank you for choosing *RAIGON ART GALLERY*. We truly appreciate your trust and support!
+
+  // *RAIGON ART GALLERY* 🖼️✨
+  // '''
+  //         .trim();
+  //   }
+
+  static String buildPaymentReminderMessage(Customer customer) {
+    final balance = customer.total - customer.advance;
+    final frames = customer.effectiveFrames;
+
+    final specialRequests = frames
+        .map((frame) => frame.notes.trim())
+        .where((note) => note.isNotEmpty)
+        .toSet()
+        .join(', ');
+
+    final frameDetails = frames.isEmpty
+        ? 'Not specified'
+        : frames
+              .asMap()
+              .entries
+              .map((entry) {
+                final frame = entry.value;
+                final size = frame.sizeLabel.isNotEmpty
+                    ? frame.sizeLabel
+                    : 'Size not specified';
+
+                return '${entry.key + 1}. $size';
+              })
+              .join('\n');
+
+    final paymentStatus = _paymentStatus(customer);
+    final orderStatus = _orderStatus(customer.status);
+
+    const workshopMapUrl = 'https://maps.app.goo.gl/T2UKxfZCaXzkEj5H7';
+
+    return '''
+*RAIGON ART GALLERY*
+*PAYMENT REMINDER*
+
+Dear *${customer.name}*,
+
+We hope you are doing well!
+
+This is a friendly reminder regarding the pending balance for your framing order with *RAIGON ART GALLERY*.
+
+Please find your order and payment details below.
+
+━━━━━━━━━━━━━━━━━━━━
+
+*ORDER DETAILS*
+
+*Order ID:* ${customer.id}
+*Order Date:* ${_formatDate(customer.orderDate)}
+*Expected Delivery:* ${_formatDate(customer.expectedDelivery)}
+
+*Items Ordered:*
+$frameDetails
+
+${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
+
+━━━━━━━━━━━━━━━━━━━━
+
+*PAYMENT SUMMARY*
+
+*Total Amount:* ${_money(customer.total)}
+*Advance Paid:* ${_money(customer.advance)}
+*Balance Due:* ${_money(balance)}
+
+*Payment Status:* $paymentStatus
+*Order Status:* $orderStatus
+
+━━━━━━━━━━━━━━━━━━━━
+
+*PAYMENT REQUEST*
+
+We kindly request you to clear the pending balance of *${_money(balance)}* at your earliest convenience.
+
+Your timely payment will help us proceed smoothly with your order.
+
+*Note:* Shipping charges are extra and will be calculated separately.
+
+━━━━━━━━━━━━━━━━━━━━
+
+*PRODUCTION HOUSE LOCATION:*
+$kWorkshopAddress
+
+*Google Maps:*
+$workshopMapUrl
+
+*Contact / GPay / UPI:* +91 $kWorkshopPhone
+
+━━━━━━━━━━━━━━━━━━━━
+
+Thank you for choosing *RAIGON ART GALLERY*. We truly appreciate your trust and support!
+
+*RAIGON ART GALLERY*
+'''
+        .trim();
+  }
+
   static Future<bool> openOrderConfirmation(Customer customer) async {
     final phone = _whatsAppNumber(customer.phone);
-
-    if (phone.length != 12 || !phone.startsWith('91')) {
-      throw ArgumentError('Customer must have a valid Indian mobile number.');
-    }
+    if (phone.isEmpty) return false;
 
     final message = buildMessage(customer);
+    return openDirectChat(phone, message);
+  }
 
-    final uri = Uri.https('wa.me', '/$phone', {'text': message});
+  static Future<bool> openPaymentReminder(Customer customer) async {
+    final phone = _whatsAppNumber(customer.phone);
+    if (phone.isEmpty) return false;
 
-    try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-      if (!opened) {
-        debugPrint('Could not open WhatsApp: $uri');
-      }
-
-      return opened;
-    } catch (error, stackTrace) {
-      debugPrint('WhatsApp launch failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
+    final message = buildPaymentReminderMessage(customer);
+    return openDirectChat(phone, message);
   }
 
   static Future<bool> openDirectChat(String phone, [String? text]) async {
     final cleanPhone = _whatsAppNumber(phone);
     if (cleanPhone.isEmpty) return false;
-    final queryParams = text != null && text.isNotEmpty ? {'text': text} : <String, String>{};
+
+    final queryParams = text != null && text.isNotEmpty
+        ? {'text': text}
+        : <String, String>{};
     final uri = Uri.https('wa.me', '/$cleanPhone', queryParams);
+
     try {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!launched) {
+        final fallbackUri = Uri.parse(
+          'https://api.whatsapp.com/send?phone=$cleanPhone'
+          '${text != null && text.isNotEmpty ? '&text=${Uri.encodeComponent(text)}' : ''}',
+        );
+        return await launchUrl(
+          fallbackUri,
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+      }
+      return launched;
     } catch (e) {
-      debugPrint('[CustomerWhatsAppService] openDirectChat failed: $e');
-      return false;
+      debugPrint(
+        '[CustomerWhatsAppService] openDirectChat failed, trying fallback: $e',
+      );
+      try {
+        final fallbackUri = Uri.parse(
+          'https://api.whatsapp.com/send?phone=$cleanPhone'
+          '${text != null && text.isNotEmpty ? '&text=${Uri.encodeComponent(text)}' : ''}',
+        );
+        return await launchUrl(
+          fallbackUri,
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+      } catch (_) {
+        return false;
+      }
     }
   }
+
+  /// Alias for openDirectChat with named parameters
+  static Future<bool> openWhatsApp({required String phone, String? message}) =>
+      openDirectChat(phone, message);
 
   static Future<bool> sendApiOrderConfirmation(String customerId) async {
     try {
@@ -201,7 +522,9 @@ Thank you for choosing Raigon Arts! ❤️
       );
       return true;
     } catch (e) {
-      debugPrint('[CustomerWhatsAppService] sendApiOrderConfirmation failed: $e');
+      debugPrint(
+        '[CustomerWhatsAppService] sendApiOrderConfirmation failed: $e',
+      );
       return false;
     }
   }
@@ -229,4 +552,3 @@ Thank you for choosing Raigon Arts! ❤️
     }
   }
 }
-

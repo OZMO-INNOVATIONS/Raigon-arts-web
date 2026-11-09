@@ -1,0 +1,222 @@
+import 'package:flutter/material.dart';
+import 'package:raigon_art/core/theme/app_colors.dart';
+import 'package:raigon_art/core/theme/app_palette.dart';
+import 'package:raigon_art/core/theme/mx_theme.dart';
+import 'package:raigon_art/core/widgets/app_primary_button.dart';
+import 'package:raigon_art/features/messaging/presentation/screens/inbox_page.dart';
+import 'package:raigon_art/features/messaging/provider/messaging_provider.dart';
+
+import 'automations_page.dart';
+
+const _nav = [
+  ('Automations', Icons.bolt_rounded),
+  ('Messages', Icons.inbox_rounded),
+];
+
+class MessagingAutomationScreen extends StatefulWidget {
+  const MessagingAutomationScreen({super.key});
+
+  @override
+  State<MessagingAutomationScreen> createState() =>
+      _MessagingAutomationScreenState();
+}
+
+class _MessagingAutomationScreenState extends State<MessagingAutomationScreen> {
+  late final MessagingAutomationProvider _messagingAutomationProvider;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _messagingAutomationProvider = MessagingAutomationProvider();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await _messagingAutomationProvider.load();
+    } catch (error) {
+      debugPrint('Messaging automation initialization failed: $error');
+    }
+  }
+
+  @override
+  void dispose() {
+    _messagingAutomationProvider.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _messagingAutomationProvider;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: ListenableBuilder(
+        listenable: s,
+        builder: (context, _) {
+          final pages = [AutomationsPage(s: s), InboxPage(s: s)];
+
+          return LayoutBuilder(
+            builder: (context, c) {
+              final narrow = c.maxWidth < 860;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TopBar(s: s, narrow: narrow),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOut,
+                      child: KeyedSubtree(
+                        key: ValueKey(s.tab),
+                        child: pages[s.tab],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.s, required this.narrow});
+
+  final MessagingAutomationProvider s;
+  final bool narrow;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+
+    final tabs = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: p.chipFill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < _nav.length; i++)
+            Expanded(
+              child: _TabItem(s: s, index: i),
+            ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        narrow ? 18 : 36,
+        narrow ? 14 : 22,
+        narrow ? 18 : 36,
+        0,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+
+          return Row(
+            children: [
+              // Automations and Messages tabs
+              Expanded(child: tabs),
+
+              // Show New automation only on Automations tab
+              SizedBox(width: compact ? 8 : 16),
+              Tooltip(
+                message: 'New automation',
+                child: AppPrimaryButton(
+                  label: compact ? '' : 'New automation',
+                  icon: Icons.add_rounded,
+                  onPressed: () => openBuilder(context, s),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  const _TabItem({required this.s, required this.index});
+
+  final MessagingAutomationProvider s;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final selected = s.tab == index;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => s.setTab(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected
+                ? (p.isDark
+                      ? AppColors.gold.withValues(alpha: 0.14)
+                      : AppColors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? (p.isDark
+                        ? AppColors.gold.withValues(alpha: 0.35)
+                        : AppPalette.statusGold.withValues(alpha: 0.25))
+                  : Colors.transparent,
+            ),
+            boxShadow: selected && !p.isDark
+                ? [
+                    BoxShadow(
+                      color: AppPalette.statusGold.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _nav[index].$2,
+                    size: 18,
+                    color: selected ? p.accent : p.textMuted,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    _nav[index].$1,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      color: selected ? p.textPrimary : p.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

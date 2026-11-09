@@ -39,6 +39,12 @@ class ApiConstants {
   static const String frameSizes = '/frame-sizes';
   static String frameSize(String code) => '/frame-sizes/$code';
 
+
+  // Module 9: Reminders Management
+  static const String reminders = '/reminders';
+  static const String reminderStats = '/reminders/summary/stats';
+  static String reminder(String id) => '/reminders/$id';
+
   // Module 5: Dashboard
   static const String dashboardStats = '/dashboard/stats';
 
@@ -54,4 +60,10 @@ class ApiConstants {
   static const String workshopProfile = '/settings/profile';
   static const String retentionPolicy = '/settings/retention';
   static const String cleanupTrigger = '/settings/cleanup/trigger';
+
+  // Module 10: Trash & Bin (14-day Auto-Purge Lifecycle)
+  static const String trash = '/trash';
+  static const String trashRestore = '/trash/restore';
+  static String trashPermanent(String type, String id) => '/trash/$type/$id';
+  static const String trashEmpty = '/trash/empty';
 }

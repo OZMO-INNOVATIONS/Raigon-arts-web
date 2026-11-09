@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:raigon_art/core/models/status.dart';
+import 'package:raigon_art/core/provider/customer_and_order_provider.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 
 enum SortOption {
@@ -79,19 +80,7 @@ class CustomersScreenProvider extends ChangeNotifier {
 
     switch (_sort) {
       case SortOption.newest:
-        result.sort((a, b) {
-          if (a.createdAt != null && b.createdAt != null) {
-            final cmp = b.createdAt!.compareTo(a.createdAt!);
-            if (cmp != 0) return cmp;
-          } else if (b.createdAt != null) {
-            return 1;
-          } else if (a.createdAt != null) {
-            return -1;
-          }
-          final orderCmp = b.orderDate.compareTo(a.orderDate);
-          if (orderCmp != 0) return orderCmp;
-          return parseIdNum(b.id).compareTo(parseIdNum(a.id));
-        });
+        result.sort(CustomerAndOrderProvider.compareLatestFirst);
       case SortOption.oldest:
         result.sort((a, b) {
           if (a.createdAt != null && b.createdAt != null) {

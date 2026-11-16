@@ -89,6 +89,14 @@ class OrderVoiceNote {
     if (localBytes != null) 'bytes': base64Encode(localBytes!),
   };
 
+  Map<String, dynamic> toApiJson() => {
+    'id': id,
+    'url': url,
+    'name': name,
+    'durationSeconds': durationSeconds,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
   factory OrderVoiceNote.fromJson(Map<String, dynamic> j) {
     Uint8List? parseBytes(dynamic v) {
       if (v == null) return null;
@@ -104,7 +112,7 @@ class OrderVoiceNote {
     return OrderVoiceNote(
       id: (j['id'] ?? 'voice_${DateTime.now().millisecondsSinceEpoch}')
           .toString(),
-      url: (j['url'] ?? j['fileUrl'] ?? j['voiceUrl'] ?? '').toString(),
+      url: (j['url'] ?? j['fileUrl'] ?? j['file_url'] ?? j['voiceUrl'] ?? j['voice_url'] ?? '').toString(),
       name: (j['name'] ?? j['title'] ?? 'Voice Note').toString(),
       durationSeconds: (j['durationSeconds'] ?? j['duration'] ?? 0 as num)
           .toInt(),
@@ -337,7 +345,8 @@ class Customer {
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     'statusHistory': [for (final h in statusHistory) h.toJson()],
-    'voiceNotes': [for (final v in voiceNotes) v.toJson()],
+    'voiceNotes': [for (final v in voiceNotes) v.toApiJson()],
+    'voice_notes': [for (final v in voiceNotes) v.toApiJson()],
     'frames': [
       for (final f in effectiveFrames)
         {
@@ -471,23 +480,38 @@ class Customer {
     }
 
     final voiceNotesList = <OrderVoiceNote>[];
-    for (final v
-        in (j['voiceNotes'] ?? j['voice_notes'] as List? ?? const [])) {
-      if (v is Map) {
-        voiceNotesList.add(
-          OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)),
-        );
-      } else if (v is String && v.isNotEmpty) {
-        voiceNotesList.add(
-          OrderVoiceNote(
-            id: 'voice_${voiceNotesList.length}',
-            url: v,
-            name: 'Voice Note ${voiceNotesList.length + 1}',
-            durationSeconds: 0,
-            createdAt: DateTime.now(),
-          ),
-        );
+    final dynamic rawVoiceData = j['voiceNotes'] ?? j['voice_notes'];
+    if (rawVoiceData is List) {
+      for (final v in rawVoiceData) {
+        if (v is Map) {
+          voiceNotesList.add(
+            OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)),
+          );
+        } else if (v is String && v.isNotEmpty) {
+          voiceNotesList.add(
+            OrderVoiceNote(
+              id: 'voice_${voiceNotesList.length}',
+              url: v,
+              name: 'Voice Note ${voiceNotesList.length + 1}',
+              durationSeconds: 0,
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
       }
+    } else if (rawVoiceData is String && rawVoiceData.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawVoiceData);
+        if (decoded is List) {
+          for (final v in decoded) {
+            if (v is Map) {
+              voiceNotesList.add(
+                OrderVoiceNote.fromJson(Map<String, dynamic>.from(v)),
+              );
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     final rawOrderDate = j['orderDate'] ?? j['order_date'];

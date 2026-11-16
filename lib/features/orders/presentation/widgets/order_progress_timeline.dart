@@ -811,6 +811,23 @@ class _OrderProgressTimelineState extends State<OrderProgressTimeline>
               ],
             ),
           ),
+          if (widget.onResumeOrder != null) ...[
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: widget.onResumeOrder,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+              label: const Text(
+                'Resume Order',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -67,10 +67,29 @@ void _showPhotoViewerDialog(
   if (customer != null) {
     final items = viewerItemsFromCustomer(customer);
     if (items.isNotEmpty) {
+      int targetIndex = -1;
+      if (photo.url != null && photo.url!.isNotEmpty) {
+        final cleanPhotoUrl = photo.url!.split('?').first.toLowerCase();
+        targetIndex = items.indexWhere((it) {
+          if (it.url == null) return false;
+          final cleanItemUrl = it.url!.split('?').first.toLowerCase();
+          return cleanItemUrl == cleanPhotoUrl;
+        });
+      }
+      if (targetIndex == -1 && photo.name.isNotEmpty) {
+        final lowerName = photo.name.toLowerCase();
+        targetIndex = items.indexWhere((it) =>
+            (it.subtitle?.toLowerCase().contains(lowerName) ?? false) ||
+            (it.title?.toLowerCase() == lowerName));
+      }
+      if (targetIndex == -1) {
+        targetIndex = initialIndex;
+      }
+
       showAppImageViewer(
         context: context,
         items: items,
-        initialIndex: initialIndex.clamp(0, items.length - 1),
+        initialIndex: targetIndex.clamp(0, items.length - 1),
       );
       return;
     }
@@ -129,7 +148,7 @@ List<_VaultPhoto> _photosOf(Customer c) {
                   ).sizeLabel
                 : 'Artwork Photo');
 
-      final key = url != null ? url.split('?').first.split('/').last : name;
+      final key = url != null ? url.split('?').first.toLowerCase() : name;
 
       if (bytes != null) {
         addVaultPhoto(
@@ -180,7 +199,7 @@ List<_VaultPhoto> _photosOf(Customer c) {
                 ).sizeLabel
               : 'Artwork Photo');
 
-    final key = url != null ? url.split('?').first.split('/').last : name;
+    final key = url != null ? url.split('?').first.toLowerCase() : name;
 
     if (bytes != null) {
       addVaultPhoto(
@@ -275,15 +294,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
     });
 
     try {
-      final provider = context.read<CustomerAndOrderProvider>();
-      final matches = provider.customers.where((c) => c.id == _c.id).toList();
-      if (matches.isNotEmpty && mounted) {
+      final fresh = await context.read<CustomerAndOrderProvider>().fetchCustomerDetails(_c.id);
+      if (mounted) {
         setState(() {
-          _c = matches.first;
+          _c = fresh;
           _isLoadingFresh = false;
         });
-      } else {
-        if (mounted) setState(() => _isLoadingFresh = false);
       }
     } catch (e) {
       debugPrint('[ViewCustomerDialog] Fetch customer details error: $e');
@@ -345,6 +361,12 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<CustomerAndOrderProvider>();
+    final liveCustomer = provider.findById(_c.id);
+    if (liveCustomer != null && liveCustomer != _c) {
+      _c = liveCustomer;
+    }
+
     final c = FormColors.of(context);
     final p = c.p;
     return DialogBackdrop(
@@ -925,14 +947,16 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
         children: [
           const Icon(RemixIcons.calendar_check_line, size: 13.5, color: green),
           const SizedBox(width: 6),
-          Text(
-            'Expected Date: ${_c.expectedDateLabel}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: green,
+          Flexible(
+            child: Text(
+              'Expected Date: ${_c.expectedDateLabel}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: green,
+              ),
             ),
           ),
         ],

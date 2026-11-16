@@ -389,12 +389,30 @@ class PhotoStrip extends StatelessWidget {
     List<String> validUrls,
   ) {
     if (customer != null) {
-      showAppImageViewer(
-        context: context,
-        items: viewerItemsFromCustomer(customer!),
-        initialIndex: initialIndex,
-      );
-      return;
+      final items = viewerItemsFromCustomer(customer!);
+      if (items.isNotEmpty) {
+        int targetIndex = -1;
+        if (initialIndex >= 0 && initialIndex < validUrls.length) {
+          final clickedUrl = validUrls[initialIndex]
+              .split('?')
+              .first
+              .toLowerCase();
+          targetIndex = items.indexWhere((it) {
+            if (it.url == null) return false;
+            return it.url!.split('?').first.toLowerCase() == clickedUrl;
+          });
+        }
+        if (targetIndex == -1) {
+          targetIndex = initialIndex;
+        }
+
+        showAppImageViewer(
+          context: context,
+          items: items,
+          initialIndex: targetIndex.clamp(0, items.length - 1),
+        );
+        return;
+      }
     }
 
     final items = <AppViewerItem>[

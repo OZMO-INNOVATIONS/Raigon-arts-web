@@ -54,7 +54,15 @@ List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
   if (customer.frames.isNotEmpty) {
     for (var i = 0; i < customer.frames.length; i++) {
       final f = customer.frames[i];
-      final title = '${f.sizeLabel} · ${f.frameType}';
+      final frameTitle = [
+        if (f.sizeLabel.isNotEmpty) f.sizeLabel,
+        if (f.frameType.isNotEmpty) f.frameType,
+      ].join(' · ');
+      final title = frameTitle.isNotEmpty
+          ? frameTitle
+          : (i < customer.photoNames.length && customer.photoNames[i].isNotEmpty
+              ? customer.photoNames[i]
+              : 'Artwork #${i + 1}');
       final photoName = (f.photoName != null && f.photoName!.isNotEmpty)
           ? f.photoName!
           : (i < customer.photoNames.length && customer.photoNames[i].isNotEmpty
@@ -66,7 +74,9 @@ List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
           ? f.photoUrl
           : (i < customer.photoUrls.length ? customer.photoUrls[i] : null);
       final url = (rawUrl != null && rawUrl.isNotEmpty) ? ImageUrlHelper.resolve(rawUrl) : null;
-      final key = url != null ? url.split('?').first.split('/').last : photoName;
+      final key = url != null
+          ? url.split('?').first.toLowerCase()
+          : (bytes != null ? '${photoName.toLowerCase()}_${bytes.length}_$i' : photoName.toLowerCase());
 
       if (bytes != null) {
         addItem(
@@ -93,21 +103,23 @@ List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
 
   // 2. Extra customer-level photos beyond frames
   final maxExtra = math.max(customer.photoBytes.length, customer.photoUrls.length);
-  for (var i = customer.frames.length; i < maxExtra; i++) {
+  for (var i = 0; i < maxExtra; i++) {
     final bytes = i < customer.photoBytes.length ? customer.photoBytes[i] : null;
     final rawUrl = i < customer.photoUrls.length ? customer.photoUrls[i] : null;
     final url = (rawUrl != null && rawUrl.isNotEmpty) ? ImageUrlHelper.resolve(rawUrl) : null;
     final photoName = i < customer.photoNames.length && customer.photoNames[i].isNotEmpty
         ? customer.photoNames[i]
         : (url != null ? url.split('?').first.split('/').last : 'Photo #${i + 1}');
-    final key = url != null ? url.split('?').first.split('/').last : photoName;
+    final key = url != null
+        ? url.split('?').first.toLowerCase()
+        : (bytes != null ? '${photoName.toLowerCase()}_${bytes.length}_$i' : photoName.toLowerCase());
 
     if (bytes != null) {
       addItem(
         AppViewerItem(
           bytes: bytes,
           url: url,
-          title: 'Artwork #${i + 1}',
+          title: 'Artwork #${items.length + 1}',
           subtitle: '${customer.id} · ${customer.name} · $photoName',
         ),
         key,
@@ -116,7 +128,7 @@ List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
       addItem(
         AppViewerItem(
           url: url,
-          title: 'Artwork #${i + 1}',
+          title: 'Artwork #${items.length + 1}',
           subtitle: '${customer.id} · ${customer.name} · $photoName',
         ),
         key,

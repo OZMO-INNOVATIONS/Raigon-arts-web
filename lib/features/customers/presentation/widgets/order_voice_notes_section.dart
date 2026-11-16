@@ -7,6 +7,7 @@ import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/theme/app_palette.dart';
 import 'package:raigon_art/core/widgets/app_audio_recorder_section.dart';
 import 'package:raigon_art/core/widgets/app_snackbar.dart';
+import 'package:raigon_art/core/utils/image_url_helper.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:raigon_art/features/reminders/services/reminder_audio_service.dart';
 
@@ -163,7 +164,8 @@ class _OrderVoiceNotesSectionState extends State<OrderVoiceNotesSection> {
       if (note.localBytes != null && note.localBytes!.isNotEmpty) {
         await _audioService.playBytes(note.localBytes!, mediaId: note.id);
       } else if (note.url.isNotEmpty) {
-        await _audioService.playUrl(note.url, mediaId: note.id);
+        final resolvedUrl = ImageUrlHelper.resolve(note.url);
+        await _audioService.playUrl(resolvedUrl.isNotEmpty ? resolvedUrl : note.url, mediaId: note.id);
       } else {
         AppSnackBar.error(context, 'Audio note data unavailable.');
         return;

@@ -26,6 +26,8 @@ import 'package:raigon_art/core/network/api_exception.dart';
 import 'package:raigon_art/core/services/storage_service.dart';
 import 'package:raigon_art/features/customers/presentation/widgets/order_voice_notes_section.dart';
 import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
+import 'package:raigon_art/core/widgets/app_image_cropper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 Future<void> showAddCustomerDialog(BuildContext context) async {
   await context.read<FrameSizeProvider>().init();
@@ -81,6 +83,34 @@ Future<void> showAddCustomerDialog(BuildContext context) async {
         updatedNotes.add(vn);
       }
       finalResult = result.copyWith(voiceNotes: updatedNotes);
+    }
+
+    if (finalResult.quotationDocuments.isNotEmpty) {
+      final updatedDocs = <QuotationDocument>[];
+      for (var i = 0; i < finalResult.quotationDocuments.length; i++) {
+        final doc = finalResult.quotationDocuments[i];
+        if (doc.url.isEmpty && doc.bytes != null && doc.bytes!.isNotEmpty) {
+          try {
+            final ext = doc.name.contains('.')
+                ? doc.name.split('.').last.toLowerCase()
+                : 'pdf';
+            final fileName =
+                'doc_order_${finalResult.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+            final uploaded = await StorageService().uploadFile(
+              doc.bytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedDocs.add(doc.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderSave] Document upload notice: $e');
+          }
+        }
+        updatedDocs.add(doc);
+      }
+      finalResult = finalResult.copyWith(quotationDocuments: updatedDocs);
     }
 
     if (!context.mounted) return;
@@ -219,6 +249,34 @@ Future<void> showEditCustomerDialog(
       finalResult = result.copyWith(voiceNotes: updatedNotes);
     }
 
+    if (finalResult.quotationDocuments.isNotEmpty) {
+      final updatedDocs = <QuotationDocument>[];
+      for (var i = 0; i < finalResult.quotationDocuments.length; i++) {
+        final doc = finalResult.quotationDocuments[i];
+        if (doc.url.isEmpty && doc.bytes != null && doc.bytes!.isNotEmpty) {
+          try {
+            final ext = doc.name.contains('.')
+                ? doc.name.split('.').last.toLowerCase()
+                : 'pdf';
+            final fileName =
+                'doc_order_${finalResult.id}_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+            final uploaded = await StorageService().uploadFile(
+              doc.bytes!,
+              fileName,
+            );
+            if (uploaded.fileUrl.isNotEmpty) {
+              updatedDocs.add(doc.copyWith(url: uploaded.fileUrl));
+              continue;
+            }
+          } catch (e) {
+            debugPrint('[OrderSave] Document upload notice: $e');
+          }
+        }
+        updatedDocs.add(doc);
+      }
+      finalResult = finalResult.copyWith(quotationDocuments: updatedDocs);
+    }
+
     if (!context.mounted) return;
 
     await context.read<CustomerAndOrderProvider>().update(finalResult);
@@ -264,6 +322,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   static const _paymentOptions = ['Unpaid', 'Partial', 'Paid'];
 
   final _scroll = ScrollController();
+  final _totalFocus = FocusNode(debugLabel: 'order_total');
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _alt = TextEditingController();
@@ -276,6 +335,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   final List<PickedPhoto> _photos = [];
   final List<_ExistingPhotoItem> _existingPhotos = [];
   List<OrderVoiceNote> _voiceNotes = [];
+  List<QuotationDocument> _quotationDocuments = [];
+  bool _isTotalManuallyAdjusted = false;
   final FrameSpecData _shared = FrameSpecData();
   final List<_FrameEntry> _entries = [];
   FrameMode _mode = FrameMode.same;
@@ -311,6 +372,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     _payment = c.paymentStatus;
     _status = c.status;
     _voiceNotes = List<OrderVoiceNote>.of(c.voiceNotes);
+    _quotationDocuments = List<QuotationDocument>.of(c.quotationDocuments);
+    _isTotalManuallyAdjusted = c.isTotalManuallyAdjusted ||
+        (c.total > 0 &&
+            c.calculatedFramesTotal > 0 &&
+            (c.total - c.calculatedFramesTotal).abs() > 0.01) ||
+        (c.total > 0 && c.calculatedFramesTotal == 0);
 
     final frames = c.effectiveFrames;
     if (frames.length > 1) {
@@ -375,6 +442,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   @override
   void dispose() {
     _scroll.dispose();
+    _totalFocus.dispose();
     for (final c in [
       _name,
       _phone,
@@ -448,7 +516,10 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Future<void> _browseSame() async {
     final picked = await _pick();
     if (!mounted || picked.isEmpty) return;
-    setState(() => _photos.addAll(picked));
+    setState(() {
+      _photos.addAll(picked);
+      _syncCalculatedTotal();
+    });
   }
 
   Future<void> _onDrop(DropDoneDetails d) async {
@@ -476,7 +547,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         'Only JPG, PNG and WEBP photos are supported.',
       );
     }
-    if (list.isNotEmpty) setState(() => _photos.addAll(list));
+    if (list.isNotEmpty) {
+      setState(() {
+        _photos.addAll(list);
+        _syncCalculatedTotal();
+      });
+    }
   }
 
   void _setMode(FrameMode mode) {
@@ -498,20 +574,56 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         ]);
       }
       _mode = mode;
+      _syncCalculatedTotal();
     });
   }
 
-  Future<void> _addIndividual() async {
+  void _addIndividual() {
+    setState(() {
+      _entries.add(_FrameEntry());
+      _syncCalculatedTotal();
+    });
+
+    // Scroll to the newly added card.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _addWithPhotos() async {
     final picked = await _pick();
     if (!mounted || picked.isEmpty) return;
     setState(() {
-      if (_entries.length == 1 && _entries.first.photo == null) {
-        _entries.first.spec.dispose();
-        _entries.clear();
+      var pIndex = 0;
+      if (_entries.length == 1 &&
+          _entries.first.photo == null &&
+          (_entries.first.existingUrl == null ||
+              _entries.first.existingUrl!.isEmpty) &&
+          _entries.first.spec.width.text.isEmpty &&
+          _entries.first.spec.height.text.isEmpty &&
+          _entries.first.spec.notes.text.isEmpty &&
+          _entries.first.spec.customerNote.text.isEmpty) {
+        _entries.first.photo = picked.first;
+        pIndex = 1;
       }
-      for (final p in picked) {
-        _entries.add(_FrameEntry(photo: p));
+      for (var i = pIndex; i < picked.length; i++) {
+        _entries.add(_FrameEntry(photo: picked[i]));
       }
+      _syncCalculatedTotal();
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -525,12 +637,151 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     });
   }
 
+  void _clearPhoto(_FrameEntry e) {
+    setState(() {
+      e.photo = null;
+      e.existingUrl = null;
+      e.existingName = null;
+    });
+  }
+
   void _removeEntry(_FrameEntry e) {
     setState(() {
       e.spec.dispose();
       _entries.remove(e);
       if (_entries.isEmpty) _entries.add(_FrameEntry());
+      _syncCalculatedTotal();
     });
+  }
+
+  double get _calculatedTotal {
+    if (_mode == FrameMode.same) {
+      final unitPrice = _shared.unitPriceValue;
+      final specQty = _shared.qtyValue;
+      final photoCount = math.max(1, _existingPhotos.length + _photos.length);
+      final effectiveQty = specQty * photoCount;
+      return unitPrice * effectiveQty;
+    } else {
+      double sum = 0.0;
+      for (final e in _entries) {
+        sum += e.spec.subtotalValue;
+      }
+      return sum;
+    }
+  }
+
+  void _syncCalculatedTotal({bool force = false}) {
+    final calc = _calculatedTotal;
+    if (force || !_isTotalManuallyAdjusted) {
+      if (calc > 0 || force) {
+        _total.text = calc > 0
+            ? (calc.truncateToDouble() == calc
+                ? calc.toInt().toString()
+                : calc.toStringAsFixed(2))
+            : (force ? '0' : '');
+      }
+      _recalc();
+    }
+  }
+
+  void _resetToCalculated() {
+    setState(() {
+      _isTotalManuallyAdjusted = false;
+      _syncCalculatedTotal(force: true);
+    });
+  }
+
+  Future<void> _pickQuotationDocuments() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'pdf',
+          'doc',
+          'docx',
+          'txt',
+          'rtf',
+          'png',
+          'jpg',
+          'jpeg',
+          'webp',
+        ],
+      );
+      if (files.isEmpty) return;
+
+      final newDocs = <QuotationDocument>[];
+      for (final f in files) {
+        final bytes = await f.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final ext =
+              f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+          String mime = 'application/octet-stream';
+          if (ext == 'pdf') {
+            mime = 'application/pdf';
+          } else if (ext == 'doc') {
+            mime = 'application/msword';
+          } else if (ext == 'docx') {
+            mime =
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          } else if (['png', 'jpg', 'jpeg', 'webp'].contains(ext)) {
+            mime = 'image/$ext';
+          } else if (ext == 'txt') {
+            mime = 'text/plain';
+          }
+
+          newDocs.add(
+            QuotationDocument(
+              id:
+                  'doc_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(9999)}',
+              name: f.name,
+              url: '',
+              sizeBytes: bytes.length,
+              mimeType: mime,
+              bytes: bytes,
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+
+      if (mounted && newDocs.isNotEmpty) {
+        setState(() {
+          _quotationDocuments.addAll(newDocs);
+        });
+      }
+    } catch (e) {
+      debugPrint('[QuotationPick] Error: $e');
+      if (mounted) {
+        AppSnackBar.error(context, 'Failed to pick quotation file: $e');
+      }
+    }
+  }
+
+  Future<void> _viewOrOpenQuotation(QuotationDocument doc) async {
+    if (doc.url.isNotEmpty) {
+      final uri = Uri.parse(ImageUrlHelper.resolve(doc.url));
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Could not launch doc URL: $e');
+      }
+    } else if (doc.bytes != null) {
+      final ext =
+          doc.name.contains('.') ? doc.name.split('.').last.toLowerCase() : '';
+      if (['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
+        showSingleImageViewer(
+          context: context,
+          bytes: doc.bytes,
+          title: doc.name,
+          subtitle: doc.sizeLabel,
+        );
+      } else {
+        AppSnackBar.info(
+          context,
+          '${doc.name} (${doc.sizeLabel}) is attached and will be uploaded on save.',
+        );
+      }
+    }
   }
 
   void _recalc() {
@@ -679,6 +930,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       photoSizeLabels: widget.existing?.photoSizeLabels ?? const [],
       frames: frames,
       voiceNotes: _voiceNotes,
+      quotationDocuments: _quotationDocuments,
+      isTotalManuallyAdjusted: _isTotalManuallyAdjusted,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -968,6 +1221,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 onChanged: (notes) => setState(() => _voiceNotes = notes),
                 isEditable: true,
               ),
+              const SizedBox(height: 24),
+              _quotationSection(c),
               const SizedBox(height: 26),
               const SectionHeader(
                 icon: RemixIcons.bill_line,
@@ -998,10 +1253,86 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 children: [
                   LabeledField(
                     label: 'Total Amount (₹)',
+                    trailing: _isTotalManuallyAdjusted
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: const Color(0xFFF59E0B).withValues(
+                                      alpha: 0.4,
+                                    ),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Adjusted',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFF59E0B),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: _resetToCalculated,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
+                                  ),
+                                  child: Text(
+                                    'Reset (₹${_calculatedTotal > 0 ? (_calculatedTotal.truncateToDouble() == _calculatedTotal ? _calculatedTotal.toInt() : _calculatedTotal.toStringAsFixed(2)) : 0})',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.gold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: AppColors.green.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: const Text(
+                              'Auto Calculated',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.green,
+                              ),
+                            ),
+                          ),
                     child: NumberBox(
                       controller: _total,
+                      focusNode: _totalFocus,
                       allowDecimal: true,
-                      onChanged: (_) => _recalc(),
+                      onChanged: (_) {
+                        _isTotalManuallyAdjusted = true;
+                        _recalc();
+                      },
                     ),
                   ),
                   LabeledField(
@@ -1338,6 +1669,45 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       ),
                       Positioned(
                         top: 5,
+                        left: 5,
+                        child: InkWell(
+                          onTap: () async {
+                            final cropped = await showAppImageCropper(
+                              context: context,
+                              url: _existingPhotos[i].url,
+                              title: 'Crop ${_existingPhotos[i].name}',
+                            );
+                            if (cropped != null && mounted) {
+                              setState(() {
+                                final ex = _existingPhotos.removeAt(i);
+                                _photos.add(
+                                  PickedPhoto(
+                                    name: ex.name,
+                                    bytes: cropped,
+                                    size: cropped.length,
+                                  ),
+                                );
+                              });
+                            }
+                          },
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: AppColors.gold,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              RemixIcons.crop_line,
+                              size: 13,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 5,
                         right: 5,
                         child: InkWell(
                           onTap: () =>
@@ -1410,6 +1780,42 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       ),
                       Positioned(
                         top: 5,
+                        left: 5,
+                        child: InkWell(
+                          onTap: () async {
+                            final cropped = await showAppImageCropper(
+                              context: context,
+                              bytes: _photos[i].bytes,
+                              title: 'Crop ${_photos[i].name}',
+                            );
+                            if (cropped != null && mounted) {
+                              setState(() {
+                                _photos[i] = PickedPhoto(
+                                  name: _photos[i].name,
+                                  bytes: cropped,
+                                  size: cropped.length,
+                                );
+                              });
+                            }
+                          },
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: AppColors.gold,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              RemixIcons.crop_line,
+                              size: 13,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 5,
                         right: 5,
                         child: InkWell(
                           onTap: () => setState(() => _photos.removeAt(i)),
@@ -1441,7 +1847,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           label: 'FRAME SPECIFICATIONS',
         ),
         const SizedBox(height: 18),
-        FrameSpecFields(data: _shared, onChanged: () => setState(() {})),
+        FrameSpecFields(
+          data: _shared,
+          onChanged: () => setState(() => _syncCalculatedTotal()),
+          onNextFromCustomerNote: () => _totalFocus.requestFocus(),
+        ),
       ],
     );
   }
@@ -1452,43 +1862,105 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < _entries.length; i++) ...[
-          _entryCard(c, i, _entries[i]),
+          FocusTraversalGroup(
+            policy: WidgetOrderTraversalPolicy(),
+            child: _entryCard(c, i, _entries[i]),
+          ),
           const SizedBox(height: 16),
         ],
-        InkWell(
-          onTap: _addIndividual,
-          borderRadius: BorderRadius.circular(14),
-          child: CustomPaint(
-            painter: DashedRRectPainter(
-              color: AppColors.gold.withValues(alpha: 0.75),
-            ),
-            child: Container(
-              height: 58,
-              decoration: BoxDecoration(
-                color: c.dropzoneFill,
-                borderRadius: BorderRadius.circular(14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 540;
+            final addFrameBtn = InkWell(
+              onTap: _addIndividual,
+              borderRadius: BorderRadius.circular(14),
+              child: CustomPaint(
+                painter: DashedRRectPainter(
+                  color: AppColors.gold.withValues(alpha: 0.85),
+                ),
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: c.dropzoneFill,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        RemixIcons.add_circle_line,
+                        size: 22,
+                        color: AppColors.gold,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Add Another Photo & Frame',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            );
+
+            final uploadPhotosBtn = InkWell(
+              onTap: _addWithPhotos,
+              borderRadius: BorderRadius.circular(14),
+              child: CustomPaint(
+                painter: DashedRRectPainter(color: p.border),
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: p.chipFill.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        RemixIcons.upload_cloud_2_line,
+                        size: 22,
+                        color: p.textPrimary,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Upload Images Directly',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: p.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            if (isNarrow) {
+              return Column(
                 children: [
-                  Icon(
-                    RemixIcons.add_circle_line,
-                    size: 22,
-                    color: p.textPrimary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Add Another Photo & Frame',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
-                      color: p.textPrimary,
-                    ),
-                  ),
+                  addFrameBtn,
+                  const SizedBox(height: 10),
+                  uploadPhotosBtn,
                 ],
-              ),
-            ),
-          ),
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(flex: 3, child: addFrameBtn),
+                const SizedBox(width: 12),
+                Expanded(flex: 2, child: uploadPhotosBtn),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -1498,6 +1970,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     final p = c.p;
     final photo = e.photo;
     final hasExisting = e.existingUrl != null && e.existingUrl!.isNotEmpty;
+    final hasPhoto = photo != null || hasExisting;
 
     final thumb = InkWell(
       onTap: () {
@@ -1515,11 +1988,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             title: e.existingName ?? 'Attached Photo',
             subtitle: 'Frame Artwork Spec',
           );
+        } else {
+          _replace(e);
         }
       },
       borderRadius: BorderRadius.circular(10),
       child: Tooltip(
-        message: (photo != null || hasExisting) ? 'Tap to view full image' : '',
+        message: hasPhoto ? 'Tap to view full image' : 'Tap to attach photo',
         child: Container(
           width: 68,
           height: 68,
@@ -1527,6 +2002,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           decoration: BoxDecoration(
             color: p.avatarBg,
             borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: hasPhoto
+                  ? Colors.transparent
+                  : AppColors.gold.withValues(alpha: 0.3),
+              width: 1.2,
+            ),
           ),
           child: (photo != null && photo.bytes != null)
               ? Image.memory(photo.bytes!, fit: BoxFit.cover)
@@ -1544,7 +2025,25 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   errorBuilder: (_, _, _) =>
                       Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
                 )
-              : Icon(RemixIcons.image_line, color: p.textMuted, size: 28),
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      RemixIcons.image_add_line,
+                      color: AppColors.gold,
+                      size: 24,
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Attach',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -1554,13 +2053,17 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       children: [
         Row(
           children: [
-            const Icon(RemixIcons.image_fill, size: 17, color: AppColors.gold),
+            Icon(
+              hasPhoto ? RemixIcons.image_fill : RemixIcons.image_line,
+              size: 17,
+              color: hasPhoto ? AppColors.gold : p.textMuted,
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 photo?.name ??
                     e.existingName ??
-                    (hasExisting ? 'Attached Photo' : 'No photo selected'),
+                    (hasExisting ? 'Attached Photo' : 'No photo attached yet'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1573,30 +2076,50 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.gold.withValues(alpha: 0.2),
+                color: AppColors.gold.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Photo #${index + 1}',
+                'Frame #${index + 1}',
                 style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: AppPalette.statusGold,
                 ),
               ),
             ),
-            if (photo != null) ...[
-              const SizedBox(width: 10),
+            if (!hasPhoto)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: p.chipFill,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: p.isDark ? p.border : Colors.black12,
+                  ),
+                ),
+                child: Text(
+                  'Photo Pending (Can update later)',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: p.textMuted,
+                  ),
+                ),
+              ),
+            if (photo != null)
               Text(
                 photo.sizeLabel,
-                style: TextStyle(fontSize: 12.5, color: p.textMuted),
+                style: TextStyle(fontSize: 12, color: p.textMuted),
               ),
-            ],
           ],
         ),
       ],
@@ -1605,41 +2128,154 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        InkWell(
-          onTap: () => _replace(e),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: p.chipFill,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: p.isDark ? p.border : Colors.transparent,
+        if (!hasPhoto) ...[
+          InkWell(
+            onTap: () => _replace(e),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.35),
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(RemixIcons.upload_2_line, size: 16, color: AppColors.gold),
+                  SizedBox(width: 6),
+                  Text(
+                    'Attach Photo',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(RemixIcons.refresh_line, size: 17, color: p.textPrimary),
-                const SizedBox(width: 6),
-                Text(
-                  photo == null ? 'Browse' : 'Replace',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: p.textPrimary,
-                  ),
+          ),
+        ] else ...[
+          InkWell(
+            onTap: () async {
+              final cropped = await showAppImageCropper(
+                context: context,
+                bytes: photo?.bytes,
+                url: e.existingUrl,
+                title: 'Crop Frame Artwork #${index + 1}',
+              );
+              if (cropped != null && mounted) {
+                setState(() {
+                  e.photo = PickedPhoto(
+                    name: photo?.name ?? e.existingName ?? 'Cropped_Artwork.jpg',
+                    bytes: cropped,
+                    size: cropped.length,
+                  );
+                  e.existingUrl = null;
+                  e.existingName = null;
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.35),
                 ),
-              ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(RemixIcons.crop_line, size: 15, color: AppColors.gold),
+                  SizedBox(width: 4),
+                  Text(
+                    'Crop',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => _replace(e),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: p.chipFill,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: p.isDark ? p.border : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(RemixIcons.refresh_line, size: 15, color: p.textPrimary),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Replace',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => _clearPhoto(e),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: p.chipFill,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: p.isDark ? p.border : Colors.transparent,
+                ),
+              ),
+              child: Tooltip(
+                message: 'Remove photo only (keep frame specs)',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(RemixIcons.close_circle_line, size: 15, color: p.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Clear',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: p.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(width: 8),
         InkWell(
           onTap: () => _removeEntry(e),
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: const Color(0xFFE5484D).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -1655,11 +2291,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   size: 14,
                   color: Color(0xFFE5484D),
                 ),
-                SizedBox(width: 6),
+                SizedBox(width: 5),
                 Text(
                   'Remove',
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFFE5484D),
                   ),
@@ -1672,6 +2308,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     );
 
     return Container(
+      key: ObjectKey(e),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -1715,7 +2352,202 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             child: CustomPaint(painter: DashedLinePainter(p.rowDivider)),
           ),
           const SizedBox(height: 18),
-          FrameSpecFields(data: e.spec, onChanged: () => setState(() {})),
+          FrameSpecFields(
+            data: e.spec,
+            onChanged: () => setState(() => _syncCalculatedTotal()),
+            onNextFromCustomerNote: () {
+              if (index + 1 < _entries.length) {
+                _entries[index + 1].spec.priceFocus.requestFocus();
+              } else {
+                _totalFocus.requestFocus();
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quotationSection(FormColors c) {
+    final p = c.p;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeader(
+          icon: RemixIcons.file_text_line,
+          label: 'COMMON QUOTATION & ORDER DOCUMENTS',
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: p.isDark ? const Color(0xFF2C2E46) : const Color(0xFFFCFAF5),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      RemixIcons.attachment_2,
+                      size: 20,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Order-Level Quotation & Reference Files',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Attach customer quotations, PDF estimates, Word documents (.doc/.docx), or common reference notes for the entire order.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: p.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _pickQuotationDocuments,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: p.chipFill,
+                      foregroundColor: p.textPrimary,
+                      elevation: 0,
+                      side: BorderSide(color: p.border),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(RemixIcons.upload_2_line, size: 16),
+                    label: const Text(
+                      'Attach File',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              if (_quotationDocuments.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Divider(height: 1, color: p.border),
+                const SizedBox(height: 12),
+                for (var i = 0; i < _quotationDocuments.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _quotationDocItem(p, i, _quotationDocuments[i]),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quotationDocItem(AppPalette p, int index, QuotationDocument doc) {
+    final isPdf = doc.isPdf;
+    final isWord = doc.name.toLowerCase().endsWith('.doc') ||
+        doc.name.toLowerCase().endsWith('.docx');
+    final iconColor = isPdf
+        ? const Color(0xFFE5484D)
+        : (isWord ? const Color(0xFF3E63DD) : AppColors.gold);
+    final iconBg = isPdf
+        ? const Color(0xFFE5484D).withValues(alpha: 0.12)
+        : (isWord
+            ? const Color(0xFF3E63DD).withValues(alpha: 0.12)
+            : AppColors.gold.withValues(alpha: 0.12));
+    final iconData = isPdf
+        ? RemixIcons.file_pdf_2_line
+        : (isWord ? RemixIcons.file_word_2_line : RemixIcons.file_text_line);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(iconData, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  doc.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: p.textPrimary,
+                  ),
+                ),
+                Text(
+                  '${doc.sizeLabel} ${doc.url.isNotEmpty ? '· Uploaded' : '· Pending upload'}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: p.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => _viewOrOpenQuotation(doc),
+            tooltip: 'View / Open Document',
+            icon: const Icon(RemixIcons.external_link_line, size: 17),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _quotationDocuments.removeAt(index);
+              });
+            },
+            tooltip: 'Remove Attachment',
+            icon: const Icon(
+              RemixIcons.delete_bin_line,
+              size: 17,
+              color: Color(0xFFE5484D),
+            ),
+          ),
         ],
       ),
     );

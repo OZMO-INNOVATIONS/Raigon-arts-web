@@ -144,6 +144,106 @@ class OrderVoiceNote {
   }
 }
 
+class QuotationDocument {
+  const QuotationDocument({
+    required this.id,
+    required this.name,
+    required this.url,
+    this.sizeBytes = 0,
+    this.mimeType = '',
+    this.bytes,
+    this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final String url;
+  final int sizeBytes;
+  final String mimeType;
+  final Uint8List? bytes;
+  final DateTime? createdAt;
+
+  String get sizeLabel {
+    if (sizeBytes <= 0 && bytes != null) {
+      final kb = bytes!.length / 1024;
+      if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+      return '${(kb / 1024).toStringAsFixed(1)} MB';
+    }
+    if (sizeBytes <= 0) return 'Document';
+    final kb = sizeBytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    return '${(kb / 1024).toStringAsFixed(1)} MB';
+  }
+
+  bool get isPdf =>
+      name.toLowerCase().endsWith('.pdf') ||
+      mimeType.toLowerCase().contains('pdf') ||
+      url.toLowerCase().contains('.pdf');
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'url': url,
+    'size_bytes': sizeBytes,
+    'sizeBytes': sizeBytes,
+    'mime_type': mimeType,
+    'mimeType': mimeType,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+  };
+
+  Map<String, dynamic> toApiJson() => toJson();
+
+  QuotationDocument copyWith({
+    String? id,
+    String? name,
+    String? url,
+    int? sizeBytes,
+    String? mimeType,
+    Uint8List? bytes,
+    DateTime? createdAt,
+  }) {
+    return QuotationDocument(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      url: url ?? this.url,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      mimeType: mimeType ?? this.mimeType,
+      bytes: bytes ?? this.bytes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  factory QuotationDocument.fromJson(Map<String, dynamic> j) {
+    int toSizeBytes(dynamic v) {
+      if (v == null) return 0;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? 0;
+      return 0;
+    }
+
+    Uint8List? parseBytes(dynamic v) {
+      if (v == null) return null;
+      if (v is Uint8List) return v;
+      if (v is String && v.isNotEmpty) {
+        try {
+          return base64Decode(v);
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    return QuotationDocument(
+      id: (j['id'] ?? '').toString(),
+      name: (j['name'] ?? j['file_name'] ?? 'Document').toString(),
+      url: (j['url'] ?? j['file_url'] ?? '').toString(),
+      sizeBytes: toSizeBytes(j['size_bytes'] ?? j['sizeBytes'] ?? j['file_size_bytes']),
+      mimeType: (j['mime_type'] ?? j['mimeType'] ?? '').toString(),
+      bytes: parseBytes(j['bytes'] ?? j['localBytes']),
+      createdAt: j['created_at'] != null ? DateTime.tryParse(j['created_at'].toString()) : null,
+    );
+  }
+}
+
 class Customer {
   const Customer({
     required this.id,
@@ -171,6 +271,8 @@ class Customer {
     this.photoSizeLabels = const [],
     this.statusHistory = const [],
     this.voiceNotes = const [],
+    this.isTotalManuallyAdjusted = false,
+    this.quotationDocuments = const [],
     this.createdAt,
     this.updatedAt,
     this.isDeleted = false,
@@ -223,10 +325,21 @@ class Customer {
   final List<String> photoSizeLabels;
   final List<OrderStatusHistoryItem> statusHistory;
   final List<OrderVoiceNote> voiceNotes;
+  final bool isTotalManuallyAdjusted;
+  final List<QuotationDocument> quotationDocuments;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool isDeleted;
   final DateTime? deletedAt;
+
+  /// Calculates sum of all frame subtotals.
+  int get calculatedFramesTotal {
+    double sum = 0;
+    for (final f in frames) {
+      sum += f.subtotal;
+    }
+    return sum.round();
+  }
 
   /// Calculates days remaining before permanent purge (14-day policy)
   int get daysRemainingInTrash {
@@ -320,6 +433,10 @@ class Customer {
     'statusHistory': [for (final h in statusHistory) h.toJson()],
     'voiceNotes': [for (final v in voiceNotes) v.toJson()],
     'voice_notes': [for (final v in voiceNotes) v.toJson()],
+    'isTotalManuallyAdjusted': isTotalManuallyAdjusted,
+    'is_total_manually_adjusted': isTotalManuallyAdjusted,
+    'quotationDocuments': [for (final q in quotationDocuments) q.toJson()],
+    'quotation_documents': [for (final q in quotationDocuments) q.toJson()],
     'frames': [for (final f in frames) f.toJson()],
   };
 
@@ -337,6 +454,10 @@ class Customer {
     'photoSizeLabels': photoSizeLabels,
     'total': total,
     'advance': advance,
+    'isTotalManuallyAdjusted': isTotalManuallyAdjusted,
+    'is_total_manually_adjusted': isTotalManuallyAdjusted,
+    'quotationDocuments': [for (final q in quotationDocuments) q.toApiJson()],
+    'quotation_documents': [for (final q in quotationDocuments) q.toApiJson()],
     'paymentStatus': paymentStatus,
     'status': status.apiValue,
     'orderDate': orderDate.toIso8601String(),
@@ -359,6 +480,10 @@ class Customer {
           'finish': f.finish,
           'orientation': f.orientation,
           'qty': f.qty,
+          'unitPrice': f.unitPrice,
+          'unit_price': f.unitPrice,
+          'price': f.unitPrice,
+          'subtotal': f.subtotal,
           'notes': f.notes,
           'customerNote': f.customerNote,
           'customer_note': f.customerNote,
@@ -515,6 +640,37 @@ class Customer {
       } catch (_) {}
     }
 
+    final quotationDocsList = <QuotationDocument>[];
+    final dynamic rawQuotationData =
+        j['quotationDocuments'] ?? j['quotation_documents'];
+    if (rawQuotationData is List) {
+      for (final q in rawQuotationData) {
+        if (q is Map) {
+          quotationDocsList.add(
+            QuotationDocument.fromJson(Map<String, dynamic>.from(q)),
+          );
+        }
+      }
+    } else if (rawQuotationData is String &&
+        rawQuotationData.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawQuotationData);
+        if (decoded is List) {
+          for (final q in decoded) {
+            if (q is Map) {
+              quotationDocsList.add(
+                QuotationDocument.fromJson(Map<String, dynamic>.from(q)),
+              );
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    final isTotalManuallyAdjusted =
+        j['isTotalManuallyAdjusted'] == true ||
+        j['is_total_manually_adjusted'] == true;
+
     final rawOrderDate = j['orderDate'] ?? j['order_date'];
     final rawExpectedDelivery = j['expectedDelivery'] ?? j['expected_delivery'];
     final rawCreatedAt = j['createdAt'] ?? j['created_at'];
@@ -564,6 +720,8 @@ class Customer {
       frames: resolvedFrames,
       statusHistory: historyList,
       voiceNotes: voiceNotesList,
+      isTotalManuallyAdjusted: isTotalManuallyAdjusted,
+      quotationDocuments: quotationDocsList,
       createdAt: rawCreatedAt != null
           ? DateTime.tryParse(rawCreatedAt.toString())
           : null,
@@ -579,6 +737,10 @@ class Customer {
     Status? status,
     String? region,
     String? paymentStatus,
+    int? total,
+    int? advance,
+    bool? isTotalManuallyAdjusted,
+    List<QuotationDocument>? quotationDocuments,
     DateTime? expectedDelivery,
     List<OrderStatusHistoryItem>? statusHistory,
     List<OrderVoiceNote>? voiceNotes,
@@ -597,8 +759,8 @@ class Customer {
     frameSize: frameSize,
     frameType: frameType,
     qty: qty,
-    total: total,
-    advance: advance,
+    total: total ?? this.total,
+    advance: advance ?? this.advance,
     status: status ?? this.status,
     orderDate: orderDate,
     photoUrls: photoUrls,
@@ -612,6 +774,9 @@ class Customer {
     photoSizeLabels: photoSizeLabels,
     statusHistory: statusHistory ?? this.statusHistory,
     voiceNotes: voiceNotes ?? this.voiceNotes,
+    isTotalManuallyAdjusted:
+        isTotalManuallyAdjusted ?? this.isTotalManuallyAdjusted,
+    quotationDocuments: quotationDocuments ?? this.quotationDocuments,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     isDeleted: isDeleted ?? this.isDeleted,
@@ -625,6 +790,10 @@ class Customer {
     List<String>? photoUrls,
     List<FrameSpec>? frames,
     List<OrderVoiceNote>? voiceNotes,
+    int? total,
+    int? advance,
+    bool? isTotalManuallyAdjusted,
+    List<QuotationDocument>? quotationDocuments,
     int? photoCount,
     DateTime? expectedDelivery,
     List<OrderStatusHistoryItem>? statusHistory,
@@ -645,8 +814,8 @@ class Customer {
     frameSize: frameSize,
     frameType: frameType,
     qty: qty,
-    total: total,
-    advance: advance,
+    total: total ?? this.total,
+    advance: advance ?? this.advance,
     status: status,
     orderDate: orderDate,
     altPhone: altPhone,
@@ -658,6 +827,9 @@ class Customer {
     photoSizeLabels: photoSizeLabels,
     statusHistory: statusHistory ?? this.statusHistory,
     voiceNotes: voiceNotes ?? this.voiceNotes,
+    isTotalManuallyAdjusted:
+        isTotalManuallyAdjusted ?? this.isTotalManuallyAdjusted,
+    quotationDocuments: quotationDocuments ?? this.quotationDocuments,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     isDeleted: isDeleted ?? this.isDeleted,

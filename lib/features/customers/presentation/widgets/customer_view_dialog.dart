@@ -1,6 +1,7 @@
 import 'dart:math' as math;
-
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:provider/provider.dart';
 import 'package:raigon_art/core/models/status.dart';
@@ -50,12 +51,14 @@ class _VaultPhoto {
     required this.sizeLabel,
     required this.image,
     this.url,
+    this.bytes,
   });
 
   final String name;
   final String sizeLabel;
   final ImageProvider image;
   final String? url;
+  final Uint8List? bytes;
 }
 
 void _showPhotoViewerDialog(
@@ -63,17 +66,30 @@ void _showPhotoViewerDialog(
   _VaultPhoto photo, {
   Customer? customer,
   int initialIndex = 0,
+  List<_VaultPhoto>? allPhotos,
 }) {
-  if (customer != null) {
-    final items = viewerItemsFromCustomer(customer);
-    if (items.isNotEmpty) {
-      int targetIndex = -1;
+  final photos = allPhotos ?? (customer != null ? _photosOf(customer) : null);
+  if (photos != null && photos.isNotEmpty) {
+    final items = photos
+        .map(
+          (p) => AppViewerItem(
+            url: p.url,
+            bytes: p.bytes,
+            title: p.name,
+            subtitle: customer != null
+                ? '${customer.id} · ${customer.name} · ${p.name}'
+                : p.name,
+          ),
+        )
+        .toList();
+
+    int targetIndex = initialIndex;
+    if (targetIndex < 0 || targetIndex >= items.length) {
       if (photo.url != null && photo.url!.isNotEmpty) {
         final cleanPhotoUrl = photo.url!.split('?').first.toLowerCase();
         targetIndex = items.indexWhere((it) {
           if (it.url == null) return false;
-          final cleanItemUrl = it.url!.split('?').first.toLowerCase();
-          return cleanItemUrl == cleanPhotoUrl;
+          return it.url!.split('?').first.toLowerCase() == cleanPhotoUrl;
         });
       }
       if (targetIndex == -1 && photo.name.isNotEmpty) {
@@ -83,21 +99,22 @@ void _showPhotoViewerDialog(
             (it.title?.toLowerCase() == lowerName));
       }
       if (targetIndex == -1) {
-        targetIndex = initialIndex;
+        targetIndex = 0;
       }
-
-      showAppImageViewer(
-        context: context,
-        items: items,
-        initialIndex: targetIndex.clamp(0, items.length - 1),
-      );
-      return;
     }
+
+    showAppImageViewer(
+      context: context,
+      items: items,
+      initialIndex: targetIndex.clamp(0, items.length - 1),
+    );
+    return;
   }
 
   showSingleImageViewer(
     context: context,
     url: photo.url,
+    bytes: photo.bytes,
     title: photo.name,
     subtitle: photo.sizeLabel,
   );
@@ -157,6 +174,7 @@ List<_VaultPhoto> _photosOf(Customer c) {
             sizeLabel: size,
             image: MemoryImage(bytes),
             url: url,
+            bytes: bytes,
           ),
           key,
         );
@@ -208,6 +226,7 @@ List<_VaultPhoto> _photosOf(Customer c) {
           sizeLabel: size,
           image: MemoryImage(bytes),
           url: url,
+          bytes: bytes,
         ),
         key,
       );
@@ -583,6 +602,10 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                     onChanged: _updateVoiceNotes,
                     isEditable: true,
                   ),
+                  if (_c.quotationDocuments.isNotEmpty) ...[
+                    SizedBox(height: isNarrow ? 16 : 21),
+                    _quotationsSection(c),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
@@ -1146,7 +1169,9 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
             children: [
               Expanded(
                 child: tile(
-                  label: 'TOTAL AMOUNT',
+                  label: _c.isTotalManuallyAdjusted
+                      ? 'TOTAL AMOUNT (ADJUSTED)'
+                      : 'TOTAL AMOUNT',
                   value: _inr(_c.total),
                   bg: neutral,
                   border: neutralBorder,
@@ -1245,22 +1270,47 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 value: '$qty Frame${qty == 1 ? '' : 's'}',
                 p: p,
               ),
-              if (f.notes.isNotEmpty) ...[
+              if (f.unitPrice > 0) ...[
                 _dashedDivider(p),
                 _specRow(
-                  icon: RemixIcons.file_text_line,
-                  label: 'Special Instructions / Notes:',
-                  value: f.notes,
+                  icon: RemixIcons.money_rupee_circle_line,
+                  label: 'Unit Price:',
+                  value:
+                      '₹${f.unitPrice.truncateToDouble() == f.unitPrice ? f.unitPrice.toInt().toString() : f.unitPrice.toStringAsFixed(2)}',
+                  p: p,
+                ),
+                _dashedDivider(p),
+                _specRow(
+                  icon: RemixIcons.calculator_line,
+                  label: 'Frame Subtotal:',
+                  value:
+                      '₹${(f.unitPrice * qty).truncateToDouble() == (f.unitPrice * qty) ? (f.unitPrice * qty).toInt().toString() : (f.unitPrice * qty).toStringAsFixed(2)}',
                   p: p,
                 ),
               ],
-              if (f.customerNote.isNotEmpty) ...[
-                _dashedDivider(p),
-                _specRow(
-                  icon: RemixIcons.message_3_line,
-                  label: 'Customer Note:',
-                  value: f.customerNote,
+              if (f.notes.trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _noteBox(
+                  icon: RemixIcons.file_text_line,
+                  title: 'SPECIAL INSTRUCTIONS / MOUNTING',
+                  content: f.notes,
                   p: p,
+                ),
+              ],
+              if (f.customerNote.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _noteBox(
+                  icon: RemixIcons.message_3_line,
+                  title: 'CUSTOMER NOTE',
+                  content: f.customerNote,
+                  p: p,
+                  borderColor: p.isDark
+                      ? const Color(0xFF6B46C1).withValues(alpha: 0.3)
+                      : const Color(0xFFD8B4FE),
+                  bgColor: p.isDark
+                      ? const Color(0xFF2B1F4A)
+                      : const Color(0xFFFBF7FF),
+                  iconColor: const Color(0xFF9333EA),
                 ),
               ],
               if (photos.isNotEmpty) ...[
@@ -1298,6 +1348,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                           photos[i],
                           customer: _c,
                           initialIndex: i,
+                          allPhotos: photos,
                         ),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
@@ -1644,6 +1695,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                         photo!,
                         customer: _c,
                         initialIndex: photoIndex,
+                        allPhotos: photos,
                       ),
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
@@ -1777,6 +1829,7 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                         photo!,
                         customer: _c,
                         initialIndex: photoIndex,
+                        allPhotos: photos,
                       ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -1889,82 +1942,105 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 "$qty Frame(s)",
             p: p,
           ),
+          if (f.unitPrice > 0) ...[
+            _dashedDivider(p),
+            _specRow(
+              icon: RemixIcons.money_rupee_circle_line,
+              label: 'Unit Price:',
+              value:
+                  '₹${f.unitPrice.truncateToDouble() == f.unitPrice ? f.unitPrice.toInt().toString() : f.unitPrice.toStringAsFixed(2)}',
+              p: p,
+            ),
+            _dashedDivider(p),
+            _specRow(
+              icon: RemixIcons.calculator_line,
+              label: 'Frame Subtotal:',
+              value:
+                  '₹${f.subtotal.truncateToDouble() == f.subtotal ? f.subtotal.toInt().toString() : f.subtotal.toStringAsFixed(2)}',
+              p: p,
+            ),
+          ],
           if (f.notes.trim().isNotEmpty) ...[
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: p.isDark
-                    ? const Color(0xFF383A66)
-                    : const Color(0xFFFCF6ED),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: p.isDark
-                      ? Colors.transparent
-                      : const Color(0xFFF2DFC6),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    RemixIcons.file_text_fill,
-                    size: 15,
-                    color: p.textPrimary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Special Instructions: ${f.notes.trim()}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            _noteBox(
+              icon: RemixIcons.file_text_line,
+              title: 'SPECIAL INSTRUCTIONS',
+              content: f.notes,
+              p: p,
             ),
           ],
           if (f.customerNote.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: p.isDark
-                    ? const Color(0xFF383A66)
-                    : const Color(0xFFF3E8FF),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: p.isDark
-                      ? Colors.transparent
-                      : const Color(0xFFD8B4FE),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    RemixIcons.message_3_fill,
-                    size: 15,
-                    color: p.textPrimary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Customer Note: ${f.customerNote.trim()}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            _noteBox(
+              icon: RemixIcons.message_3_line,
+              title: 'CUSTOMER NOTE',
+              content: f.customerNote,
+              p: p,
+              borderColor: p.isDark
+                  ? const Color(0xFF6B46C1).withValues(alpha: 0.3)
+                  : const Color(0xFFD8B4FE),
+              bgColor: p.isDark
+                  ? const Color(0xFF2B1F4A)
+                  : const Color(0xFFFBF7FF),
+              iconColor: const Color(0xFF9333EA),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _noteBox({
+    required IconData icon,
+    required String title,
+    required String content,
+    required AppPalette p,
+    Color? borderColor,
+    Color? bgColor,
+    Color? iconColor,
+  }) {
+    final accent = iconColor ?? AppColors.gold;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bgColor ??
+            (p.isDark ? const Color(0xFF383A66) : const Color(0xFFFCF8F2)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: borderColor ??
+              (p.isDark ? const Color(0xFF4A4E7A) : const Color(0xFFEEDDC8)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: accent),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            content.trim(),
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: p.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -2019,6 +2095,148 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _quotationsSection(FormColors c) {
+    final p = c.p;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF2E3050) : const Color(0xFFFCFAF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: p.isDark ? 0.35 : 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: p.isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _cardTitle(
+            p,
+            RemixIcons.file_text_line,
+            'COMMON QUOTATION & ORDER DOCUMENTS (${_c.quotationDocuments.length})',
+          ),
+          const SizedBox(height: 14),
+          for (var i = 0; i < _c.quotationDocuments.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _quotationDocItem(p, _c.quotationDocuments[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _quotationDocItem(AppPalette p, QuotationDocument doc) {
+    final isPdf = doc.isPdf;
+    final isWord = doc.name.toLowerCase().endsWith('.doc') ||
+        doc.name.toLowerCase().endsWith('.docx');
+    final iconColor = isPdf
+        ? const Color(0xFFE5484D)
+        : (isWord ? const Color(0xFF3E63DD) : AppColors.gold);
+    final iconBg = isPdf
+        ? const Color(0xFFE5484D).withValues(alpha: 0.12)
+        : (isWord
+            ? const Color(0xFF3E63DD).withValues(alpha: 0.12)
+            : AppColors.gold.withValues(alpha: 0.12));
+    final iconData = isPdf
+        ? RemixIcons.file_pdf_2_line
+        : (isWord ? RemixIcons.file_word_2_line : RemixIcons.file_text_line);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(iconData, size: 20, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  doc.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: p.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  doc.sizeLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: p.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: () async {
+              if (doc.url.isNotEmpty) {
+                final uri = Uri.parse(ImageUrlHelper.resolve(doc.url));
+                try {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } catch (e) {
+                  debugPrint('Could not launch doc: $e');
+                }
+              } else if (doc.bytes != null) {
+                final ext = doc.name.contains('.')
+                    ? doc.name.split('.').last.toLowerCase()
+                    : '';
+                if (['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
+                  showSingleImageViewer(
+                    context: context,
+                    bytes: doc.bytes,
+                    title: doc.name,
+                    subtitle: doc.sizeLabel,
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: p.chipFill,
+              foregroundColor: p.textPrimary,
+              elevation: 0,
+              side: BorderSide(color: p.border),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: const Icon(RemixIcons.external_link_line, size: 15),
+            label: const Text(
+              'Open / Download',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

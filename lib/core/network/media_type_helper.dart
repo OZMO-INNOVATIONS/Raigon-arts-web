@@ -15,6 +15,10 @@ MediaType detectMediaType(String filename) {
       return MediaType('image', 'heic');
     case 'pdf':
       return MediaType('application', 'pdf');
+    case 'doc':
+      return MediaType('application', 'msword');
+    case 'docx':
+      return MediaType('application', 'vnd.openxmlformats-officedocument.wordprocessingml.document');
     case 'm4a':
       return MediaType('audio', 'm4a');
     case 'mp3':
@@ -49,6 +53,8 @@ String ensureImageFilename(String filename, [String defaultExt = 'jpg']) {
     'webp',
     'heic',
     'pdf',
+    'doc',
+    'docx',
     'm4a',
     'mp3',
     'wav',

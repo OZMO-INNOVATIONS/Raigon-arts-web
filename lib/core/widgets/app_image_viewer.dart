@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:raigon_art/core/theme/app_colors.dart';
 import 'package:raigon_art/core/utils/image_url_helper.dart';
+import 'package:raigon_art/core/widgets/app_image_cropper.dart';
 import 'package:raigon_art/features/customers/models/customer_model.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -44,9 +45,11 @@ List<AppViewerItem> viewerItemsFromCustomer(Customer customer) {
   void addItem(AppViewerItem item, [String? dedupeKey]) {
     final key = (dedupeKey != null && dedupeKey.isNotEmpty)
         ? dedupeKey.toLowerCase()
-        : (item.title ?? '').toLowerCase();
-    if (seenKeys.contains(key)) return;
-    seenKeys.add(key);
+        : (item.url != null && item.url!.isNotEmpty
+            ? item.url!.split('?').first.toLowerCase()
+            : (item.subtitle ?? item.title ?? '').toLowerCase());
+    if (key.isNotEmpty && seenKeys.contains(key)) return;
+    if (key.isNotEmpty) seenKeys.add(key);
     items.add(item);
   }
 
@@ -518,6 +521,22 @@ class _AppImageViewerDialogState extends State<_AppImageViewerDialog> {
             icon: RemixIcons.clockwise_line,
             tooltip: 'Rotate 90°',
             onPressed: _rotateClockwise,
+          ),
+          const SizedBox(width: 6),
+          _IconButtonBadge(
+            icon: RemixIcons.crop_line,
+            tooltip: 'Crop Artwork',
+            onPressed: () async {
+              final cropped = await showAppImageCropper(
+                context: context,
+                bytes: item.bytes,
+                url: item.resolvedUrl,
+                title: 'Crop ${item.title ?? "Artwork"}',
+              );
+              if (cropped != null && mounted) {
+                Navigator.of(context).pop(cropped);
+              }
+            },
           ),
 
           if (item.resolvedUrl != null && item.resolvedUrl!.isNotEmpty) ...[

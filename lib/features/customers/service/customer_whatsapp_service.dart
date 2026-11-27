@@ -155,45 +155,95 @@ class CustomerWhatsAppService {
   //         .trim();
   //   }
 
-  static String buildMessage(Customer customer) {
-    final balance = customer.total - customer.advance;
+  static String _moneyNum(num amount) {
+    if (amount.truncateToDouble() == amount) {
+      return _money(amount.toInt());
+    }
+    return '₹${amount.toStringAsFixed(2)}';
+  }
+
+  static String _formatItemsOrdered(Customer customer) {
     final frames = customer.effectiveFrames;
+    if (frames.isEmpty) {
+      return 'Not specified';
+    }
 
-    // Collect customer notes from individual frames.
-    final customerNotes = frames
-        .map((frame) => frame.customerNote.trim())
-        .where((note) => note.isNotEmpty)
-        .toSet()
-        .join(', ');
+    final buffer = StringBuffer();
+    for (var i = 0; i < frames.length; i++) {
+      final f = frames[i];
+      final size = f.sizeLabel.isNotEmpty ? f.sizeLabel : 'Size not specified';
+      final itemQty = f.qty > 0
+          ? f.qty
+          : (frames.length == 1 && customer.qty > 0 ? customer.qty : 1);
 
-    // Collect special instructions from individual frames.
-    final specialRequests = frames
-        .map((frame) => frame.notes.trim())
-        .where((note) => note.isNotEmpty)
-        .toSet()
-        .join(', ');
+      if (i > 0) buffer.writeln();
 
-    // Build numbered frame sizes.
-    final frameDetails = frames.isEmpty
-        ? 'Not specified'
-        : frames
-              .asMap()
-              .entries
-              .map((entry) {
-                final frame = entry.value;
-                final size = frame.sizeLabel.isNotEmpty
-                    ? frame.sizeLabel
-                    : 'Size not specified';
+      // Numbered header format matching both single and multi-frame tests
+      buffer.writeln('${i + 1}. $size${itemQty > 1 || frames.length > 1 ? ' (Qty: $itemQty)' : ''}');
 
-                return '${entry.key + 1}. $size';
-              })
-              .join('\n');
+      // Individual frame pricing if available (> 0)
+      if (f.unitPrice > 0) {
+        if (itemQty > 1) {
+          buffer.writeln('   • Rate: ${_moneyNum(f.unitPrice)} each (Subtotal: ${_moneyNum(f.subtotal)})');
+        } else {
+          buffer.writeln('   • Price: ${_moneyNum(f.unitPrice)}');
+        }
+      }
+
+      // Frame Style & Material if set
+      final styleParts = <String>[];
+      if (f.frameType.trim().isNotEmpty &&
+          f.frameType.trim().toLowerCase() != 'default' &&
+          f.frameType.trim().toLowerCase() != 'custom') {
+        styleParts.add(f.frameType.trim());
+      }
+      if (f.material.trim().isNotEmpty &&
+          f.material.trim().toLowerCase() != 'standard') {
+        styleParts.add(f.material.trim());
+      }
+      if (styleParts.isNotEmpty) {
+        buffer.writeln('   • Style: ${styleParts.join(' • ')}');
+      }
+
+      // Customer Note for this specific frame, with clean multi-line alignment
+      if (f.customerNote.trim().isNotEmpty) {
+        final cleanNote = f.customerNote.trim().replaceAll('\r\n', '\n');
+        final lines = cleanNote.split('\n');
+        buffer.writeln('   • Note: ${lines[0].trim()}');
+        for (var j = 1; j < lines.length; j++) {
+          if (lines[j].trim().isNotEmpty) {
+            buffer.writeln('     ${lines[j].trim()}');
+          }
+        }
+      }
+
+      // Special Instructions for this specific frame
+      if (f.notes.trim().isNotEmpty) {
+        final cleanInst = f.notes.trim().replaceAll('\r\n', '\n');
+        final lines = cleanInst.split('\n');
+        buffer.writeln('   • Special Request: ${lines[0].trim()}');
+        for (var j = 1; j < lines.length; j++) {
+          if (lines[j].trim().isNotEmpty) {
+            buffer.writeln('     ${lines[j].trim()}');
+          }
+        }
+      }
+    }
+
+    return buffer.toString().trimRight();
+  }
+
+  static String buildMessage(Customer customer) {
+    final isPaid = customer.paymentStatus.trim().toLowerCase() == 'paid' ||
+        customer.status == Status.completed;
+    final advance = isPaid ? customer.total : customer.advance;
+    final balance = isPaid ? 0 : (customer.total - customer.advance);
+    final frameDetails = _formatItemsOrdered(customer);
 
     // Dynamic payment and order status.
     final paymentStatus = _paymentStatus(customer);
     final orderStatus = _orderStatus(customer.status);
 
-    // Google Maps location.
     const workshopMapUrl = 'https://maps.app.goo.gl/Dr5ySuwTxbSHc4FH6';
 
     return '''
@@ -216,14 +266,14 @@ Thank you for choosing *RAIGON ART GALLERY*! We're pleased to confirm your order
 *Items Ordered:*
 $frameDetails
 
-${customerNotes.isNotEmpty ? '📝 *Customer Note:* $customerNotes\n' : ''}${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
+*Total Quantity:* ${customer.qty} Pieces
 
 ━━━━━━━━━━━━━━━━━━━━
 
 *PAYMENT SUMMARY*
 
 *Total Amount:* ${_money(customer.total)}
-*Advance Paid:* ${_money(customer.advance)}
+*Advance Paid:* ${_money(advance)}
 *Balance Due:* ${_money(balance)}
 
 *Note:* Shipping charges are extra and will be calculated separately.
@@ -359,35 +409,12 @@ Thank you for trusting *RAIGON ART GALLERY* with your order. We appreciate your 
   //   }
 
   static String buildPaymentReminderMessage(Customer customer) {
-    final balance = customer.total - customer.advance;
-    final frames = customer.effectiveFrames;
+    final isPaid = customer.paymentStatus.trim().toLowerCase() == 'paid' ||
+        customer.status == Status.completed;
+    final advance = isPaid ? customer.total : customer.advance;
+    final balance = isPaid ? 0 : (customer.total - customer.advance);
 
-    final customerNotes = frames
-        .map((frame) => frame.customerNote.trim())
-        .where((note) => note.isNotEmpty)
-        .toSet()
-        .join(', ');
-
-    final specialRequests = frames
-        .map((frame) => frame.notes.trim())
-        .where((note) => note.isNotEmpty)
-        .toSet()
-        .join(', ');
-
-    final frameDetails = frames.isEmpty
-        ? 'Not specified'
-        : frames
-              .asMap()
-              .entries
-              .map((entry) {
-                final frame = entry.value;
-                final size = frame.sizeLabel.isNotEmpty
-                    ? frame.sizeLabel
-                    : 'Size not specified';
-
-                return '${entry.key + 1}. $size';
-              })
-              .join('\n');
+    final frameDetails = _formatItemsOrdered(customer);
 
     final paymentStatus = _paymentStatus(customer);
     final orderStatus = _orderStatus(customer.status);
@@ -417,14 +444,14 @@ Please find your order and payment details below.
 *Items Ordered:*
 $frameDetails
 
-${customerNotes.isNotEmpty ? '📝 *Customer Note:* $customerNotes\n' : ''}${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
+*Total Quantity:* ${customer.qty} Pieces
 
 ━━━━━━━━━━━━━━━━━━━━
 
 *PAYMENT SUMMARY*
 
 *Total Amount:* ${_money(customer.total)}
-*Advance Paid:* ${_money(customer.advance)}
+*Advance Paid:* ${_money(advance)}
 *Balance Due:* ${_money(balance)}
 
 *Payment Status:* $paymentStatus

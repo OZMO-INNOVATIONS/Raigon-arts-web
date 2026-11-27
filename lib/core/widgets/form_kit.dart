@@ -113,11 +113,13 @@ class LabeledField extends StatelessWidget {
     required this.label,
     required this.child,
     this.required = false,
+    this.trailing,
   });
 
   final String label;
   final Widget child;
   final bool required;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -125,22 +127,43 @@ class LabeledField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text.rich(
-          TextSpan(
-            text: label,
-            children: [
-              if (required)
-                const TextSpan(
-                  text: '  *',
-                  style: TextStyle(color: Color(0xFFE5484D)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  text: label,
+                  children: [
+                    if (required)
+                      const TextSpan(
+                        text: '  *',
+                        style: TextStyle(color: Color(0xFFE5484D)),
+                      ),
+                  ],
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: p.textPrimary,
+                ),
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              Flexible(
+                fit: FlexFit.loose,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: trailing!,
+                ),
+              ),
             ],
-          ),
-          style: TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-            color: p.textPrimary,
-          ),
+          ],
         ),
         const SizedBox(height: 8),
         child,
@@ -188,6 +211,9 @@ class AppTextBox extends StatefulWidget {
   const AppTextBox({
     super.key,
     required this.controller,
+    this.focusNode,
+    this.textInputAction,
+    this.onSubmitted,
     this.hint,
     this.keyboardType,
     this.inputFormatters,
@@ -199,6 +225,9 @@ class AppTextBox extends StatefulWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
   final String? hint;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
@@ -213,17 +242,33 @@ class AppTextBox extends StatefulWidget {
 }
 
 class _AppTextBoxState extends State<AppTextBox> {
-  final FocusNode _focus = FocusNode();
+  FocusNode? _internalFocus;
+  FocusNode get _effectiveFocus =>
+      widget.focusNode ?? (_internalFocus ??= FocusNode());
 
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    _effectiveFocus.addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(AppTextBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      (oldWidget.focusNode ?? _internalFocus)?.removeListener(_handleFocusChange);
+      _effectiveFocus.addListener(_handleFocusChange);
+    }
   }
 
   @override
   void dispose() {
-    _focus.dispose();
+    (widget.focusNode ?? _internalFocus)?.removeListener(_handleFocusChange);
+    _internalFocus?.dispose();
     super.dispose();
   }
 
@@ -231,7 +276,7 @@ class _AppTextBoxState extends State<AppTextBox> {
   Widget build(BuildContext context) {
     final c = FormColors.of(context);
     final p = c.p;
-    final focused = _focus.hasFocus && !widget.readOnly;
+    final focused = _effectiveFocus.hasFocus && !widget.readOnly;
     final multiline = widget.maxLines != 1;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
@@ -264,9 +309,11 @@ class _AppTextBoxState extends State<AppTextBox> {
           Expanded(
             child: TextField(
               controller: widget.controller,
-              focusNode: _focus,
+              focusNode: _effectiveFocus,
               readOnly: widget.readOnly,
               maxLines: widget.maxLines,
+              textInputAction: widget.textInputAction,
+              onSubmitted: widget.onSubmitted,
               keyboardType: widget.keyboardType,
               inputFormatters: widget.inputFormatters,
               onChanged: widget.onChanged,
@@ -335,6 +382,9 @@ class NumberBox extends StatelessWidget {
   const NumberBox({
     super.key,
     required this.controller,
+    this.focusNode,
+    this.textInputAction,
+    this.onSubmitted,
     this.hint,
     this.onChanged,
     this.min = 0,
@@ -344,6 +394,9 @@ class NumberBox extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
   final String? hint;
   final ValueChanged<String>? onChanged;
   final double min;
@@ -363,6 +416,9 @@ class NumberBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppTextBox(
       controller: controller,
+      focusNode: focusNode,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
       hint: hint,
       readOnly: readOnly,
       dim: dim,

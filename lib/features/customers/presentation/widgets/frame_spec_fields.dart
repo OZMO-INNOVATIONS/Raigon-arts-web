@@ -1,11 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:raigon_art/features/customers/models/frame_spec.dart';
 import 'package:raigon_art/core/widgets/form_kit.dart';
-import 'package:raigon_art/features/frame_sizes/models/frame_size_model.dart';
-import 'package:raigon_art/features/frame_sizes/providers/frame_size_provider.dart';
+import 'package:raigon_art/features/customers/models/frame_spec.dart';
 
 const kUnits = ['Inches', 'Centimetres', 'Feet'];
 
@@ -17,11 +14,18 @@ const kOrientations = [
 
 class FrameSpecData {
   FrameSpecData()
-    : width = TextEditingController(),
+    : price = TextEditingController(),
+      width = TextEditingController(),
       height = TextEditingController(),
       qty = TextEditingController(text: '1'),
       notes = TextEditingController(),
-      customerNote = TextEditingController();
+      customerNote = TextEditingController(),
+      priceFocus = FocusNode(debugLabel: 'frame_price'),
+      qtyFocus = FocusNode(debugLabel: 'frame_qty'),
+      widthFocus = FocusNode(debugLabel: 'frame_width'),
+      heightFocus = FocusNode(debugLabel: 'frame_height'),
+      notesFocus = FocusNode(debugLabel: 'frame_notes'),
+      customerNoteFocus = FocusNode(debugLabel: 'frame_customerNote');
 
   String size = '';
   String unit = 'Inches';
@@ -36,11 +40,30 @@ class FrameSpecData {
   String? existingPhotoUrl;
   String? existingPhotoName;
 
+  final TextEditingController price;
   final TextEditingController width;
   final TextEditingController height;
   final TextEditingController qty;
   final TextEditingController notes;
   final TextEditingController customerNote;
+
+  final FocusNode priceFocus;
+  final FocusNode qtyFocus;
+  final FocusNode widthFocus;
+  final FocusNode heightFocus;
+  final FocusNode notesFocus;
+  final FocusNode customerNoteFocus;
+
+  double get unitPriceValue {
+    final t = price.text.replaceAll(',', '').trim();
+    return double.tryParse(t) ?? 0.0;
+  }
+
+  int get qtyValue {
+    return math.max(1, int.tryParse(qty.text.trim()) ?? 1);
+  }
+
+  double get subtotalValue => (unitPriceValue > 0 ? unitPriceValue : 0.0) * qtyValue;
 
   FrameSpec toSpec([PickedPhoto? photo]) => FrameSpec(
     size: size,
@@ -53,7 +76,8 @@ class FrameSpecData {
     material: material,
     finish: finish,
     orientation: orientation,
-    qty: math.max(1, int.tryParse(qty.text) ?? 1),
+    qty: qtyValue,
+    unitPrice: unitPriceValue,
     notes: notes.text.trim(),
     customerNote: customerNote.text.trim(),
     photoName: photo?.name ?? existingPhotoName,
@@ -62,11 +86,19 @@ class FrameSpecData {
   );
 
   void dispose() {
+    price.dispose();
     width.dispose();
     height.dispose();
     qty.dispose();
     notes.dispose();
     customerNote.dispose();
+
+    priceFocus.dispose();
+    qtyFocus.dispose();
+    widthFocus.dispose();
+    heightFocus.dispose();
+    notesFocus.dispose();
+    customerNoteFocus.dispose();
   }
 
   void loadSpec(FrameSpec s) {
@@ -81,6 +113,11 @@ class FrameSpecData {
 
     orientation = s.orientation;
 
+    price.text = s.unitPrice > 0
+        ? (s.unitPrice == s.unitPrice.roundToDouble()
+            ? '${s.unitPrice.toInt()}'
+            : '${s.unitPrice}')
+        : '';
     width.text = s.customWidth;
     height.text = s.customHeight;
     qty.text = '${s.qty}';
@@ -98,10 +135,12 @@ class FrameSpecFields extends StatelessWidget {
     super.key,
     required this.data,
     required this.onChanged,
+    this.onNextFromCustomerNote,
   });
 
   final FrameSpecData data;
   final VoidCallback onChanged;
+  final VoidCallback? onNextFromCustomerNote;
 
   void _onUnitChanged(String newUnit) {
     final from = FrameUnit.fromString(data.unit);
@@ -132,35 +171,79 @@ class FrameSpecFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const gap = SizedBox(height: 18);
-
-    final provider = context.watch<FrameSizeProvider>();
-    final savedSizes = provider.sizes;
-
-    final activeSizes = savedSizes.where((size) => size.active).toList();
-    final availableSizes = List<FrameSize>.of(activeSizes);
-
-    final selectedExists = availableSizes.any((size) => size.name == data.size);
-
-    if (!selectedExists && data.size.trim().isNotEmpty) {
-      final oldSize = savedSizes.where((size) => size.name == data.size);
-
-      if (oldSize.isNotEmpty) {
-        availableSizes.add(oldSize.first);
-      }
-    }
-
-    // final sizeNames = availableSizes.map((frame) => frame.name).toList();
-
-    // final selectedSize = sizeNames.contains(data.size) ? data.size : null;
-
+    final p = FormColors.of(context).p;
     final currentUnitObj = FrameUnit.fromString(data.unit);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Frame Size and Measurement Unit
+        // 1. Price FIRST, followed by Quantity, Subtotal, and Measurement Unit
         FormRow(
           children: [
+            LabeledField(
+              label: 'Price per Frame (₹)',
+              child: NumberBox(
+                controller: data.price,
+                focusNode: data.priceFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => data.qtyFocus.requestFocus(),
+                hint: 'e.g. 150',
+                allowDecimal: true,
+                onChanged: (_) => onChanged(),
+              ),
+            ),
+            LabeledField(
+              label: 'Quantity',
+              child: NumberBox(
+                controller: data.qty,
+                focusNode: data.qtyFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => data.widthFocus.requestFocus(),
+                min: 1,
+                onChanged: (_) => onChanged(),
+              ),
+            ),
+            LabeledField(
+              label: 'Item Subtotal',
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: p.isDark
+                      ? const Color(0xFF232538)
+                      : const Color(0xFFF6F3EC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                    width: 1.2,
+                  ),
+                ),
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '₹${data.subtotalValue.toStringAsFixed(data.subtotalValue == data.subtotalValue.roundToDouble() ? 0 : 2)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFD4AF37),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    if (data.unitPriceValue > 0)
+                      Text(
+                        '₹${data.unitPriceValue.toStringAsFixed(0)} × ${data.qtyValue}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: p.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             LabeledField(
               label: 'Measurement Unit',
               child: FormDropdown<String>(
@@ -175,22 +258,21 @@ class FrameSpecFields extends StatelessWidget {
                 onChanged: _onUnitChanged,
               ),
             ),
-            LabeledField(
-              label: 'Quantity',
-              child: NumberBox(controller: data.qty, min: 1),
-            ),
           ],
         ),
 
         gap,
 
-        // Width and Height
+        // 2. Measurements (Width & Height) below Quantity
         FormRow(
           children: [
             LabeledField(
               label: 'Width (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.width,
+                focusNode: data.widthFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => data.heightFocus.requestFocus(),
                 hint:
                     'Width in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '2' : (currentUnitObj == FrameUnit.centimetres ? '60' : '24')})',
                 allowDecimal: true,
@@ -202,6 +284,9 @@ class FrameSpecFields extends StatelessWidget {
               label: 'Height (${currentUnitObj.symbol})',
               child: NumberBox(
                 controller: data.height,
+                focusNode: data.heightFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => data.notesFocus.requestFocus(),
                 hint:
                     'Height in ${currentUnitObj.symbol} (e.g. ${currentUnitObj == FrameUnit.feet ? '3' : (currentUnitObj == FrameUnit.centimetres ? '90' : '36')})',
                 allowDecimal: true,
@@ -214,23 +299,32 @@ class FrameSpecFields extends StatelessWidget {
 
         gap,
 
-        // Width and Height
+        // 3. Special Instructions & Customer Note
         FormRow(
           children: [
-            // Special Instructions
             LabeledField(
               label: 'Special Instructions / Mounting Notes',
               child: AppTextBox(
                 controller: data.notes,
+                focusNode: data.notesFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => data.customerNoteFocus.requestFocus(),
                 maxLines: 3,
-                hint: 'Glass type (Anti-glare, Clear), Matting board margin, mounting hooks...',
+                hint:
+                    'Glass type (Anti-glare, Clear), Matting board margin, mounting hooks...',
               ),
             ),
-            // Customer Note
             LabeledField(
               label: 'Customer Note',
               child: AppTextBox(
                 controller: data.customerNote,
+                focusNode: data.customerNoteFocus,
+                textInputAction: onNextFromCustomerNote != null
+                    ? TextInputAction.next
+                    : TextInputAction.done,
+                onSubmitted: (_) {
+                  onNextFromCustomerNote?.call();
+                },
                 maxLines: 3,
                 hint: 'Enter additional notes from the customer...',
               ),

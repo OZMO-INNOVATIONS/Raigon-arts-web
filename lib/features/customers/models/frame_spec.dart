@@ -110,6 +110,7 @@ class FrameSpec {
     required this.finish,
     required this.orientation,
     required this.qty,
+    this.unitPrice = 0.0,
     this.notes = '',
     this.customerNote = '',
     this.photoName,
@@ -129,6 +130,9 @@ class FrameSpec {
 
   final String orientation;
   final int qty;
+  final double unitPrice;
+
+  double get subtotal => (unitPrice > 0 ? unitPrice : 0.0) * qty;
 
   // Independent note fields.
   final String notes;
@@ -161,6 +165,7 @@ class FrameSpec {
     String? finish,
     String? orientation,
     int? qty,
+    double? unitPrice,
     String? notes,
     String? customerNote,
     String? photoName,
@@ -176,6 +181,7 @@ class FrameSpec {
     finish: finish ?? this.finish,
     orientation: orientation ?? this.orientation,
     qty: qty ?? this.qty,
+    unitPrice: unitPrice ?? this.unitPrice,
     notes: notes ?? this.notes,
     customerNote: customerNote ?? this.customerNote,
     photoName: photoName ?? this.photoName,
@@ -193,6 +199,10 @@ class FrameSpec {
     'finish': finish,
     'orientation': orientation,
     'qty': qty,
+    'unitPrice': unitPrice,
+    'unit_price': unitPrice,
+    'price': unitPrice,
+    'subtotal': subtotal,
     'notes': notes,
     'customerNote': customerNote,
     'customer_note': customerNote,
@@ -206,6 +216,13 @@ class FrameSpec {
       if (v is num) return v.toInt();
       if (v is String) return num.tryParse(v)?.toInt() ?? 1;
       return 1;
+    }
+
+    double parseDouble(dynamic v) {
+      if (v == null) return 0.0;
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? 0.0;
+      return 0.0;
     }
 
     final pUrl = j['photoUrl'] ?? j['photo_url'];
@@ -234,6 +251,7 @@ class FrameSpec {
       finish: (j['finish'] ?? '').toString(),
       orientation: (j['orientation'] ?? '').toString(),
       qty: parseQty(j['qty']),
+      unitPrice: parseDouble(j['unitPrice'] ?? j['unit_price'] ?? j['price']),
       notes: (j['notes'] ?? '').toString(),
       customerNote: (j['customerNote'] ?? j['customer_note'] ?? '').toString(),
       photoName: pName?.toString(),

@@ -195,6 +195,7 @@ class FrameSpec {
     'qty': qty,
     'notes': notes,
     'customerNote': customerNote,
+    'customer_note': customerNote,
     'photoName': photoName,
     'photoUrl': photoUrl,
   };

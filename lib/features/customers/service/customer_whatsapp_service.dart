@@ -159,6 +159,13 @@ class CustomerWhatsAppService {
     final balance = customer.total - customer.advance;
     final frames = customer.effectiveFrames;
 
+    // Collect customer notes from individual frames.
+    final customerNotes = frames
+        .map((frame) => frame.customerNote.trim())
+        .where((note) => note.isNotEmpty)
+        .toSet()
+        .join(', ');
+
     // Collect special instructions from individual frames.
     final specialRequests = frames
         .map((frame) => frame.notes.trim())
@@ -209,7 +216,7 @@ Thank you for choosing *RAIGON ART GALLERY*! We're pleased to confirm your order
 *Items Ordered:*
 $frameDetails
 
-${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
+${customerNotes.isNotEmpty ? '📝 *Customer Note:* $customerNotes\n' : ''}${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
 
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -355,6 +362,12 @@ Thank you for trusting *RAIGON ART GALLERY* with your order. We appreciate your 
     final balance = customer.total - customer.advance;
     final frames = customer.effectiveFrames;
 
+    final customerNotes = frames
+        .map((frame) => frame.customerNote.trim())
+        .where((note) => note.isNotEmpty)
+        .toSet()
+        .join(', ');
+
     final specialRequests = frames
         .map((frame) => frame.notes.trim())
         .where((note) => note.isNotEmpty)
@@ -404,7 +417,7 @@ Please find your order and payment details below.
 *Items Ordered:*
 $frameDetails
 
-${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
+${customerNotes.isNotEmpty ? '📝 *Customer Note:* $customerNotes\n' : ''}${specialRequests.isNotEmpty ? '✨ *Special Request:* $specialRequests\n' : ''}*Total Quantity:* ${customer.qty} Pieces
 
 ━━━━━━━━━━━━━━━━━━━━
 

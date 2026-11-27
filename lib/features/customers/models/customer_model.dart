@@ -361,6 +361,7 @@ class Customer {
           'qty': f.qty,
           'notes': f.notes,
           'customerNote': f.customerNote,
+          'customer_note': f.customerNote,
           if (f.photoName != null && f.photoName!.isNotEmpty)
             'photoName': f.photoName,
           if (f.photoUrl != null && f.photoUrl!.isNotEmpty)

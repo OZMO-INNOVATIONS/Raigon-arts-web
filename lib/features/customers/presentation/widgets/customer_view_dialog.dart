@@ -1249,8 +1249,17 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                 _dashedDivider(p),
                 _specRow(
                   icon: RemixIcons.file_text_line,
-                  label: 'Frame Notes:',
+                  label: 'Special Instructions / Notes:',
                   value: f.notes,
+                  p: p,
+                ),
+              ],
+              if (f.customerNote.isNotEmpty) ...[
+                _dashedDivider(p),
+                _specRow(
+                  icon: RemixIcons.message_3_line,
+                  label: 'Customer Note:',
+                  value: f.customerNote,
                   p: p,
                 ),
               ],
@@ -1906,7 +1915,45 @@ class _ViewCustomerDialogState extends State<ViewCustomerDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Notes: ${f.notes.trim()}',
+                      'Special Instructions: ${f.notes.trim()}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (f.customerNote.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: p.isDark
+                    ? const Color(0xFF383A66)
+                    : const Color(0xFFF3E8FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: p.isDark
+                      ? Colors.transparent
+                      : const Color(0xFFD8B4FE),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    RemixIcons.message_3_fill,
+                    size: 15,
+                    color: p.textPrimary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Customer Note: ${f.customerNote.trim()}',
                       style: TextStyle(
                         fontSize: 13,
                         color: p.textPrimary,

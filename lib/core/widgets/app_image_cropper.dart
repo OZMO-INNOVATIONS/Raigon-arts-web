@@ -52,6 +52,23 @@ class AppImageCropperDialog extends StatefulWidget {
   final String? imageUrl;
   final String title;
 
+  static Rect calculateCropRect(Size viewportSize, double? aspectRatio) {
+    double frameW = viewportSize.width * 0.88;
+    double frameH = viewportSize.height * 0.82;
+
+    if (aspectRatio != null && aspectRatio > 0) {
+      if (frameW / frameH > aspectRatio) {
+        frameW = frameH * aspectRatio;
+      } else {
+        frameH = frameW / aspectRatio;
+      }
+    }
+
+    final double frameX = (viewportSize.width - frameW) / 2.0;
+    final double frameY = (viewportSize.height - frameH) / 2.0;
+    return Rect.fromLTWH(frameX, frameY, frameW, frameH);
+  }
+
   @override
   State<AppImageCropperDialog> createState() => _AppImageCropperDialogState();
 }
@@ -65,8 +82,11 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
   CropAspectRatio _selectedRatio = CropAspectRatio.free;
   int _rotationQuarterTurns = 0; // 0, 1, 2, 3
   final TransformationController _transformController = TransformationController();
-  double _currentScale = 1.0;
+  final ValueNotifier<double> _scaleNotifier = ValueNotifier<double>(1.0);
   bool _isProcessing = false;
+
+  Size? _viewportSize;
+  bool _hasInitializedTransform = false;
 
   @override
   void initState() {
@@ -77,6 +97,7 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
   @override
   void dispose() {
     _transformController.dispose();
+    _scaleNotifier.dispose();
     super.dispose();
   }
 
@@ -84,6 +105,7 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _hasInitializedTransform = false;
     });
 
     try {
@@ -102,8 +124,10 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
         throw Exception('No valid image data provided for cropping.');
       }
 
-      // Decode image in background compute
-      final decoded = await compute(_decodeImageIsolate, bytes);
+      final decoded = kIsWeb
+          ? img.decodeImage(bytes)
+          : await compute(_decodeImageIsolate, bytes);
+
       if (decoded == null) {
         throw Exception('Could not decode image format.');
       }
@@ -129,43 +153,100 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
     return img.decodeImage(bytes);
   }
 
+  void _centerImage({Size? viewportSize}) {
+    final vp = viewportSize ?? _viewportSize;
+    if (_decodedImage == null || vp == null || vp.width <= 0 || vp.height <= 0) return;
+
+    final rotTurns = _rotationQuarterTurns;
+    final rawW = _decodedImage!.width.toDouble();
+    final rawH = _decodedImage!.height.toDouble();
+    final rotPixelW = (rotTurns % 2 == 1) ? rawH : rawW;
+    final rotPixelH = (rotTurns % 2 == 1) ? rawW : rawH;
+
+    final scaleFactor = math.min(
+      vp.width / rotPixelW,
+      vp.height / rotPixelH,
+    );
+    final displayW = rotPixelW * scaleFactor;
+    final displayH = rotPixelH * scaleFactor;
+
+    final tx = (vp.width - displayW) / 2.0;
+    final ty = (vp.height - displayH) / 2.0;
+
+    _transformController.value = Matrix4.translationValues(tx, ty, 0.0);
+    _scaleNotifier.value = 1.0;
+  }
+
   void _rotateClockwise() {
     setState(() {
       _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
-      _transformController.value = Matrix4.identity();
-      _currentScale = 1.0;
+      _centerImage();
     });
   }
 
   void _resetTransform() {
     setState(() {
       _rotationQuarterTurns = 0;
-      _transformController.value = Matrix4.identity();
-      _currentScale = 1.0;
       _selectedRatio = CropAspectRatio.free;
+      _centerImage();
     });
   }
 
-  Future<void> _executeCrop(Size viewportSize) async {
-    if (_decodedImage == null || _rawBytes == null) return;
+  void _zoomBy(double factor) {
+    if (_viewportSize == null) return;
+    final center = Offset(_viewportSize!.width / 2.0, _viewportSize!.height / 2.0);
+    final zoomMatrix = Matrix4.translationValues(center.dx, center.dy, 0.0)
+      ..multiply(Matrix4.diagonal3Values(factor, factor, 1.0))
+      ..multiply(Matrix4.translationValues(-center.dx, -center.dy, 0.0));
+
+    _transformController.value = zoomMatrix * _transformController.value;
+    _scaleNotifier.value = _transformController.value.getMaxScaleOnAxis();
+  }
+
+  Future<void> _executeCrop() async {
+    if (_decodedImage == null || _rawBytes == null || _viewportSize == null) return;
     setState(() => _isProcessing = true);
 
     try {
-      final matrix = _transformController.value;
-      final scale = matrix.getMaxScaleOnAxis();
-      final translation = matrix.getTranslation();
+      final rotTurns = _rotationQuarterTurns;
+      final rawW = _decodedImage!.width.toDouble();
+      final rawH = _decodedImage!.height.toDouble();
+      final rotPixelW = (rotTurns % 2 == 1) ? rawH : rawW;
+      final rotPixelH = (rotTurns % 2 == 1) ? rawW : rawH;
 
-      // Compute crop based on viewport and transform
-      final croppedBytes = await compute(_cropImageIsolate, _CropTask(
+      final scaleFactor = math.min(
+        _viewportSize!.width / rotPixelW,
+        _viewportSize!.height / rotPixelH,
+      );
+
+      final cropRect = AppImageCropperDialog.calculateCropRect(_viewportSize!, _selectedRatio.ratio);
+      final inv = Matrix4.inverted(_transformController.value);
+
+      final localTopLeft = MatrixUtils.transformPoint(inv, cropRect.topLeft);
+      final localBottomRight = MatrixUtils.transformPoint(inv, cropRect.bottomRight);
+
+      final x1 = math.min(localTopLeft.dx, localBottomRight.dx);
+      final x2 = math.max(localTopLeft.dx, localBottomRight.dx);
+      final y1 = math.min(localTopLeft.dy, localBottomRight.dy);
+      final y2 = math.max(localTopLeft.dy, localBottomRight.dy);
+
+      final cropPixelX = (x1 / scaleFactor).round();
+      final cropPixelY = (y1 / scaleFactor).round();
+      final cropPixelW = ((x2 - x1) / scaleFactor).round();
+      final cropPixelH = ((y2 - y1) / scaleFactor).round();
+
+      final task = _CropTask(
         bytes: _rawBytes!,
         rotationTurns: _rotationQuarterTurns,
-        scale: scale,
-        tx: translation.x,
-        ty: translation.y,
-        viewportWidth: viewportSize.width,
-        viewportHeight: viewportSize.height,
-        aspectRatio: _selectedRatio.ratio,
-      ));
+        cropX: cropPixelX,
+        cropY: cropPixelY,
+        cropW: cropPixelW,
+        cropH: cropPixelH,
+      );
+
+      final Uint8List? croppedBytes = kIsWeb
+          ? _cropImageWorker(task)
+          : await compute(_cropImageWorker, task);
 
       if (croppedBytes != null && mounted) {
         Navigator.of(context).pop(croppedBytes);
@@ -183,103 +264,6 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
         });
       }
     }
-  }
-
-  static Uint8List? _cropImageIsolate(_CropTask task) {
-    img.Image? src = img.decodeImage(task.bytes);
-    if (src == null) return null;
-
-    // Apply rotation if any
-    if (task.rotationTurns == 1) {
-      src = img.copyRotate(src, angle: 90);
-    } else if (task.rotationTurns == 2) {
-      src = img.copyRotate(src, angle: 180);
-    } else if (task.rotationTurns == 3) {
-      src = img.copyRotate(src, angle: 270);
-    }
-
-    // Determine target crop frame inside viewport
-    final double vpW = task.viewportWidth;
-    final double vpH = task.viewportHeight;
-
-    double frameW = vpW * 0.88;
-    double frameH = vpH * 0.82;
-
-    if (task.aspectRatio != null) {
-      final double r = task.aspectRatio!;
-      if (frameW / frameH > r) {
-        frameW = frameH * r;
-      } else {
-        frameH = frameW / r;
-      }
-    }
-
-    final double frameX = (vpW - frameW) / 2.0;
-    final double frameY = (vpH - frameH) / 2.0;
-
-    // Calculate how the image is positioned inside the viewport
-    // Default image fit inside viewport (contained)
-    final double imgAspect = src.width / src.height;
-    final double vpAspect = vpW / vpH;
-
-    double baseW;
-    double baseH;
-    if (imgAspect > vpAspect) {
-      baseW = vpW;
-      baseH = vpW / imgAspect;
-    } else {
-      baseH = vpH;
-      baseW = vpH * imgAspect;
-    }
-
-    final double baseLeft = (vpW - baseW) / 2.0;
-    final double baseTop = (vpH - baseH) / 2.0;
-
-    // Actual rendered image rect in viewport space:
-    final double renderedLeft = baseLeft * task.scale + task.tx;
-    final double renderedTop = baseTop * task.scale + task.ty;
-    final double renderedWidth = baseW * task.scale;
-    final double renderedHeight = baseH * task.scale;
-
-    // Mapping frame coordinates into image pixel coordinates:
-    final double pixelPerRenderedX = src.width / renderedWidth;
-    final double pixelPerRenderedY = src.height / renderedHeight;
-
-    double cropX = (frameX - renderedLeft) * pixelPerRenderedX;
-    double cropY = (frameY - renderedTop) * pixelPerRenderedY;
-    double cropW = frameW * pixelPerRenderedX;
-    double cropH = frameH * pixelPerRenderedY;
-
-    // Clamp coordinates
-    if (cropX < 0) {
-      cropW += cropX;
-      cropX = 0;
-    }
-    if (cropY < 0) {
-      cropH += cropY;
-      cropY = 0;
-    }
-    if (cropX + cropW > src.width) {
-      cropW = src.width - cropX;
-    }
-    if (cropY + cropH > src.height) {
-      cropH = src.height - cropY;
-    }
-
-    if (cropW <= 10 || cropH <= 10) {
-      // Fallback: entire image
-      return Uint8List.fromList(img.encodeJpg(src, quality: 92));
-    }
-
-    final cropped = img.copyCrop(
-      src,
-      x: cropX.round(),
-      y: cropY.round(),
-      width: cropW.round(),
-      height: cropH.round(),
-    );
-
-    return Uint8List.fromList(img.encodeJpg(cropped, quality: 92));
   }
 
   @override
@@ -353,28 +337,59 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
                         )
                       : LayoutBuilder(
                           builder: (context, constraints) {
+                            final vpSize = Size(constraints.maxWidth, constraints.maxHeight);
+                            if (_viewportSize != vpSize) {
+                              _viewportSize = vpSize;
+                              if (!_hasInitializedTransform) {
+                                _hasInitializedTransform = true;
+                                _centerImage(viewportSize: vpSize);
+                              }
+                            }
+
+                            final rotTurns = _rotationQuarterTurns;
+                            final rawW = _decodedImage!.width.toDouble();
+                            final rawH = _decodedImage!.height.toDouble();
+                            final rotPixelW = (rotTurns % 2 == 1) ? rawH : rawW;
+                            final rotPixelH = (rotTurns % 2 == 1) ? rawW : rawH;
+
+                            final scaleFactor = math.min(
+                              vpSize.width / rotPixelW,
+                              vpSize.height / rotPixelH,
+                            );
+                            final displayW = rotPixelW * scaleFactor;
+                            final displayH = rotPixelH * scaleFactor;
+
+                            final unrotatedDisplayW = (rotTurns % 2 == 1) ? displayH : displayW;
+                            final unrotatedDisplayH = (rotTurns % 2 == 1) ? displayW : displayH;
+
                             return Stack(
                               children: [
                                 // Interactive Zoom/Pan Canvas
                                 Positioned.fill(
                                   child: Container(
-                                    color: Colors.black,
+                                    color: const Color(0xFF12131A),
                                     child: InteractiveViewer(
                                       transformationController: _transformController,
-                                      minScale: 0.5,
-                                      maxScale: 6.0,
+                                      minScale: 0.1,
+                                      maxScale: 10.0,
+                                      constrained: false,
                                       boundaryMargin: const EdgeInsets.all(double.infinity),
                                       onInteractionUpdate: (_) {
-                                        setState(() {
-                                          _currentScale = _transformController.value.getMaxScaleOnAxis();
-                                        });
+                                        _scaleNotifier.value = _transformController.value.getMaxScaleOnAxis();
                                       },
-                                      child: Center(
+                                      child: SizedBox(
+                                        width: displayW,
+                                        height: displayH,
                                         child: RotatedBox(
-                                          quarterTurns: _rotationQuarterTurns,
-                                          child: Image.memory(
-                                            _rawBytes!,
-                                            fit: BoxFit.contain,
+                                          quarterTurns: rotTurns,
+                                          child: SizedBox(
+                                            width: unrotatedDisplayW,
+                                            height: unrotatedDisplayH,
+                                            child: Image.memory(
+                                              _rawBytes!,
+                                              fit: BoxFit.fill,
+                                              filterQuality: FilterQuality.high,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -404,6 +419,13 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
                                         decoration: BoxDecoration(
                                           color: p.surface,
                                           borderRadius: BorderRadius.circular(12),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.25),
+                                              blurRadius: 16,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
                                         ),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -414,7 +436,10 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
                                               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
                                             ),
                                             SizedBox(width: 14),
-                                            Text('Processing high-res crop...'),
+                                            Text(
+                                              'Processing high-res crop...',
+                                              style: TextStyle(fontWeight: FontWeight.w600),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -541,7 +566,7 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 560;
+          final isNarrow = constraints.maxWidth < 620;
 
           final tools = Row(
             mainAxisSize: MainAxisSize.min,
@@ -556,10 +581,26 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
                 icon: const Icon(RemixIcons.refresh_line, size: 20),
                 tooltip: 'Reset Positioning',
               ),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: () => _zoomBy(0.8),
+                icon: const Icon(RemixIcons.zoom_out_line, size: 20),
+                tooltip: 'Zoom Out',
+              ),
+              IconButton(
+                onPressed: () => _zoomBy(1.25),
+                icon: const Icon(RemixIcons.zoom_in_line, size: 20),
+                tooltip: 'Zoom In',
+              ),
               const SizedBox(width: 6),
-              Text(
-                'Zoom: ${(_currentScale * 100).round()}%',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textMuted),
+              ValueListenableBuilder<double>(
+                valueListenable: _scaleNotifier,
+                builder: (context, scale, _) {
+                  return Text(
+                    'Zoom: ${(scale * 100).round()}%',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textMuted),
+                  );
+                },
               ),
             ],
           );
@@ -577,13 +618,9 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: _isProcessing || _rawBytes == null
+                onPressed: (_isProcessing || _rawBytes == null)
                     ? null
-                    : () {
-                        final renderBox = context.findRenderObject() as RenderBox?;
-                        final size = renderBox?.size ?? const Size(800, 600);
-                        _executeCrop(size);
-                      },
+                    : _executeCrop,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.gold,
                   foregroundColor: Colors.black,
@@ -602,7 +639,10 @@ class _AppImageCropperDialogState extends State<AppImageCropperDialog> {
           if (isNarrow) {
             return Column(
               children: [
-                tools,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: tools,
+                ),
                 const SizedBox(height: 8),
                 actions,
               ],
@@ -626,22 +666,66 @@ class _CropTask {
   _CropTask({
     required this.bytes,
     required this.rotationTurns,
-    required this.scale,
-    required this.tx,
-    required this.ty,
-    required this.viewportWidth,
-    required this.viewportHeight,
-    this.aspectRatio,
+    required this.cropX,
+    required this.cropY,
+    required this.cropW,
+    required this.cropH,
   });
 
   final Uint8List bytes;
   final int rotationTurns;
-  final double scale;
-  final double tx;
-  final double ty;
-  final double viewportWidth;
-  final double viewportHeight;
-  final double? aspectRatio;
+  final int cropX;
+  final int cropY;
+  final int cropW;
+  final int cropH;
+}
+
+Uint8List? _cropImageWorker(_CropTask task) {
+  img.Image? src = img.decodeImage(task.bytes);
+  if (src == null) return null;
+
+  if (task.rotationTurns == 1) {
+    src = img.copyRotate(src, angle: 90);
+  } else if (task.rotationTurns == 2) {
+    src = img.copyRotate(src, angle: 180);
+  } else if (task.rotationTurns == 3) {
+    src = img.copyRotate(src, angle: 270);
+  }
+
+  int x = task.cropX;
+  int y = task.cropY;
+  int w = task.cropW;
+  int h = task.cropH;
+
+  // Clamp within image bounds
+  if (x < 0) {
+    w += x;
+    x = 0;
+  }
+  if (y < 0) {
+    h += y;
+    y = 0;
+  }
+  if (x + w > src.width) {
+    w = src.width - x;
+  }
+  if (y + h > src.height) {
+    h = src.height - y;
+  }
+
+  if (w <= 10 || h <= 10 || x >= src.width || y >= src.height) {
+    return Uint8List.fromList(img.encodeJpg(src, quality: 95));
+  }
+
+  final cropped = img.copyCrop(
+    src,
+    x: x,
+    y: y,
+    width: w,
+    height: h,
+  );
+
+  return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
 }
 
 class _CropOverlayPainter extends CustomPainter {
@@ -650,25 +734,15 @@ class _CropOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    double frameW = size.width * 0.88;
-    double frameH = size.height * 0.82;
-
-    if (aspectRatio != null) {
-      final double r = aspectRatio!;
-      if (frameW / frameH > r) {
-        frameW = frameH * r;
-      } else {
-        frameH = frameW / r;
-      }
-    }
-
-    final double frameX = (size.width - frameW) / 2.0;
-    final double frameY = (size.height - frameH) / 2.0;
-    final cropRect = Rect.fromLTWH(frameX, frameY, frameW, frameH);
+    final cropRect = AppImageCropperDialog.calculateCropRect(size, aspectRatio);
+    final frameX = cropRect.left;
+    final frameY = cropRect.top;
+    final frameW = cropRect.width;
+    final frameH = cropRect.height;
 
     // Dim the outside area
     final bgPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.6)
+      ..color = Colors.black.withValues(alpha: 0.65)
       ..style = PaintingStyle.fill;
 
     final bgPath = Path()
@@ -687,7 +761,7 @@ class _CropOverlayPainter extends CustomPainter {
 
     // Rule of thirds grid lines
     final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.28)
+      ..color = Colors.white.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -707,7 +781,7 @@ class _CropOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5;
 
-    const cornerLen = 18.0;
+    const cornerLen = 20.0;
 
     // Top-left
     canvas.drawLine(Offset(frameX, frameY), Offset(frameX + cornerLen, frameY), cornerPaint);

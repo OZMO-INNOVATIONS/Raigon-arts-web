@@ -171,7 +171,7 @@ class CustomerWhatsAppService {
     final buffer = StringBuffer();
     for (var i = 0; i < frames.length; i++) {
       final f = frames[i];
-      final size = f.sizeLabel.isNotEmpty ? f.sizeLabel : 'Size not specified';
+      final size = f.sizeLabel.isNotEmpty ? f.sizeLabel : 'Custom Frame';
       final itemQty = f.qty > 0
           ? f.qty
           : (frames.length == 1 && customer.qty > 0 ? customer.qty : 1);
@@ -188,21 +188,6 @@ class CustomerWhatsAppService {
         } else {
           buffer.writeln('   • Price: ${_moneyNum(f.unitPrice)}');
         }
-      }
-
-      // Frame Style & Material if set
-      final styleParts = <String>[];
-      if (f.frameType.trim().isNotEmpty &&
-          f.frameType.trim().toLowerCase() != 'default' &&
-          f.frameType.trim().toLowerCase() != 'custom') {
-        styleParts.add(f.frameType.trim());
-      }
-      if (f.material.trim().isNotEmpty &&
-          f.material.trim().toLowerCase() != 'standard') {
-        styleParts.add(f.material.trim());
-      }
-      if (styleParts.isNotEmpty) {
-        buffer.writeln('   • Style: ${styleParts.join(' • ')}');
       }
 
       // Customer Note for this specific frame, with clean multi-line alignment
